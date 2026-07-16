@@ -1,0 +1,36 @@
+{
+  "incident_id": "golden-001",
+  "thresholds": {"theta_fire": 0.5, "k_persist": 3, "theta_low": 0.2},
+  "nodes": {
+    "cart-redis": {
+      "anomaly_score": 0.95,
+      "dev_vector": {"saturation": 0.95, "p95_latency": 0.88, "error_rate": 0.4},
+      "first_deviation": "2026-07-16T10:00:02Z"
+    },
+    "cart": {
+      "anomaly_score": 0.82,
+      "dev_vector": {"p95_latency": 0.82, "error_rate": 0.55, "retry_rate": 0.7},
+      "first_deviation": "2026-07-16T10:00:05Z"
+    },
+    "checkout": {
+      "anomaly_score": 0.71,
+      "dev_vector": {"p95_latency": 0.71, "error_rate": 0.48},
+      "first_deviation": "2026-07-16T10:00:08Z"
+    },
+    "frontend": {
+      "anomaly_score": 0.55,
+      "dev_vector": {"p95_latency": 0.55, "error_rate": 0.3},
+      "first_deviation": "2026-07-16T10:00:11Z"
+    },
+    "payment": {
+      "anomaly_score": 0.12,
+      "dev_vector": {"p95_latency": 0.12},
+      "first_deviation": null
+    },
+    "node-1": {
+      "anomaly_score": 0.18,
+      "dev_vector": {"cpu": 0.18},
+      "first_deviation": null
+    }
+  }
+}

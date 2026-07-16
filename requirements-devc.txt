@@ -1,0 +1,2 @@
+# Dev C runtime / test dependencies (stdlib-first; pytest for CI)
+pytest>=8.0

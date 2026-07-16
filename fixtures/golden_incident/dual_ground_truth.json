@@ -1,0 +1,17 @@
+{
+  "incident_id": "golden-dual-d1",
+  "true_root_nodes": ["cart-redis", "payment"],
+  "fault_classes": ["Dependency", "AppLogic"],
+  "node_to_fault": {
+    "cart-redis": 0,
+    "cart": 0,
+    "checkout": 0,
+    "frontend": 0,
+    "payment": 1,
+    "node-1": 0
+  },
+  "inject_start": "2026-07-16T11:00:00Z",
+  "inject_end": "2026-07-16T11:05:00Z",
+  "scenario": "D1",
+  "expect_abstention": false
+}

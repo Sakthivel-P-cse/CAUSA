@@ -1,0 +1,20 @@
+{
+  "incident_id": "golden-001",
+  "nodes": [
+    {"id": "frontend", "kind": "service"},
+    {"id": "checkout", "kind": "service"},
+    {"id": "cart", "kind": "service"},
+    {"id": "cart-redis", "kind": "dependency"},
+    {"id": "payment", "kind": "service"},
+    {"id": "node-1", "kind": "infra"}
+  ],
+  "edges": [
+    {"src": "frontend", "dst": "checkout", "call_type": "sync"},
+    {"src": "checkout", "dst": "cart", "call_type": "sync"},
+    {"src": "cart", "dst": "cart-redis", "call_type": "sync"},
+    {"src": "checkout", "dst": "payment", "call_type": "sync"},
+    {"src": "cart", "dst": "node-1", "call_type": "runs-on"}
+  ],
+  "true_root": "cart-redis",
+  "description": "Slow-burn Redis leaf: failure influence flows cart-redis → cart → checkout → frontend"
+}

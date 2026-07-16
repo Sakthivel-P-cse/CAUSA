@@ -1,0 +1,922 @@
+{
+  "golden_eval": {
+    "Random": {
+      "method": "Random",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "MostAnomalous": {
+      "method": "MostAnomalous",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "FixtureFull": {
+      "method": "FixtureFull",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    }
+  },
+  "ablation": {
+    "Full": {
+      "method": "Full",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "EarliestOnly": {
+      "method": "EarliestOnly",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "CascadeOnly": {
+      "method": "CascadeOnly",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "PropagationOnly": {
+      "method": "PropagationOnly",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "NoT": {
+      "method": "NoT",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "NoD": {
+      "method": "NoD",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "NoP": {
+      "method": "NoP",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "Random": {
+      "method": "Random",
+      "metrics": {
+        "n": 1,
+        "top1": 0.0,
+        "top3": 0.0,
+        "top5": 0.0,
+        "mrr": 0.16666666666666666,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 0,
+        "hits_at_3": 0,
+        "hits_at_5": 0,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 0.0,
+            "top3": 0.0,
+            "top5": 0.0,
+            "mrr": 0.16666666666666666,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 0,
+            "hits_at_3": 0,
+            "hits_at_5": 0,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    },
+    "MostAnomalous": {
+      "method": "MostAnomalous",
+      "metrics": {
+        "n": 1,
+        "top1": 1.0,
+        "top3": 1.0,
+        "top5": 1.0,
+        "mrr": 1.0,
+        "subgraph_recall": 1.0,
+        "hits_at_1": 1,
+        "hits_at_3": 1,
+        "hits_at_5": 1,
+        "recall_hits": 1,
+        "per_scenario": {
+          "S1": {
+            "n": 1,
+            "top1": 1.0,
+            "top3": 1.0,
+            "top5": 1.0,
+            "mrr": 1.0,
+            "subgraph_recall": 1.0,
+            "hits_at_1": 1,
+            "hits_at_3": 1,
+            "hits_at_5": 1,
+            "recall_hits": 1,
+            "per_scenario": {}
+          }
+        }
+      }
+    }
+  },
+  "ablation_table": [
+    "method\ttop1\ttop3\tmrr\tsubgraph_recall",
+    "Full\t1.000\t1.000\t1.000\t1.000",
+    "EarliestOnly\t1.000\t1.000\t1.000\t1.000",
+    "CascadeOnly\t1.000\t1.000\t1.000\t1.000",
+    "PropagationOnly\t1.000\t1.000\t1.000\t1.000",
+    "NoT\t1.000\t1.000\t1.000\t1.000",
+    "NoD\t1.000\t1.000\t1.000\t1.000",
+    "NoP\t1.000\t1.000\t1.000\t1.000",
+    "Random\t0.000\t0.000\t0.167\t1.000",
+    "MostAnomalous\t1.000\t1.000\t1.000\t1.000"
+  ],
+  "classification": {
+    "predicted": "Dependency",
+    "truth": "Dependency",
+    "rationale": "class=Dependency from node_kind=dependency, role=origin, top_dev=0.95, logs=1",
+    "confusion_golden": {
+      "n": 1,
+      "accuracy": 1.0,
+      "matrix": {
+        "AppLogic": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Config": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Infra": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Dependency": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 1,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Resource": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Data": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        }
+      },
+      "hard_confusions": []
+    },
+    "confusion_demo": {
+      "n": 8,
+      "accuracy": 0.75,
+      "matrix": {
+        "AppLogic": {
+          "AppLogic": 1,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Config": {
+          "AppLogic": 1,
+          "Config": 1,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Infra": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 1,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Dependency": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 1,
+          "Resource": 1,
+          "Data": 0
+        },
+        "Resource": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 1,
+          "Data": 0
+        },
+        "Data": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 1
+        }
+      },
+      "hard_confusions": [
+        {
+          "truth": "Dependency",
+          "predicted": "Resource",
+          "count": 1
+        },
+        {
+          "truth": "Config",
+          "predicted": "AppLogic",
+          "count": 1
+        }
+      ]
+    },
+    "confusion_table": "truth\\pred\tAppLogic\tConfig\tInfra\tDependency\tResource\tData\nAppLogic\t1\t0\t0\t0\t0\t0\nConfig\t1\t1\t0\t0\t0\t0\nInfra\t0\t0\t1\t0\t0\t0\nDependency\t0\t0\t0\t1\t1\t0\nResource\t0\t0\t0\t0\t1\t0\nData\t0\t0\t0\t0\t0\t1\naccuracy\t0.750"
+  },
+  "tuning": {
+    "best_weights": {
+      "w_T": 0.0,
+      "w_D": 0.0,
+      "w_P": 1.0
+    },
+    "train_metrics": {
+      "n": 6,
+      "top1": 1.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 6,
+      "hits_at_3": 6,
+      "hits_at_5": 6,
+      "recall_hits": 6,
+      "per_scenario": {
+        "S3": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        },
+        "S1": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        },
+        "S2": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        }
+      }
+    },
+    "test_metrics": {
+      "n": 6,
+      "top1": 1.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 6,
+      "hits_at_3": 6,
+      "hits_at_5": 6,
+      "recall_hits": 6,
+      "per_scenario": {
+        "S4": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        },
+        "S5": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        },
+        "S0": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 2,
+          "hits_at_3": 2,
+          "hits_at_5": 2,
+          "recall_hits": 2,
+          "per_scenario": {}
+        }
+      }
+    },
+    "grid_size": 19,
+    "verified_no_leakage": true
+  },
+  "calibration": {
+    "ece": 0.0,
+    "map_kind": "isotonic",
+    "bins": [
+      {
+        "lo": 0.9,
+        "hi": 1.0,
+        "mean_predicted": 1.0,
+        "empirical_accuracy": 1.0,
+        "count": 6
+      }
+    ],
+    "reliability_points": [
+      {
+        "predicted": 1.0,
+        "empirical": 1.0
+      }
+    ],
+    "mapping": [
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.17999999979545458,
+        "calibrated": 1.0
+      }
+    ]
+  },
+  "reliability_diagram_ascii": "predicted\tempirical\n---------\t---------\n1.00 ####################\t1.00 ********************",
+  "isolation_d1": {
+    "n": 1,
+    "cluster_count_accuracy": 1.0,
+    "per_fault_top1": 1.0,
+    "per_fault_top3": 1.0,
+    "ari": 1.0,
+    "abstention_correct": null
+  },
+  "isolation_d3_abstention": {
+    "n": 1,
+    "cluster_count_accuracy": 1.0,
+    "per_fault_top1": 1.0,
+    "per_fault_top3": 1.0,
+    "ari": 1.0,
+    "abstention_correct": 1.0
+  },
+  "remediation_plans": {
+    "Dependency": {
+      "fault_class": "Dependency",
+      "action": "rollback_to_last_good",
+      "depth": "deep",
+      "summary": "Rollback / circuit-break dependency cart-redis",
+      "details": {
+        "rollback": {
+          "target": "cart-redis",
+          "strategy": "rollback_to_last_good",
+          "last_good_revision": "rev-previous",
+          "circuit_break": true,
+          "steps": [
+            "Open circuit on callers of cart-redis",
+            "Roll cart-redis to last-good revision",
+            "Watch error_rate / latency SLOs",
+            "Close circuit when healthy"
+          ]
+        },
+        "evidence_trail": {
+          "node_id": "cart-redis",
+          "node_kind": "dependency",
+          "score": 0.93,
+          "confidence": 0.81,
+          "role": "origin",
+          "signals": {
+            "T": 1.0,
+            "D": 0.91,
+            "P": 0.88
+          },
+          "dev_vector": {
+            "saturation": 0.95,
+            "p95_latency": 0.88,
+            "error_rate": 0.4
+          },
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+        }
+      },
+      "candidate_node": "cart-redis"
+    },
+    "AppLogic": {
+      "fault_class": "AppLogic",
+      "action": "code_fix_pr",
+      "depth": "deep",
+      "summary": "Open proposed PR for cart-redis (never auto-merged)",
+      "details": {
+        "pr": {
+          "title": "fix(cart-redis): proposed remediation from Causa RCA",
+          "body": "## Evidence\ncart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.\n\n- score: 0.930\n- confidence: 0.810\n- role: origin\n- signals: T=1.00 D=0.91 P=0.88\n\n## Proposed diff (illustrative)\n```diff\n--- a/services/cart-redis/handler.py\n+++ b/services/cart-redis/handler.py\n@@\n- # buggy path\n+ # guarded path with timeout + retry budget\n```\n\n**Status:** proposed only \u2014 never auto-merged.",
+          "base": "main",
+          "head": "causa/fix-cart-redis",
+          "merged": false,
+          "draft": true
+        },
+        "evidence_trail": {
+          "node_id": "cart-redis",
+          "node_kind": "dependency",
+          "score": 0.93,
+          "confidence": 0.81,
+          "role": "origin",
+          "signals": {
+            "T": 1.0,
+            "D": 0.91,
+            "P": 0.88
+          },
+          "dev_vector": {
+            "saturation": 0.95,
+            "p95_latency": 0.88,
+            "error_rate": 0.4
+          },
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+        }
+      },
+      "candidate_node": "cart-redis"
+    },
+    "Config": {
+      "fault_class": "Config",
+      "action": "config_patch",
+      "depth": "deep",
+      "summary": "Propose config patch for cart-redis",
+      "details": {
+        "patch": {
+          "target": "configmaps/cart-redis",
+          "before": {
+            "service": "cart-redis",
+            "flag": "feature.risky",
+            "value": true,
+            "replicas": 2
+          },
+          "after": {
+            "service": "cart-redis",
+            "flag": "feature.risky",
+            "value": false,
+            "replicas": 2
+          },
+          "diff": "- feature.risky: true\n+ feature.risky: false\n"
+        },
+        "evidence_trail": {
+          "node_id": "cart-redis",
+          "node_kind": "dependency",
+          "score": 0.93,
+          "confidence": 0.81,
+          "role": "origin",
+          "signals": {
+            "T": 1.0,
+            "D": 0.91,
+            "P": 0.88
+          },
+          "dev_vector": {
+            "saturation": 0.95,
+            "p95_latency": 0.88,
+            "error_rate": 0.4
+          },
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+        }
+      },
+      "candidate_node": "cart-redis"
+    }
+  },
+  "canary_healthy": {
+    "applied": true,
+    "rolled_back": false,
+    "final_traffic_pct": 100.0,
+    "reason": "Canary completed; SLOs healthy",
+    "snapshots": [
+      {
+        "step": 0,
+        "traffic_pct": 10.0,
+        "error_rate": 0.01,
+        "latency_p99_ms": 120.0,
+        "breached": false
+      },
+      {
+        "step": 1,
+        "traffic_pct": 25.0,
+        "error_rate": 0.01,
+        "latency_p99_ms": 120.0,
+        "breached": false
+      },
+      {
+        "step": 2,
+        "traffic_pct": 50.0,
+        "error_rate": 0.01,
+        "latency_p99_ms": 120.0,
+        "breached": false
+      },
+      {
+        "step": 3,
+        "traffic_pct": 100.0,
+        "error_rate": 0.01,
+        "latency_p99_ms": 120.0,
+        "breached": false
+      }
+    ]
+  },
+  "canary_rollback": {
+    "applied": false,
+    "rolled_back": true,
+    "final_traffic_pct": 0.0,
+    "reason": "SLO breach at 50.0% traffic (err=0.200, p99=900.0ms); auto-rollback",
+    "snapshots": [
+      {
+        "step": 0,
+        "traffic_pct": 10.0,
+        "error_rate": 0.02,
+        "latency_p99_ms": 150.0,
+        "breached": false
+      },
+      {
+        "step": 1,
+        "traffic_pct": 25.0,
+        "error_rate": 0.02,
+        "latency_p99_ms": 150.0,
+        "breached": false
+      },
+      {
+        "step": 2,
+        "traffic_pct": 50.0,
+        "error_rate": 0.2,
+        "latency_p99_ms": 900.0,
+        "breached": true
+      }
+    ]
+  },
+  "per_scenario_table": {
+    "S0": {
+      "top1": 1.0,
+      "top3": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "n": 2,
+      "note": "ok"
+    },
+    "S1": {
+      "top1": 1.0,
+      "top3": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "n": 1,
+      "note": "hard cell"
+    },
+    "S2": {
+      "top1": null,
+      "top3": null,
+      "mrr": null,
+      "note": "no runs"
+    },
+    "S3": {
+      "top1": null,
+      "top3": null,
+      "mrr": null,
+      "note": "no runs"
+    },
+    "S4": {
+      "top1": 1.0,
+      "top3": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "n": 2,
+      "note": "hard cell"
+    },
+    "S5": {
+      "top1": 1.0,
+      "top3": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "n": 2,
+      "note": "ok"
+    }
+  },
+  "cross_topology_argument": "T/D/P are computed from local graph structure and live deviations; the scorer memorizes nothing per-node. The only tunable parameters are three global weights (w_T, w_D, w_P) \u2014 a 3-dimensional surface with negligible overfit risk relative to learned node embeddings. In-app site split (deep chain / wide fan-out / leaf origin) is therefore a genuine within-app generalization check, not a restatement of train score.",
+  "split": {
+    "train_n": 6,
+    "test_n": 6,
+    "held_out_sites": [
+      "kafka",
+      "node-1"
+    ],
+    "verified_no_leakage": true
+  }
+}

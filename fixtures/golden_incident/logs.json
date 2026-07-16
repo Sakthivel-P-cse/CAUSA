@@ -1,0 +1,26 @@
+{
+  "cart-redis": [
+    {
+      "timestamp": "2026-07-16T10:00:03Z",
+      "severity": "error",
+      "message": "OOM killer invoked; redis maxmemory exceeded",
+      "attributes": {"component": "redis", "fault_hint": "dependency"}
+    }
+  ],
+  "cart": [
+    {
+      "timestamp": "2026-07-16T10:00:06Z",
+      "severity": "warn",
+      "message": "redis connection timeout; retrying",
+      "attributes": {"dependency": "cart-redis"}
+    }
+  ],
+  "checkout": [
+    {
+      "timestamp": "2026-07-16T10:00:09Z",
+      "severity": "error",
+      "message": "cart service unavailable",
+      "attributes": {"upstream": "cart"}
+    }
+  ]
+}

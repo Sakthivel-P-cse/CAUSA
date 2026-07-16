@@ -1,0 +1,10 @@
+{
+  "incident_id": "golden-001",
+  "true_root_node": "cart-redis",
+  "fault_class": "Dependency",
+  "inject_start": "2026-07-16T10:00:00Z",
+  "inject_end": "2026-07-16T10:05:00Z",
+  "scenario": "S1",
+  "injection_site": "cart-redis",
+  "subgraph_node_ids": ["frontend", "checkout", "cart", "cart-redis", "payment", "node-1"]
+}

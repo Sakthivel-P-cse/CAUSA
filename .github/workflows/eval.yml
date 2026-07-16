@@ -1,0 +1,27 @@
+name: Dev C Eval Gate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  golden-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r requirements-devc.txt
+      - name: Golden fixture eval (CI gate)
+        run: PYTHONPATH=. python -m eval.runner
+      - name: Unit tests
+        run: PYTHONPATH=. pytest -q tests/test_dev_c.py
+      - name: Generate demo artifacts
+        run: PYTHONPATH=. python -m eval.report
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: causa-devc-artifacts
+          path: artifacts/

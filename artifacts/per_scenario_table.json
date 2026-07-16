@@ -1,0 +1,46 @@
+{
+  "S0": {
+    "top1": 1.0,
+    "top3": 1.0,
+    "mrr": 1.0,
+    "subgraph_recall": 1.0,
+    "n": 2,
+    "note": "ok"
+  },
+  "S1": {
+    "top1": 1.0,
+    "top3": 1.0,
+    "mrr": 1.0,
+    "subgraph_recall": 1.0,
+    "n": 1,
+    "note": "hard cell"
+  },
+  "S2": {
+    "top1": null,
+    "top3": null,
+    "mrr": null,
+    "note": "no runs"
+  },
+  "S3": {
+    "top1": null,
+    "top3": null,
+    "mrr": null,
+    "note": "no runs"
+  },
+  "S4": {
+    "top1": 1.0,
+    "top3": 1.0,
+    "mrr": 1.0,
+    "subgraph_recall": 1.0,
+    "n": 2,
+    "note": "hard cell"
+  },
+  "S5": {
+    "top1": 1.0,
+    "top3": 1.0,
+    "mrr": 1.0,
+    "subgraph_recall": 1.0,
+    "n": 2,
+    "note": "ok"
+  }
+}
