@@ -1,0 +1,25 @@
+# ============================================================
+# S3 — Clock skew. Stresses: T / causality ordering. True root: the faulted
+# node. Fault class: (ordering robustness — not a class target).
+# Tests robustness of FirstDeviationTime against a skewed pod clock — the
+# trace-DAG ordering tier must keep causal order correct (ingest/ordering.py).
+#
+# TimeChaos shifts one pod's clock while a fault is present. Pair this with, e.g.,
+# S2 on the same target in the harness to see whether ordering survives the skew.
+# ------------------------------------------------------------
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: s3-clock-skew
+  namespace: otel-demo
+  labels:
+    causa/scenario: S3
+    causa/true-root: checkout
+    causa/fault-class: Dependency
+spec:
+  mode: one
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/name: checkout
+  timeOffset: "-500ms"

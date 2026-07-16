@@ -20,9 +20,13 @@
 #  12.  OTel LB             (trace-ID load balancer → correct gateway pod)
 #  13.  OTel Agent          (per-node DaemonSet — collect + forward)
 #  14.  Alertmanager       (alert routing → Stage 2 webhook)
-#  15.  Postgres           (RCA report storage for Stage 2)
-#  16.  Stage 2 RCA engine (webhook receiver + Redis)
-#  17.  Causa Dashboard  (custom observability UI)
+#  15.  Postgres           (incident + ground-truth + RCA report storage)
+#  16.  Stage-2 mock       (DEV ONLY — trivial receiver so the trigger forward
+#                           is testable; Dev B replaces it with the real engine)
+#  17.  Causa Ingest       (Dev-A trigger: opens window/state, forwards to Stage 2)
+#
+# NOT deployed here (other lanes): the real stage2-rca engine (Dev B) and the
+# causa-dashboard UI (Dev C). See helm/postgres/DB_ROLE_CONTRACT.md.
 #
 # Deploy order: each MinIO must be up before the backend that uses it.
 #   minio-tempo → tempo   (Tempo writes trace blocks to minio-tempo)
@@ -189,25 +193,20 @@ if [[ "${ENV}" == "prod" ]]; then
   fi
   echo "  ✓ minio-loki-secret exists"
 
-  if ! kubectl -n stage2-rca get secret stage2-rca-secret &>/dev/null; then
-    echo ""
-    echo "ERROR: Production secret 'stage2-rca-secret' not found in namespace 'stage2-rca'."
-    echo "  kubectl create namespace stage2-rca --dry-run=client -o yaml | kubectl apply -f -"
-    echo "  kubectl -n stage2-rca create secret generic stage2-rca-secret \\"
-    echo "    --from-literal=POSTGRES_PASSWORD='<SAME_PASSWORD>'"
-    exit 1
-  fi
-  echo "  ✓ stage2-rca-secret exists"
+  # NOTE: stage2-rca (Dev B) and causa-dashboard (Dev C) are NOT deployed by this
+  # script — they own those charts + their secrets. See helm/postgres/DB_ROLE_CONTRACT.md.
 
-  if ! kubectl -n causa-dashboard get secret dashboard-secret &>/dev/null; then
+  if ! kubectl -n causa-ingest get secret causa-ingest-secret &>/dev/null; then
     echo ""
-    echo "ERROR: Production secret 'dashboard-secret' not found in namespace 'causa-dashboard'."
-    echo "  kubectl create namespace causa-dashboard --dry-run=client -o yaml | kubectl apply -f -"
-    echo "  kubectl -n causa-dashboard create secret generic dashboard-secret \\"
-    echo "    --from-literal=POSTGRES_PASSWORD='<SAME_PASSWORD>'"
+    echo "ERROR: Production secret 'causa-ingest-secret' not found in namespace 'causa-ingest'."
+    echo "  The ingest trigger writes incident + ground-truth state as the postgres"
+    echo "  'causa' user; without this secret every write fails silently."
+    echo "  kubectl create namespace causa-ingest --dry-run=client -o yaml | kubectl apply -f -"
+    echo "  kubectl -n causa-ingest create secret generic causa-ingest-secret \\"
+    echo "    --from-literal=PGPASSWORD='<SAME_AS_POSTGRES_CAUSA_PASSWORD>'"
     exit 1
   fi
-  echo "  ✓ dashboard-secret exists"
+  echo "  ✓ causa-ingest-secret exists"
 
   # Verify the storage class exists on this cluster
   if ! kubectl get storageclass "${STORAGE_CLASS}" &>/dev/null; then
@@ -267,23 +266,37 @@ helm_deploy() {
   echo ""
 }
 
-# ── Step 2–17: Deploy components ──────────────────────────────
-helm_deploy "kube-state-metrics" "kube-state-metrics" 2  17
-helm_deploy "node-exporter"      "node-exporter"      3  17
-helm_deploy "minio-tempo"        "minio-tempo"        4  17
-helm_deploy "tempo"              "tempo"              5  17
-helm_deploy "minio-loki"         "minio-loki"         6  17
-helm_deploy "loki"               "loki"               7  17
-helm_deploy "minio-mimir"        "minio-mimir"        8  17
-helm_deploy "mimir"              "mimir"              9  17
-helm_deploy "prometheus"         "prometheus"         10 17
-helm_deploy "otel-collector"     "otel-collector"     11 17
-helm_deploy "otel-lb"            "otel-lb"            12 17
-helm_deploy "otel-agent"         "otel-agent"         13 17
-helm_deploy "alertmanager"       "alertmanager"       14 17
-helm_deploy "postgres"           "postgres"           15 17
-helm_deploy "stage2-rca"         "stage2-rca"         16 17
-helm_deploy "causa-dashboard" "causa-dashboard" 17 17
+# Total component count for the progress display: dev includes the stage2 mock.
+if [[ "${ENV}" == "dev" ]]; then TOTAL=17; else TOTAL=16; fi
+
+# ── Deploy components (in dependency order) ────────────────────
+helm_deploy "kube-state-metrics" "kube-state-metrics" 2  "${TOTAL}"
+helm_deploy "node-exporter"      "node-exporter"      3  "${TOTAL}"
+helm_deploy "minio-tempo"        "minio-tempo"        4  "${TOTAL}"
+helm_deploy "tempo"              "tempo"              5  "${TOTAL}"
+helm_deploy "minio-loki"         "minio-loki"         6  "${TOTAL}"
+helm_deploy "loki"               "loki"               7  "${TOTAL}"
+helm_deploy "minio-mimir"        "minio-mimir"        8  "${TOTAL}"
+helm_deploy "mimir"              "mimir"              9  "${TOTAL}"
+helm_deploy "prometheus"         "prometheus"         10 "${TOTAL}"
+helm_deploy "otel-collector"     "otel-collector"     11 "${TOTAL}"
+helm_deploy "otel-lb"            "otel-lb"            12 "${TOTAL}"
+helm_deploy "otel-agent"         "otel-agent"         13 "${TOTAL}"
+helm_deploy "alertmanager"       "alertmanager"       14 "${TOTAL}"
+helm_deploy "postgres"           "postgres"           15 "${TOTAL}"
+
+# Dev B's real RCA engine and Dev C's dashboard are deployed by THEM, not here
+# (out of the Dev-A lane). In DEV we stand up a trivial mock receiver so the
+# trigger's forward path + Alertmanager routing are testable end-to-end; it
+# provides the `stage2-rca` service, which Dev B's chart swaps in cleanly. In
+# PROD no mock runs — the trigger buffers forwards to stage2_outbox until Dev B's
+# engine is reachable. See helm/postgres/DB_ROLE_CONTRACT.md.
+if [[ "${ENV}" == "dev" ]]; then
+  helm_deploy "stage2-mock"      "stage2-rca"         16 "${TOTAL}"
+  helm_deploy "causa-ingest"     "causa-ingest"       17 "${TOTAL}"
+else
+  helm_deploy "causa-ingest"     "causa-ingest"       16 "${TOTAL}"
+fi
 
 # ── Summary ────────────────────────────────────────────────
 echo "========================================================"
@@ -300,10 +313,11 @@ echo ""
   echo "    MinIO-Mimir:     kubectl -n minio-mimir port-forward svc/minio-mimir 9003:9001  (console)"
   echo "    Alertmgr:        kubectl -n alertmanager port-forward svc/alertmanager 9093:9093"
   echo "    Postgres:        kubectl -n postgres port-forward svc/postgres 5432:5432"
-  echo "    Dashboard:       kubectl -n causa-dashboard port-forward svc/causa-dashboard 8090:8090"
-  echo "                     → http://localhost:8090"
-  echo "    RCA Webhook:     kubectl -n stage2-rca port-forward svc/stage2-rca 8080:8080"
+  echo "    Ingest trigger:  kubectl -n causa-ingest port-forward svc/causa-ingest 8080:8080"
   echo "                     → POST http://localhost:8080/trigger"
+  if [[ "${ENV}" == "dev" ]]; then
+  echo "    Stage-2 (mock):  kubectl -n stage2-rca port-forward svc/stage2-rca 8081:8080  (dev placeholder)"
+  fi
 echo ""
 echo "  Run validation:"
 echo "    ./scripts/validate.sh"

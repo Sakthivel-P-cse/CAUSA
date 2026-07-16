@@ -1,0 +1,40 @@
+replicaCount: 1
+
+image:
+  repository: causa/ingest
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+env:
+  # Backends the incident-window reader queries.
+  PROMETHEUS_URL: "http://prometheus.prometheus.svc.cluster.local:9090"
+  TEMPO_URL:      "http://tempo.tempo.svc.cluster.local:3200"
+  LOKI_URL:       "http://loki.loki.svc.cluster.local:3100"
+  # Postgres (incident + ground-truth state).
+  PGHOST:     "postgres.postgres.svc.cluster.local"
+  PGPORT:     "5432"
+  PGDATABASE: "causa"
+  PGUSER:     "causa"
+  # Chain to the Stage-2 engine after opening the window (don't replace it).
+  STAGE2_WEBHOOK_URL: "http://stage2-rca.stage2-rca.svc.cluster.local:8080/trigger"
+  # Namespace of the monitored app (enables container CPU/mem metrics).
+  CAUSA_APP_NAMESPACE: "otel-demo"
+  CAUSA_LOOKBACK_MIN: "10"
+  # Service-scoping knobs (shared with ingest.service_scope).
+  CAUSA_MONITORED_SERVICES_REGEX: ""
+  CAUSA_EXCLUDED_SERVICES_REGEX: ""
+  CAUSA_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
+
+existingSecret: ""   # set in prod to avoid a plain-text password in values

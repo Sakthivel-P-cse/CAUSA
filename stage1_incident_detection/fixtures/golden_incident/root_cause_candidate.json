@@ -1,0 +1,37 @@
+{
+  "_comment": "C3 RankedResult — Dev B's expected output for the golden incident, stubbed so Dev C can build eval/baselines before B's scorer exists. Ranking: origin first. Node names are otel-demo names (join to the catalog + telemetry.json). Signals illustrate the intended T/D/P shape.",
+  "incident_id": "golden-0001",
+  "fault_class": "AppLogic",
+  "candidates": [
+    {
+      "node_id": "product-catalog",
+      "node_kind": "service",
+      "score": 0.94,
+      "confidence": 0.88,
+      "role": "origin",
+      "signals": { "T": 1.0, "D": 0.91, "P": 0.92 },
+      "dev_vector": { "error_rate": 0.97, "p95_latency": 0.61 },
+      "explanation": "product-catalog deviated first (T=1.0), influence flows outward to 2 callers with no incoming anomaly (D=0.91), and 2/2 outgoing edges degraded in order (P=0.92). Role: origin."
+    },
+    {
+      "node_id": "checkout",
+      "node_kind": "service",
+      "score": 0.58,
+      "confidence": 0.88,
+      "role": "amplifier",
+      "signals": { "T": 0.83, "D": 0.52, "P": 0.44 },
+      "dev_vector": { "error_rate": 0.82, "p95_latency": 0.74 },
+      "explanation": "checkout deviated after product-catalog (T=0.83), with mixed in/out influence (D=0.52). Role: amplifier."
+    },
+    {
+      "node_id": "frontend",
+      "node_kind": "service",
+      "score": 0.41,
+      "confidence": 0.88,
+      "role": "victim",
+      "signals": { "T": 0.83, "D": 0.18, "P": 0.10 },
+      "dev_vector": { "error_rate": 0.71 },
+      "explanation": "frontend deviated late with influence flowing inward (D=0.18). Role: victim."
+    }
+  ]
+}

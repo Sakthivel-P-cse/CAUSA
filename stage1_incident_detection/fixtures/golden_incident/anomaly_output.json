@@ -1,0 +1,36 @@
+{
+  "_comment": "C2 AnomalyOutput per node for the golden incident. Origin (product-catalog) deviates first and hardest; victims deviate later; valkey-cart is a slow-burn whose first_deviation is null (never crossed theta_fire). Node names are otel-demo names so they join to the scenario catalog. Each node maps to contracts.AnomalyOutput{node, anomaly_score, dev_vector, first_deviation}. Thresholds: theta_fire=0.5, k_persist=3, theta_low=0.25, kappa=3.",
+  "thresholds": { "theta_fire": 0.5, "k_persist": 3, "theta_low": 0.25, "kappa": 3.0 },
+  "nodes": {
+    "product-catalog": {
+      "anomaly_score": 0.97,
+      "dev_vector": { "error_rate": 0.97, "p95_latency": 0.61, "cpu": 0.12, "saturation": 0.08 },
+      "first_deviation": "2026-07-16T12:04:00+00:00"
+    },
+    "checkout": {
+      "anomaly_score": 0.82,
+      "dev_vector": { "error_rate": 0.82, "p95_latency": 0.74, "cpu": 0.19 },
+      "first_deviation": "2026-07-16T12:05:00+00:00"
+    },
+    "frontend": {
+      "anomaly_score": 0.71,
+      "dev_vector": { "error_rate": 0.71, "p95_latency": 0.55, "cpu": 0.09 },
+      "first_deviation": "2026-07-16T12:05:00+00:00"
+    },
+    "currency": {
+      "anomaly_score": 0.28,
+      "dev_vector": { "error_rate": 0.10, "p95_latency": 0.28, "cpu": 0.07 },
+      "first_deviation": null
+    },
+    "cart": {
+      "anomaly_score": 0.34,
+      "dev_vector": { "error_rate": 0.12, "p95_latency": 0.34, "cpu": 0.15, "saturation": 0.22 },
+      "first_deviation": null
+    },
+    "valkey-cart": {
+      "anomaly_score": 0.41,
+      "dev_vector": { "p95_latency": 0.31, "saturation": 0.41 },
+      "first_deviation": null
+    }
+  }
+}

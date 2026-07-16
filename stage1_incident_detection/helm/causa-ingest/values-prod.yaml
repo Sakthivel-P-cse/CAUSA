@@ -1,0 +1,11 @@
+# Prod overrides — supply the Postgres password via an existing Secret with key
+# PGPASSWORD, and scale/limits as needed.
+existingSecret: "causa-ingest-secret"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi

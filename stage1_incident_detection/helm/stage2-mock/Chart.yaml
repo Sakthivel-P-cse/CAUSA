@@ -1,0 +1,12 @@
+apiVersion: v2
+name: stage2-mock
+description: >-
+  DEV-ONLY mock Stage-2 receiver. Provides the `stage2-rca` Service (namespace
+  stage2-rca, port 8080) so the Dev-A ingest trigger's forward path and the
+  Alertmanager → causa-ingest → stage2 routing are testable end-to-end WITHOUT
+  Dev B's real RCA engine. It just returns 200 and logs the payload. Dev B
+  replaces it with the real `stage2-rca` chart (same namespace + service name)
+  when their engine is ready — see helm/postgres/DB_ROLE_CONTRACT.md.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

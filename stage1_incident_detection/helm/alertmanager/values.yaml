@@ -38,10 +38,11 @@ persistence:
     - ReadWriteOnce
 
 # ── Alertmanager routing configuration ───────────────────
-# stage2WebhookUrl: the HTTP endpoint of the Stage 2 RCA trigger.
-# In dev this points to the local Stage 2 service once deployed.
-# Override this value when Stage 2 is deployed.
-stage2WebhookUrl: "http://stage2-rca.stage2-rca.svc.cluster.local:8080/trigger"
+# stage2WebhookUrl: the HTTP endpoint alerts are POSTed to.
+# This now points at the Dev-A ingestion trigger (causa-ingest), which opens the
+# incident window + records incident state, then forwards to the Stage-2 engine
+# (chain, don't replace). To bypass ingestion, point this back at stage2-rca.
+stage2WebhookUrl: "http://causa-ingest.causa-ingest.svc.cluster.local:8080/trigger"
 
 config:
   # How long to wait before re-sending a firing alert

@@ -1,0 +1,14 @@
+Causa ingest trigger deployed!
+
+Webhook endpoint (point Alertmanager here — it runs IN FRONT of Stage 2):
+  http://{{ include "causa-ingest.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/trigger
+
+Health check:
+  http://{{ include "causa-ingest.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/health
+
+It opens an incident window + records incident state in Postgres, then forwards
+the webhook to STAGE2_WEBHOOK_URL ({{ .Values.env.STAGE2_WEBHOOK_URL }}).
+
+Set the Alertmanager receiver:
+  helm upgrade alertmanager helm/alertmanager \
+    --set stage2WebhookUrl=http://{{ include "causa-ingest.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/trigger

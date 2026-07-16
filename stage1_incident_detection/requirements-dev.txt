@@ -1,0 +1,4 @@
+# Dev/test dependencies for the Dev-A lane. Runtime deps live in ingest/requirements.txt.
+httpx>=0.27,<1.0
+pytest>=8
+respx>=0.21

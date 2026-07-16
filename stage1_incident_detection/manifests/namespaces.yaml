@@ -106,20 +106,14 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  # Kept as the Stage-2 deployment SLOT: Dev-A's dev mock lives here, and Dev B's
+  # real engine replaces it in place (see helm/postgres/DB_ROLE_CONTRACT.md).
+  # causa-dashboard's namespace is Dev C's to create (they own that chart).
   name: stage2-rca
   labels:
     app.kubernetes.io/part-of: causa
     causa/layer: rca
     causa/component: stage2-rca
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: causa-dashboard
-  labels:
-    app.kubernetes.io/part-of: causa
-    causa/layer: dashboard
-    causa/component: causa-dashboard
 ---
 apiVersion: v1
 kind: Namespace
@@ -147,3 +141,12 @@ metadata:
     app.kubernetes.io/part-of: causa
     causa/layer: alerting
     causa/component: alertmanager
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: causa-ingest
+  labels:
+    app.kubernetes.io/part-of: causa
+    causa/layer: ingestion
+    causa/component: trigger

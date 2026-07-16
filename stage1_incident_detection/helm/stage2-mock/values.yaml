@@ -1,0 +1,13 @@
+# DEV-ONLY mock Stage-2 receiver (see Chart.yaml). Not deployed in prod.
+image:
+  repository: python
+  tag: "3.11-slim"
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

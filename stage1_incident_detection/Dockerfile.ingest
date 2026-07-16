@@ -1,0 +1,23 @@
+# Causa Dev-A ingestion image — runs the RCA-trigger service.
+# Build context is stage1_incident_detection/ (this repo).
+#   docker build -f Dockerfile.ingest -t causa/ingest:latest .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install runtime deps first (layer cache). The trigger extra pulls psycopg.
+COPY pyproject.toml ./
+COPY contracts/ ./contracts/
+COPY ingest/ ./ingest/
+COPY anomaly/ ./anomaly/
+
+RUN pip install --no-cache-dir ".[trigger]"
+
+# Non-root
+RUN useradd --uid 10001 --create-home causa
+USER causa
+
+EXPOSE 8080
+
+# /health for probes, /trigger for the Alertmanager webhook.
+CMD ["python", "-m", "ingest.trigger.app"]

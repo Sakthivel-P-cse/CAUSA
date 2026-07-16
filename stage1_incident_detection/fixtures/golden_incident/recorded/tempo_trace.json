@@ -1,0 +1,63 @@
+{
+  "_comment": "Golden OTLP/JSON trace as returned by Tempo GET /api/traces/{id}. Exercises: gRPC CLIENT (sync), Kafka PRODUCER (async), SERVER child, DB CLIENT, and an ERROR span whose message is in a span event. Parsing tests assert kind + attributes survive.",
+  "batches": [
+    {
+      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "frontend" } } ] },
+      "scopeSpans": [ { "spans": [
+        {
+          "spanId": "a1", "name": "GET /api/checkout", "kind": 2,
+          "startTimeUnixNano": "1784548800000000000", "endTimeUnixNano": "1784548800500000000",
+          "status": { "code": 1 }
+        },
+        {
+          "spanId": "a2", "parentSpanId": "a1", "name": "checkout.PlaceOrder", "kind": 3,
+          "startTimeUnixNano": "1784548800050000000", "endTimeUnixNano": "1784548800450000000",
+          "attributes": [ { "key": "rpc.system", "value": { "stringValue": "grpc" } } ],
+          "status": { "code": 1 }
+        }
+      ] } ]
+    },
+    {
+      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "checkoutservice" } } ] },
+      "scopeSpans": [ { "spans": [
+        {
+          "spanId": "b1", "parentSpanId": "a2", "name": "checkout.PlaceOrder", "kind": 2,
+          "startTimeUnixNano": "1784548800060000000", "endTimeUnixNano": "1784548800440000000",
+          "status": { "code": 1 }
+        },
+        {
+          "spanId": "b2", "parentSpanId": "b1", "name": "productcatalog.GetProduct", "kind": 3,
+          "startTimeUnixNano": "1784548800070000000", "endTimeUnixNano": "1784548800300000000",
+          "attributes": [
+            { "key": "rpc.system", "value": { "stringValue": "grpc" } },
+            { "key": "net.peer.name", "value": { "stringValue": "productcatalogservice" } }
+          ],
+          "status": { "code": 2, "message": "" }
+        },
+        {
+          "spanId": "b3", "parentSpanId": "b1", "name": "orders publish", "kind": 4,
+          "startTimeUnixNano": "1784548800310000000", "endTimeUnixNano": "1784548800330000000",
+          "attributes": [
+            { "key": "messaging.system", "value": { "stringValue": "kafka" } },
+            { "key": "messaging.destination.name", "value": { "stringValue": "orders" } }
+          ],
+          "status": { "code": 1 }
+        }
+      ] } ]
+    },
+    {
+      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "productcatalogservice" } } ] },
+      "scopeSpans": [ { "spans": [
+        {
+          "spanId": "c1", "parentSpanId": "b2", "name": "productcatalog.GetProduct", "kind": 2,
+          "startTimeUnixNano": "1784548800080000000", "endTimeUnixNano": "1784548800295000000",
+          "attributes": [ { "key": "http.method", "value": { "stringValue": "GET" } } ],
+          "status": { "code": 2 },
+          "events": [ { "attributes": [
+            { "key": "exception.message", "value": { "stringValue": "productCatalogFailure: injected fault" } }
+          ] } ]
+        }
+      ] } ]
+    }
+  ]
+}
