@@ -1,7 +1,7 @@
 apiVersion: v2
 name: kube-state-metrics
 description: >
-  Kubernetes state metrics exporter for TraceOps.
+  Kubernetes state metrics exporter for Causa.
   Required by Stage 2 RCA — Infrastructure Level Graph (Graph 2).
   Provides kube_pod_info, kube_pod_container_status_restarts_total, kube_node_status_condition, etc.
 type: application

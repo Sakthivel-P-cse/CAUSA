@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# validate.sh — End-to-end health check for the TraceOps stack
+# validate.sh — End-to-end health check for the Causa stack
 #
 # Usage:
 #   ./scripts/validate.sh [--context <kube-context>]
@@ -19,7 +19,7 @@
 #  11. Alertmanager health + Prometheus alert rules loaded
 #  12. Postgres health + rca_reports table exists
 #  13. Stage 2 RCA engine /health
-#  14. TraceOps Dashboard /health
+#  14. Causa Dashboard /health
 # ============================================================
 set -euo pipefail
 
@@ -89,7 +89,7 @@ wait_for_port() {
 }
 
 echo "========================================================"
-echo "  TraceOps Stack — Validation"
+echo "  Causa Stack — Validation"
 echo "========================================================"
 if [[ -n "${CONTEXT}" ]]; then
   echo "  Kubernetes context: ${CONTEXT}"
@@ -115,7 +115,7 @@ echo ""
 # ── 1. Pod status ──────────────────────────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "infra" ]]; then
 echo "[1/14] Checking pod status across all namespaces..."
-for ns in tempo minio-tempo loki minio-loki prometheus mimir minio-mimir otel-collector otel-lb otel-agent kube-state-metrics node-exporter alertmanager postgres stage2-rca traceops-dashboard; do
+for ns in tempo minio-tempo loki minio-loki prometheus mimir minio-mimir otel-collector otel-lb otel-agent kube-state-metrics node-exporter alertmanager postgres stage2-rca causa-dashboard; do
   pods_raw="$(k -n "${ns}" get pods --no-headers 2>/dev/null || true)"
   total="$(printf "%s\n" "${pods_raw}" | awk 'NF { n++ } END { print n+0 }')"
   # Ignore Terminating pods during rollout; they are expected shortly after upgrades.
@@ -185,7 +185,7 @@ pid=$(port_forward_bg mimir mimir 8880 8080)
 cleanup_pids+=("${pid}")
 sleep 2
 if curl --connect-timeout 2 --max-time 5 -sf \
-    -H 'X-Scope-OrgID: traceops' \
+    -H 'X-Scope-OrgID: causa' \
     http://localhost:8880/ready &>/dev/null; then
   ok "Mimir /ready → 200 OK"
 else
@@ -221,7 +221,7 @@ TRACE_RESPONSE=$(curl --connect-timeout 2 --max-time 10 -sv -X POST http://local
     "resourceSpans": [
       {
         "resource": {
-          "attributes": [{"key":"service.name","value":{"stringValue":"traceops-validate-client"}}]
+          "attributes": [{"key":"service.name","value":{"stringValue":"causa-validate-client"}}]
         },
         "scopeSpans": [{
           "spans": [{
@@ -232,7 +232,7 @@ TRACE_RESPONSE=$(curl --connect-timeout 2 --max-time 10 -sv -X POST http://local
             "startTimeUnixNano": "'"$(date +%s%N)"'",
             "endTimeUnixNano": "'"$(( $(date +%s%N) + 3000000 ))"'",
             "attributes": [
-              {"key":"peer.service","value":{"stringValue":"traceops-validate-server"}}
+              {"key":"peer.service","value":{"stringValue":"causa-validate-server"}}
             ],
             "status": {"code": 1}
           }]
@@ -240,7 +240,7 @@ TRACE_RESPONSE=$(curl --connect-timeout 2 --max-time 10 -sv -X POST http://local
       },
       {
         "resource": {
-          "attributes": [{"key":"service.name","value":{"stringValue":"traceops-validate-server"}}]
+          "attributes": [{"key":"service.name","value":{"stringValue":"causa-validate-server"}}]
         },
         "scopeSpans": [{
           "spans": [{
@@ -287,7 +287,7 @@ for i in $(seq 1 "${max_wait}"); do
         "resourceSpans": [
           {
             "resource": {
-              "attributes": [{"key":"service.name","value":{"stringValue":"traceops-validate-client"}}]
+              "attributes": [{"key":"service.name","value":{"stringValue":"causa-validate-client"}}]
             },
             "scopeSpans": [{
               "spans": [{
@@ -298,7 +298,7 @@ for i in $(seq 1 "${max_wait}"); do
                 "startTimeUnixNano": "'"$(date +%s%N)"'",
                 "endTimeUnixNano": "'"$(( $(date +%s%N) + 3000000 ))"'",
                 "attributes": [
-                  {"key":"peer.service","value":{"stringValue":"traceops-validate-server"}}
+                  {"key":"peer.service","value":{"stringValue":"causa-validate-server"}}
                 ],
                 "status": {"code": 1}
               }]
@@ -306,7 +306,7 @@ for i in $(seq 1 "${max_wait}"); do
           },
           {
             "resource": {
-              "attributes": [{"key":"service.name","value":{"stringValue":"traceops-validate-server"}}]
+              "attributes": [{"key":"service.name","value":{"stringValue":"causa-validate-server"}}]
             },
             "scopeSpans": [{
               "spans": [{
@@ -348,7 +348,7 @@ LOG_TS="$(date +%s%N)"
 LOKI_PUSH_RESP=$(curl --connect-timeout 2 --max-time 10 -sv \
   -X POST http://localhost:3101/loki/api/v1/push \
   -H 'Content-Type: application/json' \
-  -d '{"streams":[{"stream":{"job":"traceops-validate","env":"validate"},"values":[["'"${LOG_TS}"'","traceops validate log line"]]}]}' \
+  -d '{"streams":[{"stream":{"job":"causa-validate","env":"validate"},"values":[["'"${LOG_TS}"'","causa validate log line"]]}]}' \
   2>&1)
 
 if echo "${LOKI_PUSH_RESP}" | grep -q '204\|HTTP/2 204\|HTTP/1.1 204'; then
@@ -362,10 +362,10 @@ fi
 loki_log_found=0
 for i in $(seq 1 30); do
   LOKI_QUERY_RESP=$(curl --connect-timeout 2 --max-time 5 -sf \
-    'http://localhost:3101/loki/api/v1/query_range?query=\{job%3D%22traceops-validate%22\}&limit=1' \
+    'http://localhost:3101/loki/api/v1/query_range?query=\{job%3D%22causa-validate%22\}&limit=1' \
     2>/dev/null || true)
   if [[ -n "${LOKI_QUERY_RESP}" ]] \
-      && echo "${LOKI_QUERY_RESP}" | grep -q 'traceops validate log line'; then
+      && echo "${LOKI_QUERY_RESP}" | grep -q 'causa validate log line'; then
     loki_log_found=1
     break
   fi
@@ -439,7 +439,7 @@ sleep 3
 
 # pg_isready checks if Postgres is accepting connections
 if k -n postgres exec deployment/postgres -- \
-    pg_isready -U traceops -d traceops &>/dev/null; then
+    pg_isready -U causa -d causa &>/dev/null; then
   ok "Postgres is accepting connections"
 else
   fail "Postgres is not ready"
@@ -447,7 +447,7 @@ fi
 
 # Verify rca_reports table was created by the init script
 TBL_CHECK=$(k -n postgres exec deployment/postgres -- \
-  psql -U traceops -d traceops -tAc \
+  psql -U causa -d causa -tAc \
   "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='rca_reports';" \
   2>/dev/null || echo "0")
 
@@ -473,17 +473,17 @@ fi
 echo ""
 fi
 
-# ── 12. TraceOps Dashboard health ────────────────────────────────
+# ── 12. Causa Dashboard health ────────────────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "rca" ]]; then
-echo "[14/14] Checking TraceOps Dashboard..."
-pid=$(port_forward_bg traceops-dashboard traceops-dashboard 8090 8090)
+echo "[14/14] Checking Causa Dashboard..."
+pid=$(port_forward_bg causa-dashboard causa-dashboard 8090 8090)
 cleanup_pids+=("${pid}")
 sleep 3
 if curl --connect-timeout 2 --max-time 5 -sf http://localhost:8090/health &>/dev/null; then
-  ok "TraceOps Dashboard /health → 200 OK"
+  ok "Causa Dashboard /health → 200 OK"
   info "Dashboard UI: http://localhost:8090"
 else
-  fail "TraceOps Dashboard /health did not respond (not deployed yet?)"
+  fail "Causa Dashboard /health did not respond (not deployed yet?)"
 fi
 echo ""
 fi

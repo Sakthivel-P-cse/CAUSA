@@ -17,4 +17,4 @@ home: https://grafana.com/oss/loki/
 sources:
   - https://github.com/grafana/loki
 maintainers:
-  - name: traceops-team
+  - name: causa-team

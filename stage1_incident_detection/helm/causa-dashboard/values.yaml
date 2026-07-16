@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: traceops/dashboard
+  repository: causa/dashboard
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -24,13 +24,13 @@ env:
   ALERTMANAGER_URL:  "http://alertmanager.alertmanager.svc.cluster.local:9093"
   POSTGRES_HOST:     "postgres.postgres.svc.cluster.local"
   POSTGRES_PORT:     "5432"
-  POSTGRES_DB:       "traceops"
-  POSTGRES_USER:     "traceops"
+  POSTGRES_DB:       "causa"
+  POSTGRES_USER:     "causa"
 
 existingSecret: ""   # set in prod to avoid plain-text passwords in values
 
 ingress:
   enabled: false
   className: nginx
-  host: traceops.local
+  host: causa.local
   tls: []

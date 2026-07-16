@@ -26,7 +26,7 @@ def _utcnow() -> datetime:
 
 def _service_name_label_keys() -> list[str]:
     keys_env = os.getenv(
-        "TRACEOPS_SERVICE_NAME_LABEL_KEYS",
+        "CAUSA_SERVICE_NAME_LABEL_KEYS",
         "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
     )
     return [k.strip() for k in keys_env.split(",") if k.strip()]

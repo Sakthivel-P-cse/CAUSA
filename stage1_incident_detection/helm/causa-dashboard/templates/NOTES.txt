@@ -1,0 +1,12 @@
+Causa Dashboard deployed!
+
+Internal access:
+  http://{{ include "causa-dashboard.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+Port-forward for local access:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "causa-dashboard.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  Open: http://localhost:{{ .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+External URL: https://{{ .Values.ingress.host }}
+{{- end }}

@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "prometheus.labels" . | nindent 4 }}
 data:
-  traceops-alerts.yml: |
+  causa-alerts.yml: |
     groups:
 
 {{- if .Values.rules.appWorkloads.enabled }}

@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: traceops/stage2-rca
+  repository: causa/stage2-rca
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -23,14 +23,14 @@ env:
   LOKI_URL:       "http://loki.loki.svc.cluster.local:3100"
   POSTGRES_HOST:  "postgres.postgres.svc.cluster.local"
   POSTGRES_PORT:  "5432"
-  POSTGRES_DB:    "traceops"
-  POSTGRES_USER:  "traceops"
+  POSTGRES_DB:    "causa"
+  POSTGRES_USER:  "causa"
   REDIS_URL:      "redis://localhost:6379"
   # Environment versatility config
-  TRACEOPS_TARGET_NAMESPACE: ""
-  TRACEOPS_MONITORED_SERVICES_REGEX: ""
-  TRACEOPS_EXCLUDED_SERVICES_REGEX: ""
-  TRACEOPS_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
+  CAUSA_TARGET_NAMESPACE: ""
+  CAUSA_MONITORED_SERVICES_REGEX: ""
+  CAUSA_EXCLUDED_SERVICES_REGEX: ""
+  CAUSA_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
 
 existingSecret: ""   # set in prod to avoid plain-text passwords in values
 

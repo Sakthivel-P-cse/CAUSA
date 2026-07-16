@@ -23,4 +23,4 @@ home: https://opentelemetry.io/docs/collector/deployment/agent/
 sources:
   - https://github.com/open-telemetry/opentelemetry-collector
 maintainers:
-  - name: traceops-team
+  - name: causa-team

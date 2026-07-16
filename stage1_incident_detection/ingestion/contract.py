@@ -1,5 +1,5 @@
 """
-contract.py — TraceOps Stage-1 ingestion public contract.
+contract.py — Causa Stage-1 ingestion public contract.
 
 This module OWNS the normalized telemetry types. Downstream consumers
 (RCA engine, dashboard, anything else) import these types FROM here —

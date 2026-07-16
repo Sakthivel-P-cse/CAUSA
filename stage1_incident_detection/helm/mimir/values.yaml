@@ -46,7 +46,7 @@ config:
 
   # ── Multi-tenancy ───────────────────────────────────────────────
   # When enabled, every request must carry X-Scope-OrgID. Prometheus
-  # remote_write sends "traceops" (see prometheus/values-prod.yaml).
+  # remote_write sends "causa" (see prometheus/values-prod.yaml).
   multitenancyEnabled: true
 
   # ── Limits (guardrails for ingestion) ───────────────────────────

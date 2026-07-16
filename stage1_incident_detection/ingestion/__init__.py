@@ -1,5 +1,5 @@
 """
-TraceOps Stage-1 Ingestion Module — public API.
+Causa Stage-1 Ingestion Module — public API.
 
 A loosely-coupled, drop-in ingestion module. It reads from the Stage-1
 OTel stack (Tempo/Prometheus/Loki) and normalizes one incident window into

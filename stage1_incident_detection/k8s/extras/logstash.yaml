@@ -1,7 +1,7 @@
 # ============================================================
 # OPTIONAL — Logstash + Elasticsearch side-car stack
 #
-# This manifest is NOT part of the core TraceOps OTLP stack
+# This manifest is NOT part of the core Causa OTLP stack
 # (Tempo / Loki / Prometheus / OTel Collector / Grafana).
 # It is kept here as an optional Elasticsearch-backed log
 # forwarder for teams that already operate an ES cluster.
@@ -24,8 +24,8 @@ kind: Namespace
 metadata:
   name: monitoring
   labels:
-    app.kubernetes.io/part-of: traceops-extras
-    traceops/component: logstash
+    app.kubernetes.io/part-of: causa-extras
+    causa/component: logstash
 ---
 apiVersion: apps/v1
 kind: DaemonSet

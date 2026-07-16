@@ -2,8 +2,8 @@
 set -euo pipefail
 
 CONTEXT="kind-gcp-demo-test"
-NAMESPACE="traceops-dashboard"
-SERVICE="traceops-dashboard"
+NAMESPACE="causa-dashboard"
+SERVICE="causa-dashboard"
 LOCAL_PORT="8091"
 REMOTE_PORT="8090"
 

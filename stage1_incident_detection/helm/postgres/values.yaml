@@ -9,11 +9,11 @@ image:
 
 # Database credentials — override per environment
 auth:
-  database: traceops
-  username: traceops
+  database: causa
+  username: causa
   # Plain-text password used only in dev.
   # In prod this field is ignored; secret must be pre-created.
-  password: "traceops_dev_pass"
+  password: "causa_dev_pass"
   # Name of a pre-existing Kubernetes Secret that carries
   # POSTGRES_PASSWORD (optional — used in prod).
   existingSecret: ""

@@ -117,7 +117,7 @@ for s in "${SERVICES[@]}"; do
 
   echo "Latest RCA report for alerted_service='$s':"
   kubectl --context "$CTX" -n postgres exec deployment/postgres -- \
-    psql -U traceops -d traceops -c "
+    psql -U causa -d causa -c "
       SELECT id, alert_name, alerted_service, root_cause_service, failure_type,
              ROUND(confidence_score::numeric, 2) AS confidence, created_at
       FROM rca_reports
@@ -134,7 +134,7 @@ done
 echo ""
 echo "================ FINAL RCA COVERAGE SUMMARY ================"
 kubectl --context "$CTX" -n postgres exec deployment/postgres -- \
-  psql -U traceops -d traceops -c "
+  psql -U causa -d causa -c "
     SELECT alerted_service, COUNT(*) AS reports
     FROM rca_reports
     WHERE created_at > NOW() - INTERVAL '4 hours'

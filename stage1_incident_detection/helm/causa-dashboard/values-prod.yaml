@@ -1,4 +1,4 @@
-# values-prod.yaml — production overrides for traceops-dashboard
+# values-prod.yaml — production overrides for causa-dashboard
 replicaCount: 2
 
 existingSecret: "dashboard-secret"   # must contain POSTGRES_PASSWORD
@@ -14,8 +14,8 @@ resources:
 ingress:
   enabled: true
   className: nginx
-  host: traceops.your-domain.com
+  host: causa.your-domain.com
   tls:
-    - secretName: traceops-tls
+    - secretName: causa-tls
       hosts:
-        - traceops.your-domain.com
+        - causa.your-domain.com

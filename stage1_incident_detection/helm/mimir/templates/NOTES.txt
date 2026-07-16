@@ -7,7 +7,7 @@ Version:    {{ .Values.image.tag }}
 Remote-write target (point Prometheus here):
   http://{{ include "mimir.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}/api/v1/push
   {{- if .Values.config.multitenancyEnabled }}
-  Requires header: X-Scope-OrgID (Prometheus sends "traceops")
+  Requires header: X-Scope-OrgID (Prometheus sends "causa")
   {{- end }}
 
 Object storage:
@@ -22,5 +22,5 @@ Verify:
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mimir.fullname" . }} {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }}
   curl -s http://localhost:{{ .Values.service.ports.http }}/ready
   # Confirm samples are landing (after Prometheus starts pushing):
-  curl -s -H 'X-Scope-OrgID: traceops' \
+  curl -s -H 'X-Scope-OrgID: causa' \
     'http://localhost:{{ .Values.service.ports.http }}/prometheus/api/v1/query?query=up' | head

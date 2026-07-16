@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # start_dashboards.sh
-# Start all 3 TraceOps telemetry web dashboards.
+# Start all 3 Causa telemetry web dashboards.
 #
 # Port mapping:
 #   Port 5001 — Logs     (from Loki        in namespace loki        :3100)
@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo ""
 echo "╔════════════════════════════════════════════════════╗"
-echo "║      TraceOps · Telemetry Web Dashboards          ║"
+echo "║      Causa · Telemetry Web Dashboards          ║"
 echo "╚════════════════════════════════════════════════════╝"
 echo ""
 

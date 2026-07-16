@@ -46,7 +46,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TraceOps · Metrics Dashboard</title>
+  <title>Causa · Metrics Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
   <style>
     :root {{
@@ -176,7 +176,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <header>
   <h1>
     <span class="pulse"></span>
-    TraceOps <span style="color:var(--muted);font-weight:300;margin:0 4px;">·</span> Metrics Dashboard
+    Causa <span style="color:var(--muted);font-weight:300;margin:0 4px;">·</span> Metrics Dashboard
     <span class="badge">LIVE</span>
   </h1>
   <div class="meta">Source: <span>Prometheus :9090</span> &nbsp;|&nbsp; Refreshes in <span id="countdown">{refresh}s</span></div>
@@ -185,7 +185,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   {body}
 </main>
 <footer>
-  TraceOps · Stage 1 Incident Detection &nbsp;|&nbsp; Metrics Dashboard · Port {port}
+  Causa · Stage 1 Incident Detection &nbsp;|&nbsp; Metrics Dashboard · Port {port}
 </footer>
 <script>
   let t = {refresh};

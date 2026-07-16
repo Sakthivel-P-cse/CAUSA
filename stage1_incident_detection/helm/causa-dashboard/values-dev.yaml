@@ -1,0 +1,3 @@
+# values-dev.yaml — development overrides for causa-dashboard
+env:
+  POSTGRES_PASSWORD: "causa_dev_pass"

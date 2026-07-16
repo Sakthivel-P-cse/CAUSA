@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# deploy.sh — Deploy the full TraceOps observability stack
+# deploy.sh — Deploy the full Causa observability stack
 #
 # Usage:
 #   ./scripts/deploy.sh [dev|prod]
@@ -22,7 +22,7 @@
 #  14.  Alertmanager       (alert routing → Stage 2 webhook)
 #  15.  Postgres           (RCA report storage for Stage 2)
 #  16.  Stage 2 RCA engine (webhook receiver + Redis)
-#  17.  TraceOps Dashboard  (custom observability UI)
+#  17.  Causa Dashboard  (custom observability UI)
 #
 # Deploy order: each MinIO must be up before the backend that uses it.
 #   minio-tempo → tempo   (Tempo writes trace blocks to minio-tempo)
@@ -61,7 +61,7 @@ VALUES_FILE="values-${ENV}.yaml"
 STORAGE_CLASS="${STORAGE_CLASS:-standard}"
 
 echo "========================================================"
-echo "  TraceOps Observability Stack — Deploying [${ENV^^}]"
+echo "  Causa Observability Stack — Deploying [${ENV^^}]"
 echo "========================================================"
 echo ""
 
@@ -199,11 +199,11 @@ if [[ "${ENV}" == "prod" ]]; then
   fi
   echo "  ✓ stage2-rca-secret exists"
 
-  if ! kubectl -n traceops-dashboard get secret dashboard-secret &>/dev/null; then
+  if ! kubectl -n causa-dashboard get secret dashboard-secret &>/dev/null; then
     echo ""
-    echo "ERROR: Production secret 'dashboard-secret' not found in namespace 'traceops-dashboard'."
-    echo "  kubectl create namespace traceops-dashboard --dry-run=client -o yaml | kubectl apply -f -"
-    echo "  kubectl -n traceops-dashboard create secret generic dashboard-secret \\"
+    echo "ERROR: Production secret 'dashboard-secret' not found in namespace 'causa-dashboard'."
+    echo "  kubectl create namespace causa-dashboard --dry-run=client -o yaml | kubectl apply -f -"
+    echo "  kubectl -n causa-dashboard create secret generic dashboard-secret \\"
     echo "    --from-literal=POSTGRES_PASSWORD='<SAME_PASSWORD>'"
     exit 1
   fi
@@ -283,7 +283,7 @@ helm_deploy "otel-agent"         "otel-agent"         13 17
 helm_deploy "alertmanager"       "alertmanager"       14 17
 helm_deploy "postgres"           "postgres"           15 17
 helm_deploy "stage2-rca"         "stage2-rca"         16 17
-helm_deploy "traceops-dashboard" "traceops-dashboard" 17 17
+helm_deploy "causa-dashboard" "causa-dashboard" 17 17
 
 # ── Summary ────────────────────────────────────────────────
 echo "========================================================"
@@ -300,7 +300,7 @@ echo ""
   echo "    MinIO-Mimir:     kubectl -n minio-mimir port-forward svc/minio-mimir 9003:9001  (console)"
   echo "    Alertmgr:        kubectl -n alertmanager port-forward svc/alertmanager 9093:9093"
   echo "    Postgres:        kubectl -n postgres port-forward svc/postgres 5432:5432"
-  echo "    Dashboard:       kubectl -n traceops-dashboard port-forward svc/traceops-dashboard 8090:8090"
+  echo "    Dashboard:       kubectl -n causa-dashboard port-forward svc/causa-dashboard 8090:8090"
   echo "                     → http://localhost:8090"
   echo "    RCA Webhook:     kubectl -n stage2-rca port-forward svc/stage2-rca 8080:8080"
   echo "                     → POST http://localhost:8080/trigger"

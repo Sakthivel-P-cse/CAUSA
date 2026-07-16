@@ -3,7 +3,7 @@
 # ============================================================
 
 auth:
-  password: "traceops_dev_pass"
+  password: "causa_dev_pass"
 
 persistence:
   enabled: false   # use emptyDir in dev — data is ephemeral

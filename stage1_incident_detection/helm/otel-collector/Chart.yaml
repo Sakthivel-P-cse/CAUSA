@@ -19,4 +19,4 @@ home: https://opentelemetry.io/docs/collector/
 sources:
   - https://github.com/open-telemetry/opentelemetry-collector
 maintainers:
-  - name: traceops-team
+  - name: causa-team

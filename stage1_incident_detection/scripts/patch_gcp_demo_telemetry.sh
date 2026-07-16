@@ -3,7 +3,7 @@
 # patch_gcp_demo_telemetry.sh
 #
 # Enable OpenTelemetry trace export for Google Online Boutique
-# services so they emit through the TraceOps OTel stack.
+# services so they emit through the Causa OTel stack.
 #
 # PRD2 §12 topology (agent DaemonSet → LB → gateway):
 #   apps → node-local OTel Agent :4317 → otel-lb (traces) /

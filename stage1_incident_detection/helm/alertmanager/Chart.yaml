@@ -6,4 +6,4 @@ version: 0.1.0
 appVersion: "0.27.0"
 keywords:
   - alerting
-  - traceops
+  - causa

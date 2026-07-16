@@ -8,7 +8,7 @@ metadata:
 data:
   # This SQL runs once when the Postgres container starts for the first time.
   # It creates the rca_reports table used by the Stage 2 RCA engine and
-  # queries used by the TraceOps custom dashboard.
+  # queries used by the Causa custom dashboard.
   init.sql: |
     -- Enable pgcrypto for gen_random_uuid()
     CREATE EXTENSION IF NOT EXISTS pgcrypto;

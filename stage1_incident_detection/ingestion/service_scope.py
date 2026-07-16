@@ -1,16 +1,16 @@
 """
 service_scope.py — Scope helpers: which services are "application" services.
 
-Stage-1 monitors user/application microservices, not the internal TraceOps
+Stage-1 monitors user/application microservices, not the internal Causa
 observability stack (Tempo/Loki/Prometheus/OTel/etc). These helpers decide
 what belongs in scope and normalize pod names → stable service names.
 
 Self-contained: env-configurable, no dependency on any other module.
 
 Env knobs:
-  TRACEOPS_MONITORED_SERVICES_REGEX   allowlist (if set, only matches are in scope)
-  TRACEOPS_EXCLUDED_SERVICES_REGEX    extra excludes, ORed with the defaults
-  TRACEOPS_SERVICE_NAME_LABEL_KEYS    ordered label keys used to read a service name
+  CAUSA_MONITORED_SERVICES_REGEX   allowlist (if set, only matches are in scope)
+  CAUSA_EXCLUDED_SERVICES_REGEX    extra excludes, ORed with the defaults
+  CAUSA_SERVICE_NAME_LABEL_KEYS    ordered label keys used to read a service name
 """
 
 from __future__ import annotations
@@ -38,10 +38,10 @@ _INTERNAL_NAMESPACES = {
     "postgres",
     "prometheus",
     "stage2-rca",
-    "traceops-dashboard",
+    "causa-dashboard",
 }
 
-# Defaults target TraceOps internals so app/test microservices remain visible.
+# Defaults target Causa internals so app/test microservices remain visible.
 _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"^(?:"
     r"alertmanager|"
@@ -64,7 +64,7 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"redis|"
     r"stage2-rca|"
     r"tempo|"
-    r"traceops-dashboard"
+    r"causa-dashboard"
     r")$"
 )
 
@@ -75,7 +75,7 @@ _DAEMONSET_POD_RE = re.compile(r"^(?P<base>.+)-[a-z0-9]{5}$", re.IGNORECASE)
 
 @lru_cache(maxsize=1)
 def _monitored_services_re() -> re.Pattern[str] | None:
-    raw = (os.getenv("TRACEOPS_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
     if not raw:
         return None
     try:
@@ -86,7 +86,7 @@ def _monitored_services_re() -> re.Pattern[str] | None:
 
 @lru_cache(maxsize=1)
 def _excluded_services_re() -> re.Pattern[str] | None:
-    extra = (os.getenv("TRACEOPS_EXCLUDED_SERVICES_REGEX") or "").strip()
+    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
     pattern = (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -100,19 +100,19 @@ def _excluded_services_re() -> re.Pattern[str] | None:
 
 def _service_name_label_keys() -> list[str]:
     keys_env = os.getenv(
-        "TRACEOPS_SERVICE_NAME_LABEL_KEYS",
+        "CAUSA_SERVICE_NAME_LABEL_KEYS",
         "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
     )
     return [k.strip() for k in keys_env.split(",") if k.strip()]
 
 
 def monitored_services_pattern() -> str | None:
-    raw = (os.getenv("TRACEOPS_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
     return raw or None
 
 
 def excluded_services_pattern() -> str:
-    extra = (os.getenv("TRACEOPS_EXCLUDED_SERVICES_REGEX") or "").strip()
+    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
     return (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -166,7 +166,7 @@ def is_monitored_service(service: str | None) -> bool:
     """
     True when a service should be included in monitoring/RCA scope.
 
-    Allowlist (TRACEOPS_MONITORED_SERVICES_REGEX) wins if set; otherwise
+    Allowlist (CAUSA_MONITORED_SERVICES_REGEX) wins if set; otherwise
     everything is in scope except the internal-stack excludes.
     """
     if not service:

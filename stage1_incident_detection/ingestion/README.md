@@ -73,9 +73,9 @@ Scope / naming env knobs (see `service_scope.py`):
 
 | Env var | Purpose |
 |---|---|
-| `TRACEOPS_MONITORED_SERVICES_REGEX` | allowlist; if set, only matches are in scope |
-| `TRACEOPS_EXCLUDED_SERVICES_REGEX` | extra excludes, ORed with the internal-stack defaults |
-| `TRACEOPS_SERVICE_NAME_LABEL_KEYS` | ordered label keys used to read a service name |
+| `CAUSA_MONITORED_SERVICES_REGEX` | allowlist; if set, only matches are in scope |
+| `CAUSA_EXCLUDED_SERVICES_REGEX` | extra excludes, ORed with the internal-stack defaults |
+| `CAUSA_SERVICE_NAME_LABEL_KEYS` | ordered label keys used to read a service name |
 
 ## Layout
 

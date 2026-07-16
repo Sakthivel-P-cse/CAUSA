@@ -17,4 +17,4 @@ home: https://prometheus.io/
 sources:
   - https://github.com/prometheus/prometheus
 maintainers:
-  - name: traceops-team
+  - name: causa-team

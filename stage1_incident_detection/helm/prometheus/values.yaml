@@ -117,7 +117,7 @@ config:
   # give each replica the SAME cluster but a DIFFERENT replica value.
   # Empty by default (single-Prometheus dev needs no external labels).
   externalLabels: {}
-    # cluster: traceops
+    # cluster: causa
     # replica: "0"
 
   # Remote write — ship samples to a horizontally scalable long-term
@@ -127,7 +127,7 @@ config:
     url: ""   # e.g. http://mimir-distributor.mimir.svc.cluster.local:8080/api/v1/push
     # Extra HTTP headers. Mimir/Cortex use X-Scope-OrgID for tenancy.
     headers: {}
-      # X-Scope-OrgID: traceops
+      # X-Scope-OrgID: causa
     # Basic auth. Password is mounted from a Secret (never inlined).
     basicAuth:
       enabled: false

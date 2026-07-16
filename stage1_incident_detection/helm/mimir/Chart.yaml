@@ -20,4 +20,4 @@ home: https://grafana.com/docs/mimir/latest/
 sources:
   - https://github.com/grafana/mimir
 maintainers:
-  - name: traceops-team
+  - name: causa-team

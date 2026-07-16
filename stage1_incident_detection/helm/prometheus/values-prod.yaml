@@ -15,7 +15,7 @@ config:
   # Set the replica per-pod at deploy time, e.g.:
   #   --set config.externalLabels.replica=$(POD_NAME)
   externalLabels:
-    cluster: traceops-prod
+    cluster: causa-prod
     replica: "0"
 
   # ── Metrics scale-out ───────────────────────────────────────────
@@ -32,13 +32,13 @@ config:
     headers:
       # Mimir/Cortex tenant. Required unless the store runs with
       # auth_enabled=false (single-tenant "anonymous").
-      X-Scope-OrgID: traceops
+      X-Scope-OrgID: causa
     basicAuth:
       # Enable + create the secret when the store fronts auth:
       #   kubectl -n prometheus create secret generic prometheus-remote-write \
       #     --from-literal=password='<REMOTE_WRITE_PASSWORD>'
       enabled: false
-      username: traceops
+      username: causa
       secretName: prometheus-remote-write
       secretKey: password
     queueConfig:

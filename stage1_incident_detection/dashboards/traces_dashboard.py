@@ -153,14 +153,14 @@ def make_html(total, n_services, avg_dur, slow, chips_html, content_html, fetche
     parts.append("<!DOCTYPE html><html lang='en'><head>")
     parts.append("<meta charset='UTF-8'/>")
     parts.append("<meta name='viewport' content='width=device-width, initial-scale=1.0'/>")
-    parts.append("<title>TraceOps · Traces Dashboard</title>")
+    parts.append("<title>Causa · Traces Dashboard</title>")
     parts.append("<link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet'/>")
     parts.append("<style>" + CSS + "</style></head><body>")
 
     # Header
     parts.append("<header><h1>")
     parts.append("<span class='pulse'></span>")
-    parts.append("TraceOps <span style='color:var(--muted);font-weight:300;margin:0 4px;'>·</span> Traces Dashboard ")
+    parts.append("Causa <span style='color:var(--muted);font-weight:300;margin:0 4px;'>·</span> Traces Dashboard ")
     parts.append("<span class='badge'>LIVE</span></h1>")
     parts.append("<div class='meta'>Source: <span>Tempo :3200</span> &nbsp;|&nbsp; ")
     parts.append("Refreshes in <span id='countdown'>" + str(REFRESH_SECONDS) + "s</span></div>")
@@ -187,7 +187,7 @@ def make_html(total, n_services, avg_dur, slow, chips_html, content_html, fetche
     parts.append("<div class='table-wrap'>" + content_html + "</div>")
     parts.append("</main>")
 
-    parts.append("<footer>TraceOps · Stage 1 Incident Detection &nbsp;|&nbsp; Traces Dashboard · Port " + str(DASHBOARD_PORT) + "</footer>")
+    parts.append("<footer>Causa · Stage 1 Incident Detection &nbsp;|&nbsp; Traces Dashboard · Port " + str(DASHBOARD_PORT) + "</footer>")
     parts.append("<script>" + JS + "</script>")
     parts.append("</body></html>")
 

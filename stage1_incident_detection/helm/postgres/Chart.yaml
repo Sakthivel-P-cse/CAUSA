@@ -1,7 +1,7 @@
 apiVersion: v2
 name: postgres
 description: >
-  PostgreSQL 16 — persistent RCA report storage for TraceOps Stage 2.
+  PostgreSQL 16 — persistent RCA report storage for Causa Stage 2.
   Stores every root cause analysis report produced by the RCA engine
   (root_cause_service, failure_type, confidence_score, evidence, timeline).
 type: application
@@ -11,4 +11,4 @@ keywords:
   - postgres
   - database
   - rca
-  - traceops
+  - causa

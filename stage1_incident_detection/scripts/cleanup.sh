@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# cleanup.sh — Remove all TraceOps stack resources
+# cleanup.sh — Remove all Causa stack resources
 #
 # Usage:
 #   ./scripts/cleanup.sh [--force]
@@ -11,14 +11,14 @@ set -euo pipefail
 
 FORCE="${1:-}"
 
-RELEASES=("traceops-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
-NAMESPACES=("traceops-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
+RELEASES=("causa-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
+NAMESPACES=("causa-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "========================================================"
-echo "  TraceOps Observability Stack — CLEANUP"
+echo "  Causa Observability Stack — CLEANUP"
 echo "========================================================"
 echo ""
 echo "  This will remove:"

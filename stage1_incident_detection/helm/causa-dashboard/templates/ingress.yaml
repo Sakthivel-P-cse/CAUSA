@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "traceops-dashboard.fullname" . }}
+  name: {{ include "causa-dashboard.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "traceops-dashboard.labels" . | nindent 4 }}
+    {{- include "causa-dashboard.labels" . | nindent 4 }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   {{- if .Values.ingress.tls }}
@@ -20,7 +20,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "traceops-dashboard.fullname" . }}
+                name: {{ include "causa-dashboard.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
 {{- end }}

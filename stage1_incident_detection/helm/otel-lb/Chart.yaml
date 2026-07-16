@@ -21,4 +21,4 @@ home: https://opentelemetry.io/docs/collector/deployment/gateway/
 sources:
   - https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter
 maintainers:
-  - name: traceops-team
+  - name: causa-team

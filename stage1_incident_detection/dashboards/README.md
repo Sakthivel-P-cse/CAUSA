@@ -1,4 +1,4 @@
-# TraceOps · Telemetry Web Dashboards
+# Causa · Telemetry Web Dashboards
 
 Three standalone web dashboards that display **live telemetry data** directly in the browser — no Grafana required.
 
@@ -27,7 +27,7 @@ kubectl -n tempo      port-forward svc/tempo      3200:3200 &
 ### Step 2 — Start all dashboards
 
 ```bash
-cd /home/sakthi/projects/traceops/stage1_incident_detection/dashboards
+cd /home/sakthi/projects/causa/stage1_incident_detection/dashboards
 bash start_dashboards.sh
 ```
 

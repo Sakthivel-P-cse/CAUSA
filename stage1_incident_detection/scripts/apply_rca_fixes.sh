@@ -40,7 +40,7 @@ done
 VALUES_FILE="values-${ENV}.yaml"
 
 echo "========================================================"
-echo "  TraceOps RCA Fixes — context: ${CONTEXT}  env: ${ENV}"
+echo "  Causa RCA Fixes — context: ${CONTEXT}  env: ${ENV}"
 echo "========================================================"
 echo ""
 
@@ -63,16 +63,16 @@ echo ""
 echo "──────────────────────────────────────────────────────"
 echo "[1/4] Building stage2-rca Docker image"
 echo "──────────────────────────────────────────────────────"
-cd "${ROOT_DIR}/.."    # traceops project root (Dockerfile.stage2-rca lives here)
-docker build -f Dockerfile.stage2-rca -t traceops/stage2-rca:latest .
-echo "✓ Image built: traceops/stage2-rca:latest"
+cd "${ROOT_DIR}/.."    # causa project root (Dockerfile.stage2-rca lives here)
+docker build -f Dockerfile.stage2-rca -t causa/stage2-rca:latest .
+echo "✓ Image built: causa/stage2-rca:latest"
 echo ""
 
 # ── Step 2: Load image into kind ──────────────────────────
 echo "──────────────────────────────────────────────────────"
 echo "[2/4] Loading image into kind cluster '${KIND_CLUSTER}'"
 echo "──────────────────────────────────────────────────────"
-kind load docker-image traceops/stage2-rca:latest --name "${KIND_CLUSTER}"
+kind load docker-image causa/stage2-rca:latest --name "${KIND_CLUSTER}"
 echo "✓ Image loaded into kind"
 echo ""
 

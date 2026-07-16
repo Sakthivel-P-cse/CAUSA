@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "traceops-dashboard.fullname" . }}
+  name: {{ include "causa-dashboard.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "traceops-dashboard.labels" . | nindent 4 }}
+    {{- include "causa-dashboard.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "traceops-dashboard.selectorLabels" . | nindent 6 }}
+      {{- include "causa-dashboard.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "traceops-dashboard.selectorLabels" . | nindent 8 }}
+        {{- include "causa-dashboard.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: dashboard
@@ -32,7 +32,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "traceops-dashboard.fullname" . }}-secret{{ end }}
+                  name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "causa-dashboard.fullname" . }}-secret{{ end }}
                   key: POSTGRES_PASSWORD
           livenessProbe:
             httpGet:

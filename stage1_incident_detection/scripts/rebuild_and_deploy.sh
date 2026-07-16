@@ -4,8 +4,8 @@
 #                          source-code changes.
 #
 # Rebuilds:
-#   traceops/dashboard:latest   — backend bug-fixes + new frontend UI
-#   traceops/stage2-rca:latest  — Loki/Tempo/CPU-memory scorer fixes
+#   causa/dashboard:latest   — backend bug-fixes + new frontend UI
+#   causa/stage2-rca:latest  — Loki/Tempo/CPU-memory scorer fixes
 #
 # Then loads them into the kind cluster and rolls the pods.
 #
@@ -20,7 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"      # stage1_incident_detection/
-PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"    # traceops/
+PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"    # causa/
 
 CONTEXT="kind-gcp-demo-test"
 KIND_CLUSTER="gcp-demo-test"
@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "========================================================"
-echo "  TraceOps — Rebuild & Redeploy"
+echo "  Causa — Rebuild & Redeploy"
 echo "  context: ${CONTEXT}   env: ${ENV}"
 echo "========================================================"
 echo ""
@@ -68,27 +68,27 @@ echo ""
 
 # ── Step 2: Build stage2-rca Docker image ───────────────────
 echo "──────────────────────────────────────────────────────"
-echo "[2/6] Building Docker image: traceops/stage2-rca:latest"
+echo "[2/6] Building Docker image: causa/stage2-rca:latest"
 echo "──────────────────────────────────────────────────────"
 cd "${PROJECT_ROOT}"
-docker build --no-cache -f Dockerfile.stage2-rca -t traceops/stage2-rca:latest .
-echo "✓ traceops/stage2-rca:latest built"
+docker build --no-cache -f Dockerfile.stage2-rca -t causa/stage2-rca:latest .
+echo "✓ causa/stage2-rca:latest built"
 echo ""
 
 # ── Step 3: Build dashboard Docker image ────────────────────
 echo "──────────────────────────────────────────────────────"
-echo "[3/6] Building Docker image: traceops/dashboard:latest"
+echo "[3/6] Building Docker image: causa/dashboard:latest"
 echo "──────────────────────────────────────────────────────"
-docker build -f Dockerfile.dashboard -t traceops/dashboard:latest .
-echo "✓ traceops/dashboard:latest built"
+docker build -f Dockerfile.dashboard -t causa/dashboard:latest .
+echo "✓ causa/dashboard:latest built"
 echo ""
 
 # ── Step 4: Load images into kind cluster ───────────────────
 echo "──────────────────────────────────────────────────────"
 echo "[4/6] Loading images into kind cluster '${KIND_CLUSTER}'"
 echo "──────────────────────────────────────────────────────"
-kind load docker-image traceops/stage2-rca:latest  --name "${KIND_CLUSTER}"
-kind load docker-image traceops/dashboard:latest   --name "${KIND_CLUSTER}"
+kind load docker-image causa/stage2-rca:latest  --name "${KIND_CLUSTER}"
+kind load docker-image causa/dashboard:latest   --name "${KIND_CLUSTER}"
 echo "✓ Images loaded"
 echo ""
 
@@ -108,17 +108,17 @@ echo "✓ stage2-rca restarted"
 echo ""
 
 echo "──────────────────────────────────────────────────────"
-echo "[6/6] Rolling restart: traceops-dashboard"
+echo "[6/6] Rolling restart: causa-dashboard"
 echo "──────────────────────────────────────────────────────"
-helm upgrade --install traceops-dashboard "${ROOT_DIR}/helm/traceops-dashboard" \
+helm upgrade --install causa-dashboard "${ROOT_DIR}/helm/causa-dashboard" \
   --kube-context "${CONTEXT}" \
-  --namespace traceops-dashboard \
+  --namespace causa-dashboard \
   --create-namespace \
-  -f "${ROOT_DIR}/helm/traceops-dashboard/values.yaml" \
-  -f "${ROOT_DIR}/helm/traceops-dashboard/values-${ENV}.yaml" \
+  -f "${ROOT_DIR}/helm/causa-dashboard/values.yaml" \
+  -f "${ROOT_DIR}/helm/causa-dashboard/values-${ENV}.yaml" \
   --wait \
   --timeout 3m
-echo "✓ traceops-dashboard restarted"
+echo "✓ causa-dashboard restarted"
 echo ""
 
 # ── Done ────────────────────────────────────────────────────
@@ -127,8 +127,8 @@ echo "  All images rebuilt and pods restarted successfully!"
 echo "========================================================"
 echo ""
 echo "  Access the dashboard:"
-echo "    kubectl --context ${CONTEXT} -n traceops-dashboard \\"
-echo "      port-forward svc/traceops-dashboard 8090:8090"
+echo "    kubectl --context ${CONTEXT} -n causa-dashboard \\"
+echo "      port-forward svc/causa-dashboard 8090:8090"
 echo "    → http://localhost:8090"
 echo ""
 echo "  Verify:"

@@ -80,7 +80,7 @@ data:
         spike_limit_mib: {{ .Values.config.processors.memoryLimiter.spikeLimitMib }}
 
       # Enrich every signal with Kubernetes metadata (pod, namespace,
-      # node, labels, owner). This is TraceOps' unified tagging — it
+      # node, labels, owner). This is Causa' unified tagging — it
       # lets Stage 2 correlate a trace, its logs, and its pod metrics.
       k8sattributes:
         auth_type: serviceAccount
