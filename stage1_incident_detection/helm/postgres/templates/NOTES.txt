@@ -1,0 +1,21 @@
+PostgreSQL is now running inside the cluster.
+
+Internal DNS address (for Stage 2 RCA engine and the custom dashboard):
+
+  Host:     postgres.postgres.svc.cluster.local
+  Port:     5432
+  Database: {{ .Values.auth.database }}
+  User:     {{ .Values.auth.username }}
+
+The rca_reports table was created automatically by the init script.
+Indexes on triggered_at, failure_type, root_cause_service are ready.
+
+To connect from your laptop:
+  kubectl -n postgres port-forward svc/postgres 5432:5432
+  psql -h localhost -U {{ .Values.auth.username }} -d {{ .Values.auth.database }}
+
+To tail Postgres logs:
+  kubectl -n postgres logs -f deployment/postgres
+
+To inspect the schema:
+  \d rca_reports

@@ -1,0 +1,72 @@
+# ============================================================
+# MinIO (for Tempo) — Default values (shared across environments)
+# Override with values-dev.yaml or values-prod.yaml
+#
+# Dedicated MinIO instance. Tempo writes its metric blocks here via
+# the S3 API. One bucket: tempo-traces (created on first boot).
+# ============================================================
+
+replicaCount: 1   # Single-node MinIO (standalone). Scale to distributed
+                  # mode separately if you outgrow one node.
+
+image:
+  repository: minio/minio
+  tag: "RELEASE.2024-06-13T22-53-53Z"
+  pullPolicy: IfNotPresent
+
+# mc client image used by the bucket-provisioning Job.
+mcImage:
+  repository: minio/mc
+  tag: "RELEASE.2024-06-12T14-34-03Z"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "minio-tempo"
+
+# Root credentials for the MinIO server (also used as the S3
+# access/secret key by Tempo).
+#   dev  → plain-text values below are applied.
+#   prod → set existingSecret to a pre-created Secret; the fields
+#          below are then ignored (see values-prod.yaml).
+auth:
+  rootUser: "minio"
+  rootPassword: "minio_dev_pass"
+  existingSecret: ""            # e.g. "minio-tempo-secret"
+  rootUserKey: "root-user"
+  rootPasswordKey: "root-password"
+
+# Bucket Tempo writes its blocks into. Created by a post-install Job.
+bucket: "tempo-traces"
+
+service:
+  type: ClusterIP
+  ports:
+    api: 9000       # S3 API — Tempo connects here
+    console: 9001   # MinIO web console
+
+persistence:
+  enabled: false    # dev: ephemeral. prod overrides to true.
+  storageClassName: ""
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

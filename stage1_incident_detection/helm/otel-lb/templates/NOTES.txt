@@ -1,0 +1,37 @@
+OpenTelemetry Load Balancer has been deployed successfully!
+
+Component: OTel LB (trace-ID load balancer — sits between agents and gateway)
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+Replicas:   {{ .Values.replicaCount }}
+
+Role:
+  Receives traces from the agents and re-exports them with the
+  loadbalancingexporter (routing_key: traceID). Every span of a
+  trace is hashed to the SAME gateway pod, so the gateway's
+  tail_sampling processor always sees whole traces — even with a
+  multi-replica, autoscaled gateway.
+
+Trace path:
+  agents → otel-lb ({{ include "otel-lb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.otlpGrpc }})
+         → gateway pods ({{ .Values.gateway.service }}.{{ .Values.gateway.namespace }}, port {{ .Values.gateway.port }}, discovered via k8s resolver)
+         → Tempo
+
+  (Metrics and logs bypass this tier and go agents → gateway directly.)
+
+IMPORTANT — decision_wait vs. p99 trace duration:
+  The gateway's tail_sampling.decision_wait must be >= your p99 trace
+  duration, so all spans of a trace arrive before the keep/drop
+  decision. Find p99 in Tempo/Grafana, then set it in the gateway
+  chart: helm/otel-collector/values-prod.yaml
+    config.processors.tailSampling.decisionWait  (default prod: 15s)
+
+Verify deployment:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "otel-lb.fullname" . }}
+  # Confirm the resolver found gateway pods (look for "resolver" / backend count):
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "otel-lb.fullname" . }} | grep -i resolver
+
+Health check:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "otel-lb.fullname" . }} {{ .Values.service.ports.healthCheck }}:{{ .Values.service.ports.healthCheck }}
+  curl http://localhost:{{ .Values.service.ports.healthCheck }}

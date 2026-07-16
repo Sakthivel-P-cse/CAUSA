@@ -1,0 +1,28 @@
+MinIO (for Tempo) has been deployed successfully!
+
+Component: MinIO — dedicated object storage for Grafana Tempo
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+S3 endpoint (Tempo connects here):
+  http://{{ include "minio-tempo.endpoint" . }}
+Bucket (auto-created by the post-install Job):
+  {{ .Values.bucket }}
+Credentials source:
+  {{- if .Values.auth.existingSecret }}
+  existing Secret "{{ .Values.auth.existingSecret }}" (keys: {{ .Values.auth.rootUserKey }} / {{ .Values.auth.rootPasswordKey }})
+  {{- else }}
+  chart-managed Secret "{{ include "minio-tempo.fullname" . }}-secret" (dev credentials)
+  {{- end }}
+
+Verify:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs job/{{ include "minio-tempo.fullname" . }}-createbucket
+  # Confirm the bucket exists:
+  kubectl -n {{ .Release.Namespace }} run mc --rm -it --restart=Never \
+    --image={{ .Values.mcImage.repository }}:{{ .Values.mcImage.tag }} -- \
+    sh -c 'mc alias set m http://{{ include "minio-tempo.endpoint" . }} <USER> <PASS> && mc ls m'
+
+Web console (port-forward):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "minio-tempo.fullname" . }} {{ .Values.service.ports.console }}:{{ .Values.service.ports.console }}
+  → http://localhost:{{ .Values.service.ports.console }}

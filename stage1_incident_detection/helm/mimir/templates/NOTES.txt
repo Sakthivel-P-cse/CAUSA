@@ -1,0 +1,26 @@
+Grafana Mimir (monolithic) has been deployed successfully!
+
+Component: Mimir — horizontally scalable long-term metric storage
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+Remote-write target (point Prometheus here):
+  http://{{ include "mimir.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}/api/v1/push
+  {{- if .Values.config.multitenancyEnabled }}
+  Requires header: X-Scope-OrgID (Prometheus sends "traceops")
+  {{- end }}
+
+Object storage:
+  bucket "{{ .Values.config.storage.bucket }}" in MinIO at {{ .Values.config.storage.endpoint }}
+  S3 creds from Secret: {{ include "mimir.s3SecretName" . }}
+
+Query API (Grafana/dashboard datasource, PromQL-compatible):
+  http://{{ include "mimir.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}/prometheus
+
+Verify:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mimir.fullname" . }} {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }}
+  curl -s http://localhost:{{ .Values.service.ports.http }}/ready
+  # Confirm samples are landing (after Prometheus starts pushing):
+  curl -s -H 'X-Scope-OrgID: traceops' \
+    'http://localhost:{{ .Values.service.ports.http }}/prometheus/api/v1/query?query=up' | head

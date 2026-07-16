@@ -1,0 +1,51 @@
+# ============================================================
+# Tempo — Production environment overrides
+# PersistentVolume, higher resources, longer retention
+# ============================================================
+
+replicaCount: 1
+
+# NOTE: keep this as a SINGLE config: block. A second top-level
+# config: key would silently override this one (YAML last-key-wins).
+config:
+  # Traces now live in object storage (MinIO). The PVC below is only
+  # the WAL/generator scratch dir, not the trace blocks themselves.
+  backend: s3
+  storage:
+    bucket: "tempo-traces"
+    endpoint: "minio-tempo.minio-tempo.svc.cluster.local:9000"
+    region: "us-east-1"
+    insecure: true   # in-cluster plain HTTP to MinIO
+    # S3 creds must match the minio-tempo root creds. Pre-create:
+    #   kubectl -n tempo create secret generic tempo-s3-secret \
+    #     --from-literal=root-user='<ACCESS_KEY>' \
+    #     --from-literal=root-password='<SECRET_KEY>'
+    existingSecret: "tempo-s3-secret"
+    accessKeyKey: "root-user"
+    secretKeyKey: "root-password"
+  retention: 168h    # 7 days
+  ingester:
+    max_block_duration: 30m
+  compactor:
+    compaction:
+      block_retention: 168h
+  # Metrics generator — prod uses full capacity
+  metricsGenerator:
+    serviceGraphs:
+      maxItems: 10000
+      workers: 10
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  storageClassName: "standard"   # Change to your cluster's storage class
+  size: 20Gi
+  accessModes:
+    - ReadWriteOnce

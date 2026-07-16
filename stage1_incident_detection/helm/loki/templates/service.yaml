@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "loki.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "loki.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "loki.selectorLabels" . | nindent 4 }}
+  ports:
+    # Loki HTTP API — receives logs from OTel Collector (loki exporter)
+    # and serves Grafana LogQL queries
+    - name: http
+      port: {{ .Values.service.ports.http }}
+      targetPort: http
+      protocol: TCP
+    # Loki internal gRPC
+    - name: grpc
+      port: {{ .Values.service.ports.grpc }}
+      targetPort: grpc
+      protocol: TCP

@@ -1,0 +1,26 @@
+# ============================================================
+# Loki — Development environment overrides
+# Local filesystem, minimal resources, short retention
+# ============================================================
+
+replicaCount: 1
+
+config:
+  auth_enabled: false
+  backend: filesystem
+  retention: 6h
+  limits_config:
+    retention_period: 6h
+    ingestion_rate_mb: 5
+    ingestion_burst_size_mb: 10
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+persistence:
+  enabled: false   # emptyDir in dev — logs are ephemeral

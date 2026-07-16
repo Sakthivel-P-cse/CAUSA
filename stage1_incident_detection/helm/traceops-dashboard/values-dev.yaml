@@ -1,0 +1,3 @@
+# values-dev.yaml — development overrides for traceops-dashboard
+env:
+  POSTGRES_PASSWORD: "traceops_dev_pass"

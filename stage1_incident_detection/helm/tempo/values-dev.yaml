@@ -1,0 +1,33 @@
+# ============================================================
+# Tempo — Development environment overrides
+# Local storage, minimal resources, short retention
+# ============================================================
+
+replicaCount: 1
+
+config:
+  backend: local
+  retention: 6h
+  ingester:
+    max_block_duration: 5m
+  compactor:
+    compaction:
+      block_retention: 6h
+  metricsGenerator:
+    serviceGraphs:
+      maxItems: 10000
+      workers: 6
+    forwarder:
+      queueSize: 20000
+      workers: 12
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+persistence:
+  enabled: false   # Use emptyDir in dev — data is ephemeral

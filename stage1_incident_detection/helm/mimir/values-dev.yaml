@@ -1,0 +1,19 @@
+# ============================================================
+# Mimir — Development overrides
+# Ephemeral, small footprint, inline dev S3 creds.
+# ============================================================
+
+config:
+  limits:
+    compactorBlocksRetentionPeriod: "24h"   # dev: don't hoard blocks
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

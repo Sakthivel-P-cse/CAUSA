@@ -1,0 +1,47 @@
+replicaCount: 1
+
+image:
+  repository: traceops/stage2-rca
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+env:
+  PROMETHEUS_URL: "http://prometheus.prometheus.svc.cluster.local:9090"
+  TEMPO_URL:      "http://tempo.tempo.svc.cluster.local:3200"
+  LOKI_URL:       "http://loki.loki.svc.cluster.local:3100"
+  POSTGRES_HOST:  "postgres.postgres.svc.cluster.local"
+  POSTGRES_PORT:  "5432"
+  POSTGRES_DB:    "traceops"
+  POSTGRES_USER:  "traceops"
+  REDIS_URL:      "redis://localhost:6379"
+  # Environment versatility config
+  TRACEOPS_TARGET_NAMESPACE: ""
+  TRACEOPS_MONITORED_SERVICES_REGEX: ""
+  TRACEOPS_EXCLUDED_SERVICES_REGEX: ""
+  TRACEOPS_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
+
+existingSecret: ""   # set in prod to avoid plain-text passwords in values
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  port: 6379
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

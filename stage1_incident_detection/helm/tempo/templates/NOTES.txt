@@ -1,0 +1,21 @@
+Tempo has been deployed successfully!
+
+Component: Grafana Tempo (Distributed Tracing Backend)
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+Service Endpoints (ClusterIP — internal only):
+  OTLP gRPC:    tempo.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.otlpGrpc }}
+  OTLP HTTP:    tempo.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.otlpHttp }}
+  Query HTTP:   tempo.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.tempoQuery }}
+
+Verify deployment:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs deploy/tempo
+
+Grafana Datasource URL (use this in Grafana):
+  http://tempo.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.tempoQuery }}
+
+Port-forward for local access:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/tempo {{ .Values.service.ports.tempoQuery }}:{{ .Values.service.ports.tempoQuery }}
+  curl http://localhost:{{ .Values.service.ports.tempoQuery }}/ready

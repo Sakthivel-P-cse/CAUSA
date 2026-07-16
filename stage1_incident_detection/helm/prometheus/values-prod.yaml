@@ -1,0 +1,71 @@
+# ============================================================
+# Prometheus — Production environment overrides
+# Longer retention, persistent storage, remote_write optional
+# ============================================================
+
+config:
+  # Local retention is short: it's a hot buffer for alerting/recent
+  # queries. Long-term retention lives in the remote store (Mimir).
+  retention: 30d
+  globalScrapeInterval: 30s
+  globalEvaluationInterval: 30s
+
+  # HA dedup: run 2 Prometheus replicas with the SAME cluster label and
+  # DIFFERENT replica label. Thanos/Mimir collapse the duplicate streams.
+  # Set the replica per-pod at deploy time, e.g.:
+  #   --set config.externalLabels.replica=$(POD_NAME)
+  externalLabels:
+    cluster: traceops-prod
+    replica: "0"
+
+  # ── Metrics scale-out ───────────────────────────────────────────
+  # Ship every sample to Mimir. A single Prometheus TSDB cannot hold
+  # large-fleet cardinality; Mimir owns long-term storage + query
+  # fan-out while this Prometheus stays the scrape + alert engine.
+  remoteWrite:
+    enabled: true
+    # Mimir push endpoint (monolithic mode: one service on :8080).
+    # Swap for Thanos Receive
+    # (http://thanos-receive.monitoring.svc.cluster.local:19291/api/v1/receive)
+    # or Grafana Cloud / AMP as needed.
+    url: "http://mimir.mimir.svc.cluster.local:8080/api/v1/push"
+    headers:
+      # Mimir/Cortex tenant. Required unless the store runs with
+      # auth_enabled=false (single-tenant "anonymous").
+      X-Scope-OrgID: traceops
+    basicAuth:
+      # Enable + create the secret when the store fronts auth:
+      #   kubectl -n prometheus create secret generic prometheus-remote-write \
+      #     --from-literal=password='<REMOTE_WRITE_PASSWORD>'
+      enabled: false
+      username: traceops
+      secretName: prometheus-remote-write
+      secretKey: password
+    queueConfig:
+      # Prod fleet volumes: more shards + larger batches than the
+      # base defaults so the write path keeps up under load.
+      maxSamplesPerSend: 2000
+      maxShards: 500
+      minShards: 2
+      capacity: 10000
+      batchSendDeadline: 5s
+    writeRelabelConfigs:
+      # Trim Go-runtime internals that inflate cardinality with no RCA value.
+      - source_labels: [__name__]
+        regex: "go_gc_.*|go_memstats_.*"
+        action: drop
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+persistence:
+  enabled: true
+  storageClassName: "standard"   # Override at deploy time: STORAGE_CLASS=<name> ./scripts/deploy.sh prod
+  size: 40Gi
+  accessModes:
+    - ReadWriteOnce

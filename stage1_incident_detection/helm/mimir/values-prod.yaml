@@ -1,0 +1,38 @@
+# ============================================================
+# Mimir — Production overrides
+# Persistent WAL, larger footprint, S3 creds from a Secret,
+# long block retention.
+#
+# The S3 creds must match the MinIO root credentials. Reuse the same
+# Secret shape as minio-mimir. Pre-create it before deploying prod:
+#   kubectl create namespace mimir --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl -n mimir create secret generic mimir-s3-secret \
+#     --from-literal=root-user='<ACCESS_KEY>' \
+#     --from-literal=root-password='<SECRET_KEY>'
+# ============================================================
+
+config:
+  storage:
+    existingSecret: "mimir-s3-secret"
+    accessKeyKey: "root-user"
+    secretKeyKey: "root-password"
+  limits:
+    ingestionRate: 250000
+    ingestionBurstSize: 500000
+    maxGlobalSeriesPerUser: 5000000
+    compactorBlocksRetentionPeriod: "8760h"   # 1 year long-term retention
+
+persistence:
+  enabled: true
+  storageClassName: "standard"   # Override: STORAGE_CLASS=<name> ./scripts/deploy.sh prod
+  size: 50Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi

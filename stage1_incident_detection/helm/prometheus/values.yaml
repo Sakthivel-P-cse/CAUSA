@@ -1,0 +1,185 @@
+# ============================================================
+# Prometheus — Default values (shared across all environments)
+# Override with values-dev.yaml or values-prod.yaml
+# ============================================================
+
+replicaCount: 1
+
+image:
+  repository: prom/prometheus
+  tag: "v2.50.1"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "prometheus"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 9090     # Prometheus HTTP API and UI
+
+config:
+  # Data retention duration
+  retention: 15d
+
+  # Scrape interval — how often to pull metrics
+  globalScrapeInterval: 30s
+  globalEvaluationInterval: 30s
+
+  # Scrape targets — static (simple HTTP endpoints)
+  scrapeConfigs:
+    - jobName: otel-collector
+      staticConfigs:
+        - targets:
+            - otel-collector.otel-collector.svc.cluster.local:8888
+    # otel-lb — trace-ID load balancer self-telemetry (Deployment, so a
+    # ClusterIP target load-balances across its pods; fine for own-metrics).
+    - jobName: otel-lb
+      staticConfigs:
+        - targets:
+            - otel-lb.otel-lb.svc.cluster.local:8888
+    # kube-state-metrics — Kubernetes object state metrics (Graph 2)
+    - jobName: kube-state-metrics
+      staticConfigs:
+        - targets:
+            - kube-state-metrics.kube-state-metrics.svc.cluster.local:8080
+    # mimir — long-term metric store self-telemetry (remote_write target)
+    - jobName: mimir
+      staticConfigs:
+        - targets:
+            - mimir.mimir.svc.cluster.local:8080
+
+  # Extra scrape configs using Kubernetes SD — rendered as raw YAML via tpl.
+  # Required for node-exporter (endpoint discovery) and cAdvisor (node role).
+  # Stage 2 RCA Graph 2 (Infrastructure Level Graph) depends on these metrics.
+  extraScrapeConfigs: |
+    # ── otel-agent — per-node collector self-telemetry ─────────────────────
+    # DaemonSet: one pod per node, so discover via endpoints (a static
+    # ClusterIP would scrape only one random pod). Health signals here
+    # feed the collector-health alert rules (send-failed / refused spans).
+    - job_name: otel-agent
+      kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names: [otel-agent]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          regex: metrics
+          action: keep
+        - source_labels: [__meta_kubernetes_endpoint_node_name]
+          target_label: node
+
+    # ── node-exporter — hardware metrics per node ──────────────────────────
+    - job_name: node-exporter
+      kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names: [node-exporter]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          regex: node-exporter
+          action: keep
+        - source_labels: [__meta_kubernetes_endpoint_node_name]
+          target_label: node
+
+    # ── cAdvisor — container CPU / memory per pod ──────────────────────────
+    # cAdvisor is embedded in every kubelet — accessed via K8s API proxy.
+    # Provides: container_cpu_usage_seconds_total, container_memory_usage_bytes
+    - job_name: cadvisor
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+        - role: node
+      relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_node_name]
+          regex: (.+)
+          target_label: __metrics_path__
+          replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+      metric_relabel_configs:
+        # Drop high-cardinality metrics not needed for RCA
+        - source_labels: [__name__]
+          regex: container_(network_tcp_usage_total|tasks_state|cpu_load_average_10s|blkio_device_usage_total)
+          action: drop
+
+  # Alertmanager address — Prometheus sends fired alerts here
+  # Alertmanager then routes them to Stage 2 webhook
+  alertmanagerUrl: "alertmanager.alertmanager.svc.cluster.local:9093"
+
+  # Labels stamped on every series shipped via remote_write. Required
+  # for Thanos/Mimir to deduplicate samples from HA Prometheus pairs:
+  # give each replica the SAME cluster but a DIFFERENT replica value.
+  # Empty by default (single-Prometheus dev needs no external labels).
+  externalLabels: {}
+    # cluster: traceops
+    # replica: "0"
+
+  # Remote write — ship samples to a horizontally scalable long-term
+  # store (Mimir/Thanos/Cortex). Disabled by default; enabled in prod.
+  remoteWrite:
+    enabled: false
+    url: ""   # e.g. http://mimir-distributor.mimir.svc.cluster.local:8080/api/v1/push
+    # Extra HTTP headers. Mimir/Cortex use X-Scope-OrgID for tenancy.
+    headers: {}
+      # X-Scope-OrgID: traceops
+    # Basic auth. Password is mounted from a Secret (never inlined).
+    basicAuth:
+      enabled: false
+      username: ""
+      secretName: "prometheus-remote-write"
+      secretKey: "password"
+    # Queue tuning — governs throughput and memory of the write path.
+    queueConfig:
+      maxSamplesPerSend: 1000
+      maxShards: 200
+      minShards: 1
+      capacity: 2500
+      batchSendDeadline: 5s
+    # Drop noisy/high-cardinality series before they leave the cluster.
+    writeRelabelConfigs: []
+      # - source_labels: [__name__]
+      #   regex: "go_gc_.*|go_memstats_.*"
+      #   action: drop
+
+rules:
+  core:
+    enabled: true
+  appWorkloads:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: false
+  storageClassName: ""
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+serviceAccount:
+  create: true
+  name: ""
+
+# RBAC — Prometheus needs read access to discover scrape targets via ServiceMonitors
+rbac:
+  create: true
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

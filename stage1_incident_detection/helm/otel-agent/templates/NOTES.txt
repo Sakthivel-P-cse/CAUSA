@@ -1,0 +1,38 @@
+OpenTelemetry Agent (DaemonSet) has been deployed successfully!
+
+Component: OTel Agent (per-node collector — tier 1 of 2)
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+Role:
+  Runs ONE pod per node. Receives OTLP from local pods, tails node
+  container logs (filelog), scrapes node host metrics (hostmetrics),
+  enriches every signal with Kubernetes attributes, and forwards
+  OTLP → the GATEWAY. It does NOT write to storage.
+
+Forwarding to gateway:
+  {{ .Values.gateway.endpoint }}  (OTLP gRPC, insecure={{ .Values.gateway.tls.insecure }})
+
+Configure your application SDK to send to the NODE-LOCAL agent
+(the agent listens on the node's host IP via hostPort):
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://$(HOST_IP):{{ .Values.service.ports.otlpHttp }}
+  # In a pod spec, inject HOST_IP via the downward API:
+  #   env:
+  #     - name: HOST_IP
+  #       valueFrom:
+  #         fieldRef:
+  #           fieldPath: status.hostIP
+  # or gRPC:
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=$(HOST_IP):{{ .Values.service.ports.otlpGrpc }}
+
+Per-node signals collected here (must not run centrally):
+  filelog     → /var/log/pods/*/*/*.log   (container stdout/stderr)
+  hostmetrics → CPU / memory / disk / filesystem / network / load
+
+Verify deployment:
+  kubectl -n {{ .Release.Namespace }} get pods -o wide   # one per node
+  kubectl -n {{ .Release.Namespace }} logs ds/otel-agent
+
+Health check:
+  kubectl -n {{ .Release.Namespace }} port-forward ds/otel-agent {{ .Values.service.ports.healthCheck }}:{{ .Values.service.ports.healthCheck }}
+  curl http://localhost:{{ .Values.service.ports.healthCheck }}

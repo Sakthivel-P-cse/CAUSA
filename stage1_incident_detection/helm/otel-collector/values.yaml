@@ -1,0 +1,109 @@
+# ============================================================
+# OpenTelemetry Collector — Default values
+# Central receiver: OTLP in → Tempo/Prometheus/Loki out
+# ============================================================
+
+replicaCount: 1
+
+# Gateway autoscaling. Disabled by default (dev). Enabled in prod so
+# the gateway tier scales with telemetry volume. When enabled, the
+# Deployment omits a static replica count and the HPA owns it.
+autoscaling:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.96.0"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "otel-collector"
+
+service:
+  type: ClusterIP
+  ports:
+    otlpGrpc: 4317     # OTLP gRPC — received from applications
+    otlpHttp: 4318     # OTLP HTTP — received from applications
+    metrics: 8888      # Collector's own Prometheus metrics (scraped by Prometheus)
+    healthCheck: 13133 # Health check extension
+
+config:
+  # ---- Receivers ------------------------------------------------
+  # Application sends telemetry to these endpoints.
+  receivers:
+    otlp:
+      grpcEndpoint: "0.0.0.0:4317"
+      httpEndpoint: "0.0.0.0:4318"
+
+  # ---- Processors -----------------------------------------------
+  # Applied to all pipelines for reliability and efficiency.
+  processors:
+    # Batch data before exporting — reduces network calls
+    batch:
+      sendBatchSize: 1024
+      timeout: 5s
+    # Prevent OOM by dropping data when memory is high
+    memoryLimiter:
+      checkInterval: 1s
+      limitMib: 400
+      spikeLimitMib: 128
+    # Tail sampling — keep all error/slow traces, sample the rest.
+    # decisionWait should be >= your p99 trace duration so a trace's
+    # spans have all arrived before the keep/drop decision is made.
+    tailSampling:
+      decisionWait: 10s
+      numTraces: 50000
+      expectedNewTracesPerSec: 100
+      latencyThresholdMs: 500
+      samplingPercentage: 10
+
+  # ---- Exporters ------------------------------------------------
+  # Routes data to backend services.
+  exporters:
+    # Traces → Tempo. protocol: "http" (otlphttp :4318) or "grpc" (otlp :4317).
+    # PRD2 §12 prefers gRPC for Tempo; use http for simple local/dev setups.
+    tempo:
+      protocol: "http"
+      endpoint: "http://tempo.tempo.svc.cluster.local:4318"
+      tls:
+        insecure: true    # Use false + cert in production
+
+    # Metrics → Prometheus via Remote Write (push to :9090)
+    prometheusremotewrite:
+      endpoint: "http://prometheus.prometheus.svc.cluster.local:9090/api/v1/write"
+      tls:
+        insecure: true
+
+    # Logs → Loki via HTTP
+    loki:
+      endpoint: "http://loki.loki.svc.cluster.local:3100/loki/api/v1/push"
+      tls:
+        insecure: true
+
+    # Debug exporter — logs all received data (dev only)
+    debug:
+      verbosity: basic
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

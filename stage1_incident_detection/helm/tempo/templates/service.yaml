@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tempo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tempo.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "tempo.selectorLabels" . | nindent 4 }}
+  ports:
+    # OTLP gRPC — used by OTel Collector to push traces
+    - name: otlp-grpc
+      port: {{ .Values.service.ports.otlpGrpc }}
+      targetPort: otlp-grpc
+      protocol: TCP
+    # OTLP HTTP — alternate push endpoint
+    - name: otlp-http
+      port: {{ .Values.service.ports.otlpHttp }}
+      targetPort: otlp-http
+      protocol: TCP
+    # Tempo query HTTP API — used by Grafana datasource
+    - name: http
+      port: {{ .Values.service.ports.tempoQuery }}
+      targetPort: http
+      protocol: TCP

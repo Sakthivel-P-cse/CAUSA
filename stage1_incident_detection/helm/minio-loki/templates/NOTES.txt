@@ -1,0 +1,28 @@
+MinIO (for Loki) has been deployed successfully!
+
+Component: MinIO — dedicated object storage for Grafana Loki
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+S3 endpoint (Loki connects here):
+  http://{{ include "minio-loki.endpoint" . }}
+Bucket (auto-created by the post-install Job):
+  {{ .Values.bucket }}
+Credentials source:
+  {{- if .Values.auth.existingSecret }}
+  existing Secret "{{ .Values.auth.existingSecret }}" (keys: {{ .Values.auth.rootUserKey }} / {{ .Values.auth.rootPasswordKey }})
+  {{- else }}
+  chart-managed Secret "{{ include "minio-loki.fullname" . }}-secret" (dev credentials)
+  {{- end }}
+
+Verify:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs job/{{ include "minio-loki.fullname" . }}-createbucket
+  # Confirm the bucket exists:
+  kubectl -n {{ .Release.Namespace }} run mc --rm -it --restart=Never \
+    --image={{ .Values.mcImage.repository }}:{{ .Values.mcImage.tag }} -- \
+    sh -c 'mc alias set m http://{{ include "minio-loki.endpoint" . }} <USER> <PASS> && mc ls m'
+
+Web console (port-forward):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "minio-loki.fullname" . }} {{ .Values.service.ports.console }}:{{ .Values.service.ports.console }}
+  → http://localhost:{{ .Values.service.ports.console }}

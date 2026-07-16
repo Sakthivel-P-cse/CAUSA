@@ -1,0 +1,149 @@
+# ============================================================
+# Namespace Definitions — TraceOps Observability Stack
+# All components run in isolated namespaces for clean RBAC
+# and resource quota management.
+# ============================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tempo
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: backend
+    traceops/component: traces
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: loki
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: backend
+    traceops/component: logs
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio-loki
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: storage
+    traceops/component: object-storage-loki
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio-tempo
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: storage
+    traceops/component: object-storage-tempo
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prometheus
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: backend
+    traceops/component: metrics
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mimir
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: backend
+    traceops/component: metrics-longterm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio-mimir
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: storage
+    traceops/component: object-storage-mimir
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-agent
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: ingestion
+    traceops/component: agent
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-collector
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: ingestion
+    traceops/component: gateway
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-lb
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: ingestion
+    traceops/component: load-balancer
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: storage
+    traceops/component: postgres
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stage2-rca
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: rca
+    traceops/component: stage2-rca
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traceops-dashboard
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: dashboard
+    traceops/component: traceops-dashboard
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-state-metrics
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: infrastructure
+    traceops/component: kube-state-metrics
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-exporter
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: infrastructure
+    traceops/component: node-exporter
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: alertmanager
+  labels:
+    app.kubernetes.io/part-of: traceops
+    traceops/layer: alerting
+    traceops/component: alertmanager

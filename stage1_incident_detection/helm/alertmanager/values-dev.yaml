@@ -1,0 +1,17 @@
+# ============================================================
+# Alertmanager — Development overrides
+# ============================================================
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 64Mi
+
+# In dev, repeat alerts less frequently to reduce noise
+config:
+  repeatInterval: 3h
+  groupWait: 1m
+  groupInterval: 10m

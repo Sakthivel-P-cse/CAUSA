@@ -1,0 +1,21 @@
+# values-prod.yaml — production overrides for traceops-dashboard
+replicaCount: 2
+
+existingSecret: "dashboard-secret"   # must contain POSTGRES_PASSWORD
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: traceops.your-domain.com
+  tls:
+    - secretName: traceops-tls
+      hosts:
+        - traceops.your-domain.com

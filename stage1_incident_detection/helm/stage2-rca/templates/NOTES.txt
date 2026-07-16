@@ -1,0 +1,11 @@
+Stage 2 RCA Engine deployed!
+
+Webhook endpoint (internal):
+  http://{{ include "stage2-rca.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/trigger
+
+Health check:
+  http://{{ include "stage2-rca.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/health
+
+Configure Alertmanager to POST webhooks to the /trigger endpoint.
+
+Redis sidecar is {{ if .Values.redis.enabled }}ENABLED{{ else }}DISABLED{{ end }} (baseline store).

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: stage2-rca
+description: Stage 2 RCA Engine — webhook receiver + Redis baseline store
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

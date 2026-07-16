@@ -1,0 +1,9 @@
+apiVersion: v2
+name: alertmanager
+description: Alertmanager — routes Prometheus alerts to Stage 2 RCA webhook and notification channels
+type: application
+version: 0.1.0
+appVersion: "0.27.0"
+keywords:
+  - alerting
+  - traceops

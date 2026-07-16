@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-collector.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otel-collector.labels" . | nindent 4 }}
+data:
+  otel-collector-config.yaml: |
+    # =================================================================
+    # OpenTelemetry Collector Pipeline Configuration
+    #
+    # Flow:
+    #   Application ─OTLP─→ [Receivers]
+    #                              │
+    #                        [Processors]
+    #                      batch + memory_limiter
+    #                              │
+    #              ┌───────────────┼───────────────┐
+    #           Traces          Metrics           Logs
+    #              │               │               │
+    #           [Tempo]    [Prometheus]         [Loki]
+    # =================================================================
+
+    extensions:
+      health_check:
+        endpoint: "0.0.0.0:{{ .Values.service.ports.healthCheck }}"
+      pprof:
+        endpoint: "0.0.0.0:1777"
+      zpages:
+        endpoint: "0.0.0.0:55679"
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: {{ .Values.config.receivers.otlp.grpcEndpoint }}
+          http:
+            endpoint: {{ .Values.config.receivers.otlp.httpEndpoint }}
+
+    processors:
+      memory_limiter:
+        check_interval: {{ .Values.config.processors.memoryLimiter.checkInterval }}
+        limit_mib: {{ .Values.config.processors.memoryLimiter.limitMib }}
+        spike_limit_mib: {{ .Values.config.processors.memoryLimiter.spikeLimitMib }}
+
+      batch:
+        send_batch_size: {{ .Values.config.processors.batch.sendBatchSize }}
+        timeout: {{ .Values.config.processors.batch.timeout }}
+
+      # Attach resource attributes to all signals
+      resource:
+        attributes:
+          - action: insert
+            key: deployment.environment
+            value: {{ .Release.Namespace }}
+
+      # ── Tail sampling (gateway-only) ───────────────────────────────
+      # Decides which whole traces to keep AFTER all spans arrive.
+      # Keep every error/slow trace; probabilistically sample the rest.
+      # NOTE: all spans of a trace must reach the SAME gateway instance
+      # for this to be correct. With >1 replica, front this tier with a
+      # load-balancing collector (loadbalancingexporter, routing_key:
+      # traceID). See values-prod.yaml and NOTES.txt.
+      tail_sampling:
+        decision_wait: {{ .Values.config.processors.tailSampling.decisionWait }}
+        num_traces: {{ .Values.config.processors.tailSampling.numTraces }}
+        expected_new_traces_per_sec: {{ .Values.config.processors.tailSampling.expectedNewTracesPerSec }}
+        policies:
+          # 1. Always keep traces that contain an error span.
+          - name: keep-errors
+            type: status_code
+            status_code:
+              status_codes: [ERROR]
+          # 2. Always keep slow traces (latency in milliseconds).
+          - name: keep-slow
+            type: latency
+            latency:
+              threshold_ms: {{ .Values.config.processors.tailSampling.latencyThresholdMs }}
+          # 3. Catch-all: probabilistically sample everything else.
+          - name: probabilistic-catch-all
+            type: probabilistic
+            probabilistic:
+              sampling_percentage: {{ .Values.config.processors.tailSampling.samplingPercentage }}
+
+    exporters:
+      # ── Traces → Tempo ─────────────────────────────────────────────
+      # PRD2 §12: Tempo speaks OTLP gRPC — use gRPC where the backend
+      # speaks OTLP. protocol=grpc (prod) → otlp exporter on :4317;
+      # protocol=http (dev) → otlphttp exporter on :4318.
+{{- if eq (.Values.config.exporters.tempo.protocol | default "http") "grpc" }}
+      otlp/tempo:
+        endpoint: {{ .Values.config.exporters.tempo.endpoint }}
+        tls:
+          insecure: {{ .Values.config.exporters.tempo.tls.insecure }}
+{{- else }}
+      otlphttp/tempo:
+        endpoint: {{ .Values.config.exporters.tempo.endpoint }}
+        tls:
+          insecure: {{ .Values.config.exporters.tempo.tls.insecure }}
+{{- end }}
+
+      # ── Metrics → Prometheus via Remote Write (push to :9090) ────────
+      prometheusremotewrite:
+        endpoint: {{ .Values.config.exporters.prometheusremotewrite.endpoint }}
+        tls:
+          insecure: {{ .Values.config.exporters.prometheusremotewrite.tls.insecure }}
+
+      # ── Logs → Loki ────────────────────────────────────────────────
+      loki:
+        endpoint: {{ .Values.config.exporters.loki.endpoint }}
+        tls:
+          insecure: {{ .Values.config.exporters.loki.tls.insecure }}
+        default_labels_enabled:
+          exporter: false
+          job: true
+
+      # ── Debug (dev convenience, produces no production overhead) ───
+      debug:
+        verbosity: {{ .Values.config.exporters.debug.verbosity }}
+
+    service:
+      extensions: [health_check, pprof, zpages]
+      pipelines:
+        # Traces pipeline: OTLP → tail_sampling → batch → Tempo
+        # memory_limiter first (guard), then sampling decision, then
+        # resource/batch. tail_sampling must run before batch so whole
+        # traces are evaluated together.
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, tail_sampling, resource, batch]
+{{- if eq (.Values.config.exporters.tempo.protocol | default "http") "grpc" }}
+          exporters: [otlp/tempo, debug]
+{{- else }}
+          exporters: [otlphttp/tempo, debug]
+{{- end }}
+
+        # Metrics pipeline: OTLP → batch → Prometheus remote_write (:9090)
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [prometheusremotewrite, debug]
+
+        # Logs pipeline: OTLP → batch → Loki
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [loki, debug]
+
+      # Collector's own telemetry (emitted as Prometheus metrics on :8888)
+      telemetry:
+        metrics:
+          address: "0.0.0.0:{{ .Values.service.ports.metrics }}"
+        logs:
+          level: info

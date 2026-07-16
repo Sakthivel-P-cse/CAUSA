@@ -1,0 +1,26 @@
+# Chart.yaml file defines metadata about a Helm chart, such as its name, version, description, and dependencies. These files are essential for packaging, deploying, and managing applications and services (like Grafana, Loki, Prometheus, etc.) on Kubernetes clusters using Helm.
+apiVersion: v2
+name: otel-agent
+description: >
+  OpenTelemetry Collector in AGENT mode — runs as a DaemonSet
+  (one pod per node). Receives OTLP from local pods, tails node
+  container logs (filelog), scrapes host metrics (hostmetrics),
+  enriches every signal with Kubernetes attributes, and forwards
+  everything over OTLP to the otel-collector GATEWAY. It never
+  writes to storage — it only collects and forwards.
+type: application
+version: 0.1.0
+appVersion: "0.96.0"
+keywords:
+  - opentelemetry
+  - observability
+  - agent
+  - daemonset
+  - tracing
+  - metrics
+  - logging
+home: https://opentelemetry.io/docs/collector/deployment/agent/
+sources:
+  - https://github.com/open-telemetry/opentelemetry-collector
+maintainers:
+  - name: traceops-team
