@@ -10,9 +10,7 @@
 
 Turn one incident's telemetry into a **ranked, explainable list of probable root-cause nodes**, deterministically. Given `AnomalyOutput` (from Dev A) over a topology, build the graphs, re-orient them into the **Influence Graph**, compute three signals **T/D/P**, arbitrate across layers, and emit `RootCauseCandidate`s.
 
-This lane is the tight kernel from `Team_Split.md` §1 — T, D, and P are one graph viewed three ways. **The entire RCA engine is one dev's job — yours — and is never split.** Graphs, Influence Graph, T/D/P, arbitration, and isolation all belong to you as a single coherent artifact. If the team needs more hands, they go to Dev A or Dev C, not into this core.
-
----
+This lane is the tight kernel from `Team_Split.md` §1 — T, D, and P are one graph viewed three ways. *
 
 ## Modules you build
 

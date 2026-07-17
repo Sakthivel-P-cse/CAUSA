@@ -1,0 +1,105 @@
+"""C4 Scorer interface — pure scoring for ablation / weight sweeps."""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+from contracts.types import AnomalyOutput, RankedResult
+from graphs.incident_subgraph import IncidentSubgraph
+from graphs.influence_graph import InfluenceGraph, build_influence_graph
+
+from .arbitration import arbitrate
+from .output import build_candidates
+from .signals import compute_signals
+
+DEFAULT_WEIGHTS: dict[str, float] = {"T": 1.0 / 3.0, "D": 1.0 / 3.0, "P": 1.0 / 3.0}
+ALL_SIGNALS = frozenset({"T", "D", "P"})
+
+
+def score(
+    subgraph: IncidentSubgraph,
+    weights: dict[str, float] | None = None,
+    enabled_signals: Iterable[str] | None = None,
+    *,
+    ig: InfluenceGraph | None = None,
+    anomaly: AnomalyOutput | None = None,
+    top_c: int = 5,
+    run_arbitration: bool = True,
+) -> RankedResult:
+    """Deterministic RCA scoring over an incident subgraph.
+
+    Parameters
+    ----------
+    subgraph:
+        Incident subgraph (nodes/edges + anomaly annotation).
+    weights:
+        ``{"T": float, "D": float, "P": float}``. Defaults to equal 1/3.
+    enabled_signals:
+        Subset of ``{"T", "D", "P"}``. Disabled signals contribute **0** —
+        this function zeros them internally; caller weights for disabled
+        keys are ignored.
+    ig:
+        Optional pre-built Influence Graph. If omitted, built once from
+        ``subgraph`` and reused for all signals + arbitration.
+    anomaly:
+        Defaults to ``subgraph.anomaly``.
+    top_c:
+        Top-C window for layer arbitration.
+    run_arbitration:
+        When True, apply infra-vs-service re-ranking pass.
+
+    Returns
+    -------
+    RankedResult with candidates sorted by score descending (deterministic).
+
+    Notes
+    -----
+    Side-effect free and deterministic given the same inputs — safe to call
+    repeatedly with varying weights / signal subsets for ablation sweeps.
+    No tuning logic lives here.
+    """
+    weights = dict(weights or DEFAULT_WEIGHTS)
+    enabled = set(enabled_signals) if enabled_signals is not None else set(ALL_SIGNALS)
+    enabled &= set(ALL_SIGNALS)
+
+    # Zero disabled signals internally.
+    effective = {k: (weights.get(k, 0.0) if k in enabled else 0.0) for k in ALL_SIGNALS}
+
+    anomaly = anomaly or subgraph.anomaly
+    if anomaly is None:
+        raise ValueError("anomaly required (pass anomaly= or set subgraph.anomaly)")
+
+    # Build IG once; never rebuild per signal.
+    if ig is None:
+        ig = build_influence_graph(subgraph)
+
+    signals = compute_signals(ig, anomaly)
+
+    raw_scores: dict[str, float] = {}
+    for nid, sig in signals.by_node.items():
+        s = (
+            effective["T"] * sig.T
+            + effective["D"] * sig.D
+            + effective["P"] * sig.P
+        )
+        raw_scores[nid] = s
+
+    candidates = build_candidates(signals, raw_scores, anomaly, ig)
+
+    if run_arbitration:
+        candidates = arbitrate(candidates, ig, anomaly, top_c=top_c)
+
+    return RankedResult(candidates=candidates)
+
+
+class Scorer:
+    """Thin callable wrapper around :func:`score` (C4 seam)."""
+
+    def score(
+        self,
+        subgraph: IncidentSubgraph,
+        weights: dict[str, float] | None = None,
+        enabled_signals: Iterable[str] | None = None,
+        **kwargs,
+    ) -> RankedResult:
+        return score(subgraph, weights, enabled_signals, **kwargs)
