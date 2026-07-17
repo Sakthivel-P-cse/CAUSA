@@ -27,7 +27,7 @@ kubectl -n tempo      port-forward svc/tempo      3200:3200 &
 ### Step 2 — Start all dashboards
 
 ```bash
-cd /home/sakthi/projects/causa/stage1_incident_detection/dashboards
+cd /home/sakthi/projects/causa/incident-detection/dashboards
 bash start_dashboards.sh
 ```
 

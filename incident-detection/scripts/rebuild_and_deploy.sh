@@ -19,7 +19,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"      # stage1_incident_detection/
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"      # incident-detection/
 PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"    # causa/
 
 CONTEXT="kind-gcp-demo-test"
