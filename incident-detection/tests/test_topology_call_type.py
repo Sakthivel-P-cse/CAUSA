@@ -44,8 +44,8 @@ def test_classify_kafka_is_async():
 def test_call_types_from_real_trace(tempo_trace_payload):
     spans = TempoClient._parse_spans(tempo_trace_payload)
     ct = call_types_from_spans(spans)
-    # checkoutservice --grpc--> productcatalogservice : sync
-    assert ct[("checkoutservice", "productcatalogservice")] is CallType.SYNC
+    # checkout --grpc--> product-catalog : sync  (otel-demo names, not hipstershop *service)
+    assert ct[("checkout", "product-catalog")] is CallType.SYNC
 
 
 def test_async_dominates_and_runs_on_edge():

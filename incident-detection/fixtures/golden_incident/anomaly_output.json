@@ -1,5 +1,5 @@
 {
-  "_comment": "C2 AnomalyOutput per node for the golden incident. Origin (product-catalog) deviates first and hardest; victims deviate later; valkey-cart is a slow-burn whose first_deviation is null (never crossed theta_fire). Node names are otel-demo names so they join to the scenario catalog. Each node maps to contracts.AnomalyOutput{node, anomaly_score, dev_vector, first_deviation}. Thresholds: theta_fire=0.5, k_persist=3, theta_low=0.25, kappa=3.",
+  "_comment": "C2 AnomalyOutput per node for the golden incident. Origin (product-catalog) deviates first and hardest; victims deviate later; valkey-cart is a slow-burn whose first_deviation is null (never crossed theta_fire). Onsets cascade product-catalog 12:04:00 -> checkout +20s -> frontend +40s; these first_deviation times are exactly what the C3 T signal (spec 2.1: T=clamp01(1-(FDT-t0)/horizon), horizon=min(max_delta,60)=40s) is derived from, so root_cause_candidate.json's T=1.0/0.5/0.0 stays consistent. Node names are otel-demo names so they join to the scenario catalog. Each node maps to contracts.AnomalyOutput{node, anomaly_score, dev_vector, first_deviation}. Thresholds: theta_fire=0.5, k_persist=3, theta_low=0.25, kappa=3.",
   "thresholds": { "theta_fire": 0.5, "k_persist": 3, "theta_low": 0.25, "kappa": 3.0 },
   "nodes": {
     "product-catalog": {
@@ -10,12 +10,12 @@
     "checkout": {
       "anomaly_score": 0.82,
       "dev_vector": { "error_rate": 0.82, "p95_latency": 0.74, "cpu": 0.19 },
-      "first_deviation": "2026-07-16T12:05:00+00:00"
+      "first_deviation": "2026-07-16T12:04:20+00:00"
     },
     "frontend": {
       "anomaly_score": 0.71,
       "dev_vector": { "error_rate": 0.71, "p95_latency": 0.55, "cpu": 0.09 },
-      "first_deviation": "2026-07-16T12:05:00+00:00"
+      "first_deviation": "2026-07-16T12:04:40+00:00"
     },
     "currency": {
       "anomaly_score": 0.28,

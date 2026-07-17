@@ -1,5 +1,5 @@
 {
-  "_comment": "C3 RankedResult — Dev B's expected output for the golden incident, stubbed so Dev C can build eval/baselines before B's scorer exists. Ranking: origin first. Node names are otel-demo names (join to the catalog + telemetry.json). Signals illustrate the intended T/D/P shape.",
+  "_comment": "C3 RankedResult — Dev B's expected output for the golden incident, stubbed so Dev C can build eval/baselines before B's scorer exists. Ranking: origin first. Node names are otel-demo names (join to the catalog + telemetry.json). D/P are illustrative, but T is computed exactly from anomaly_output.json's first_deviation per spec 2.1: t0=12:04:00, horizon=min(max_delta,60)=40s, T=clamp01(1-(FDT-t0)/horizon) -> product-catalog 1.0, checkout 0.5, frontend 0.0.",
   "incident_id": "golden-0001",
   "fault_class": "AppLogic",
   "candidates": [
@@ -11,7 +11,7 @@
       "role": "origin",
       "signals": { "T": 1.0, "D": 0.91, "P": 0.92 },
       "dev_vector": { "error_rate": 0.97, "p95_latency": 0.61 },
-      "explanation": "product-catalog deviated first (T=1.0), influence flows outward to 2 callers with no incoming anomaly (D=0.91), and 2/2 outgoing edges degraded in order (P=0.92). Role: origin."
+      "explanation": "product-catalog deviated first at t0 (T=1.0), influence flows outward to 2 callers with no incoming anomaly (D=0.91), and 2/2 outgoing edges degraded in order (P=0.92). Role: origin."
     },
     {
       "node_id": "checkout",
@@ -19,9 +19,9 @@
       "score": 0.58,
       "confidence": 0.88,
       "role": "amplifier",
-      "signals": { "T": 0.83, "D": 0.52, "P": 0.44 },
+      "signals": { "T": 0.5, "D": 0.52, "P": 0.44 },
       "dev_vector": { "error_rate": 0.82, "p95_latency": 0.74 },
-      "explanation": "checkout deviated after product-catalog (T=0.83), with mixed in/out influence (D=0.52). Role: amplifier."
+      "explanation": "checkout deviated 20s after product-catalog — half the 40s subgraph horizon, so T=0.5 (spec 2.1) — with mixed in/out influence (D=0.52). Role: amplifier."
     },
     {
       "node_id": "frontend",
@@ -29,9 +29,9 @@
       "score": 0.41,
       "confidence": 0.88,
       "role": "victim",
-      "signals": { "T": 0.83, "D": 0.18, "P": 0.10 },
+      "signals": { "T": 0.0, "D": 0.18, "P": 0.10 },
       "dev_vector": { "error_rate": 0.71 },
-      "explanation": "frontend deviated late with influence flowing inward (D=0.18). Role: victim."
+      "explanation": "frontend deviated last in the subgraph (40s after t0 -> T=0.0 per spec 2.1), influence flowing inward (D=0.18); it earns its rank via D/P, not time. Role: victim."
     }
   ]
 }

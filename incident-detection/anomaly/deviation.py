@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Mapping, Sequence
 
 from contracts import METRICS, AnomalyOutput, Baseline, Thresholds, Window
 
-from .score import anomaly_series
+from .score import anomaly_series, peak
 
 if TYPE_CHECKING:
     from ingest.adapters import TelemetryAdapter
@@ -120,16 +120,16 @@ def node_anomaly(
     )
     scored = [(o.window_ts, o.anomaly_score) for o in series if o.window_ts is not None]
     fdt = first_deviation_from_scores(scored, th)
-    if not series:
+    worst = peak(series)  # SAME peak selection anomaly() uses (audit M1)
+    if worst is None:
         return AnomalyOutput(
             node=node, anomaly_score=0.0, dev_vector={},
             first_deviation=None, window_ts=None,
         )
-    peak = max(series, key=lambda o: o.anomaly_score)
     return AnomalyOutput(
         node=node,
-        anomaly_score=peak.anomaly_score,
-        dev_vector=peak.dev_vector,
+        anomaly_score=worst.anomaly_score,
+        dev_vector=worst.dev_vector,
         first_deviation=fdt,
-        window_ts=peak.window_ts,
+        window_ts=worst.window_ts,
     )

@@ -20,7 +20,7 @@ def test_parse_spans_captures_kind_and_attributes(tempo_trace_payload):
     grpc = by_id["b2"]
     assert grpc.kind is SpanKind.CLIENT
     assert grpc.attributes.get("rpc.system") == "grpc"
-    assert grpc.attributes.get("net.peer.name") == "productcatalogservice"
+    assert grpc.attributes.get("net.peer.name") == "product-catalog"
 
     # Kafka producer span
     kafka = by_id["b3"]
@@ -44,7 +44,8 @@ def test_parse_spans_error_message_from_event(tempo_trace_payload):
 def test_parse_spans_service_from_resource(tempo_trace_payload):
     spans = TempoClient._parse_spans(tempo_trace_payload)
     services = {s.service for s in spans}
-    assert {"frontend", "checkoutservice", "productcatalogservice"} <= services
+    assert {"frontend", "checkout", "product-catalog"} <= services  # otel-demo names
+    assert not any("service" in s for s in services)                # no hipstershop *service chimera
 
 
 def test_attr_value_unwraps_otlp_types():

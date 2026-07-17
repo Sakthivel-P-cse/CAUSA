@@ -13,6 +13,11 @@ Key guarantees (vs the naive apply→sleep→delete→stamp):
   • A run whose fault never activated does NOT produce a ground-truth row (no
     phantom incidents entering the corpus as "real"); override with
     --allow-unverified only when you know status polling is unavailable.
+  • S0's real fault is the flagd `productCatalogFailure` flag, not a CRD — the
+    harness flips that flag itself (and resets it on teardown). Because a flagd
+    flip has no AllInjected object to poll, S0 records ONLY under --verify-effect
+    (confirm an observable effect) or --allow-unverified, so the ineffective
+    HTTPChaos stand-in can never mint a phantom S0 (audit M2).
   • S5's infra root is the CONCRETE node name (resolved from --node or the CRD's
     node selector), never the literal placeholder "NODE" — and when --node is
     given the APPLIED CRD's node selector is patched to that same node, so the
@@ -27,6 +32,7 @@ Usage:
     python -m testbed.harness.run_scenario --list
     python -m testbed.harness.run_scenario --scenario S2 --hold-seconds 300 --out gt/
     python -m testbed.harness.run_scenario --scenario S5 --node kind-worker --write-db
+    python -m testbed.harness.run_scenario --scenario S0 --verify-effect --out gt/
     python -m testbed.harness.run_scenario --scenario S1 --dry-run
 """
 
@@ -41,10 +47,10 @@ import sys
 import time
 import uuid
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from contracts import Incident
+from contracts import Incident, Window
 
 from .catalog import Scenario, all_scenarios, get
 
@@ -53,6 +59,19 @@ logger = logging.getLogger("causa.testbed")
 # Placeholder true-root in the catalog/CRD for infra scenarios; the harness
 # substitutes the concrete node name at run time.
 _NODE_SENTINEL = "NODE"
+
+# flagd (S0) automation — the OTel Demo's feature-flag ConfigMap and the JSON
+# flag-definition file it holds (audit M2). Overridable from the CLI.
+_FLAGD_CONFIGMAP = "flagd-config"
+_FLAGD_FILE_KEY = "demo.flagd.json"
+_FLAGD_ON = "on"
+_FLAGD_OFF = "off"
+
+# --verify-effect defaults: a target counts as "actually broken" if its
+# error_rate peaks above this fraction, or its p95_latency rises this many ×.
+_DEFAULT_PROM_URL = "http://prometheus.prometheus.svc.cluster.local:9090"
+_DEFAULT_ERROR_FLOOR = 0.05
+_DEFAULT_LATENCY_RISE = 2.0
 
 
 def _kubectl(args: list[str], context: str | None = None) -> None:
@@ -191,6 +210,145 @@ def _render_crd(path: Path, node_override: str | None) -> str:
     return text
 
 
+# ── flagd feature-flag injection (S0) ─────────────────────────────────
+# S0's real fault is a flagd flag, not a CRD. The stand-in HTTPChaos can report
+# AllInjected while intercepting nothing (gRPC), so recording S0 on that signal
+# is a phantom (audit M2). The harness flips the flag itself and confirms via
+# --verify-effect instead.
+
+def _read_flagd_variant(flag_file_json: str, flag_key: str) -> str | None:
+    """The flag's current defaultVariant, or None if the file/flag is absent."""
+    try:
+        flags = (json.loads(flag_file_json).get("flags") or {})
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return None
+    flag = flags.get(flag_key)
+    if not isinstance(flag, dict) or flag.get("defaultVariant") is None:
+        return None
+    return str(flag["defaultVariant"])
+
+
+def _set_flagd_variant(flag_file_json: str, flag_key: str, variant: str) -> str:
+    """
+    Return the flagd flag-definition JSON with `flag_key`'s defaultVariant set to
+    `variant`. Raises KeyError if the flag (or, when the flag enumerates variants,
+    the requested variant) is absent — so we never "inject" a flag the demo does
+    not actually define, which would itself be a phantom.
+    """
+    doc = json.loads(flag_file_json)
+    flags = doc.get("flags")
+    if not isinstance(flags, dict) or not isinstance(flags.get(flag_key), dict):
+        raise KeyError(f"flagd flag {flag_key!r} not found in the flag definition")
+    variants = flags[flag_key].get("variants")
+    if isinstance(variants, dict) and variant not in variants:
+        raise KeyError(f"flagd flag {flag_key!r} has no variant {variant!r}")
+    flags[flag_key]["defaultVariant"] = variant
+    return json.dumps(doc, indent=2)
+
+
+def _flagd_get_flagfile(
+    namespace: str, context: str | None,
+    configmap: str = _FLAGD_CONFIGMAP, key: str = _FLAGD_FILE_KEY,
+) -> str | None:
+    out = _kubectl_capture(["get", "configmap", configmap, "-n", namespace, "-o", "json"], context)
+    if out is None:
+        return None
+    try:
+        return json.loads(out).get("data", {}).get(key)
+    except (json.JSONDecodeError, AttributeError):
+        return None
+
+
+def _flagd_patch_flagfile(
+    new_flagfile: str, namespace: str, context: str | None,
+    configmap: str = _FLAGD_CONFIGMAP, key: str = _FLAGD_FILE_KEY,
+) -> bool:
+    patch = json.dumps({"data": {key: new_flagfile}})
+    try:
+        _kubectl(["patch", "configmap", configmap, "-n", namespace, "--type", "merge", "-p", patch], context)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        logger.error("flagd patch of %s failed: %s", configmap, exc)
+        return False
+
+
+# ── Observable-effect verification (--verify-effect) ──────────────────
+
+def _median(values: list[float]) -> float:
+    s = sorted(values)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def _series_rose(series: list[list[float]], factor: float) -> bool:
+    """True if a metric's peak is ≥ `factor`× its early-window (first-quartile
+    median) level — a real, multiplicative rise, not baseline noise."""
+    vals = [float(v) for _, v in series if v is not None]
+    if len(vals) < 2:
+        return False
+    ref = _median(vals[: max(1, len(vals) // 4)])
+    return ref > 0 and max(vals) >= factor * ref
+
+
+def _effect_observed(
+    adapter,
+    nodes: list[str],
+    window: Window,
+    namespace: str | None = None,
+    *,
+    error_floor: float = _DEFAULT_ERROR_FLOOR,
+    latency_rise: float = _DEFAULT_LATENCY_RISE,
+) -> bool:
+    """
+    True if ANY target node shows an observable fault effect in `window`:
+    error_rate peaking above `error_floor`, or p95_latency rising ≥`latency_rise`×
+    its early-window level. This is the --verify-effect gate that keeps a phantom
+    (injection admitted, nothing actually broke) out of the ground-truth corpus
+    (audit M2). Most meaningful for service-level faults; infra/slow-burn
+    scenarios may legitimately show no effect in a short probe.
+    """
+    for node in nodes:
+        err = adapter.metrics(node, "error_rate", window, namespace=namespace)
+        if err and max(float(v) for _, v in err) >= error_floor:
+            return True
+        lat = adapter.metrics(node, "p95_latency", window, namespace=namespace)
+        if lat and _series_rose(lat, latency_rise):
+            return True
+    return False
+
+
+def _injection_ok(
+    allinjected: bool | None, effect_ok: bool | None, is_flagd: bool, allow_unverified: bool,
+) -> bool:
+    """
+    Decide whether a run is a real, recordable incident.
+
+      • --allow-unverified  → always record (operator override).
+      • flagd (S0)          → no AllInjected signal exists, so require an OBSERVED
+                              effect (effect_ok is True). Without --verify-effect
+                              (effect_ok is None) the run is NOT recorded — this is
+                              what stops S0's phantom.
+      • CRD scenarios       → require AllInjected; if --verify-effect was also
+                              requested, require the effect too.
+    """
+    if allow_unverified:
+        return True
+    if is_flagd:
+        return effect_ok is True
+    if not allinjected:
+        return False
+    return True if effect_ok is None else effect_ok
+
+
+def _target_nodes(scenario: Scenario, node_name: str | None) -> list[str]:
+    """The concrete node(s) to probe for an effect (infra sentinel resolved)."""
+    resolved = _resolve_node(scenario, node_name)
+    return [
+        resolved if f.true_root_node == _NODE_SENTINEL and resolved else f.true_root_node
+        for f in scenario.faults
+    ]
+
+
 def _build_incidents(
     scenario: Scenario,
     inject_start: datetime,
@@ -285,71 +443,128 @@ def run_scenario(
     node_name: str | None = None,
     inject_timeout: int = 120,
     allow_unverified: bool = False,
+    verify_effect: bool = False,
+    probe_seconds: int = 30,
+    prometheus_url: str = _DEFAULT_PROM_URL,
+    error_floor: float = _DEFAULT_ERROR_FLOOR,
 ) -> list[Incident]:
     """Execute one scenario and return the Incident ground-truth row(s)."""
-    if scenario.special == "flagd":
-        logger.warning(
-            "S0's canonical form is the flagd `productCatalogFailure` flag; "
-            "applying the HTTPChaos stand-in CRD instead. See chaos/S0_*.yaml."
-        )
+    is_flagd = scenario.special == "flagd"
 
     # ── dry-run: describe only, never sleep or persist ────────────────
     if not apply:
         now = _now()
         incidents = _build_incidents(scenario, now, now, node_name)
+        how = f"flip flagd flag {scenario.flag!r}" if is_flagd else "apply CRD"
         logger.info(
-            "[dry-run] would inject %s (roots=%s) for %ds — not applying, not persisting.",
-            scenario.id, [i.true_root_node for i in incidents], hold_seconds,
+            "[dry-run] would %s for %s (roots=%s) for %ds — not applying, not persisting.",
+            how, scenario.id, [i.true_root_node for i in incidents], hold_seconds,
         )
         return incidents
 
-    # Object kind/name/namespace (used for status polling) are unaffected by a
-    # node repoint, so targets come from the on-disk CRD either way.
-    targets = _crd_documents(scenario.crd_path)
+    # ── Mechanism-specific apply / teardown / injection-confirm ───────
+    # flagd (S0): flip the real feature flag; there is NO AllInjected object to
+    # poll, so confirmation comes only from --verify-effect. CRD scenarios apply
+    # the manifest and poll AllInjected as before.
+    targets: list[dict[str, object]] = []
+    if is_flagd:
+        if not scenario.flag:
+            raise ValueError(f"{scenario.id} is special='flagd' but names no `flag` to flip.")
+        _original_variant: dict[str, str | None] = {"v": None}
 
-    # When --node is given, apply a manifest whose node selector is repointed to
-    # that node (so we stress the node we record); otherwise apply the file as-is.
-    manifest = _render_crd(scenario.crd_path, node_name) if node_name else None
+        def _apply() -> None:
+            flagfile = _flagd_get_flagfile(namespace, context)
+            if flagfile is None:
+                raise RuntimeError(
+                    f"cannot read flagd ConfigMap {_FLAGD_CONFIGMAP!r} in {namespace} "
+                    f"(kubectl unavailable?) — {scenario.id} needs it to inject."
+                )
+            _original_variant["v"] = _read_flagd_variant(flagfile, scenario.flag) or _FLAGD_OFF
+            patched = _set_flagd_variant(flagfile, scenario.flag, _FLAGD_ON)
+            if not _flagd_patch_flagfile(patched, namespace, context):
+                raise RuntimeError(f"could not enable flagd flag {scenario.flag!r}")
+            logger.info("flagd flag %s → %s (S0 injection)", scenario.flag, _FLAGD_ON)
 
-    def _apply() -> None:
-        if manifest is not None:
-            _kubectl_stdin(["apply", "-f", "-", "-n", namespace], manifest, context)
-        else:
-            _kubectl(["apply", "-f", str(scenario.crd_path), "-n", namespace], context)
+        def _teardown() -> None:
+            # Reset the flag to whatever it was before (best-effort).
+            flagfile = _flagd_get_flagfile(namespace, context)
+            if flagfile is None:
+                logger.warning("could not re-read flagd ConfigMap to reset %s.", scenario.flag)
+                return
+            try:
+                reset = _set_flagd_variant(flagfile, scenario.flag, _original_variant["v"] or _FLAGD_OFF)
+            except KeyError:
+                return
+            _flagd_patch_flagfile(reset, namespace, context)
+            logger.info("flagd flag %s reset → %s", scenario.flag, _original_variant["v"] or _FLAGD_OFF)
+    else:
+        # Object kind/name/namespace (used for status polling) are unaffected by a
+        # node repoint, so targets come from the on-disk CRD either way.
+        targets = _crd_documents(scenario.crd_path)
+        # When --node is given, apply a manifest whose node selector is repointed to
+        # that node (so we stress the node we record); otherwise apply the file as-is.
+        manifest = _render_crd(scenario.crd_path, node_name) if node_name else None
 
-    def _teardown() -> None:
-        if manifest is not None:
-            _kubectl_stdin(
-                ["delete", "-f", "-", "-n", namespace, "--ignore-not-found"],
-                manifest, context,
-            )
-        else:
-            _kubectl(
-                ["delete", "-f", str(scenario.crd_path), "-n", namespace, "--ignore-not-found"],
-                context,
-            )
+        def _apply() -> None:
+            if manifest is not None:
+                _kubectl_stdin(["apply", "-f", "-", "-n", namespace], manifest, context)
+            else:
+                _kubectl(["apply", "-f", str(scenario.crd_path), "-n", namespace], context)
 
-    injected = False
+        def _teardown() -> None:
+            if manifest is not None:
+                _kubectl_stdin(
+                    ["delete", "-f", "-", "-n", namespace, "--ignore-not-found"],
+                    manifest, context,
+                )
+            else:
+                _kubectl(
+                    ["delete", "-f", str(scenario.crd_path), "-n", namespace, "--ignore-not-found"],
+                    context,
+                )
+
+    if is_flagd and not (verify_effect or allow_unverified):
+        logger.error(
+            "%s is a flagd scenario with no AllInjected signal — pass --verify-effect "
+            "to confirm an observable effect (or --allow-unverified to override). "
+            "NOT running, to avoid recording a phantom incident (audit M2).",
+            scenario.id,
+        )
+        return []
+
     inject_start: datetime | None = None
     inject_end: datetime | None = None
     try:
         # apply INSIDE the try so a partial multi-doc apply is still torn down.
         _apply()
 
-        injected = _wait_injected(targets, namespace, context, inject_timeout)
-        if not injected and not allow_unverified:
+        # CRD scenarios: poll AllInjected. flagd: no such object → None.
+        allinjected: bool | None = None
+        if not is_flagd:
+            allinjected = _wait_injected(targets, namespace, context, inject_timeout)
+
+        # --verify-effect: after a short settle, require an observable effect on a
+        # target before this run counts as a real incident (audit M2).
+        effect_ok: bool | None = None
+        if verify_effect:
+            logger.info("Probing %ds for an observable effect…", probe_seconds)
+            time.sleep(probe_seconds)
+            probe_window = Window(_now() - timedelta(seconds=max(probe_seconds, 60) * 2), _now())
+            effect_ok = _probe_effect(
+                _target_nodes(scenario, node_name), probe_window,
+                namespace=namespace, prometheus_url=prometheus_url, error_floor=error_floor,
+            )
+
+        if not _injection_ok(allinjected, effect_ok, is_flagd, allow_unverified):
             logger.error(
-                "%s never reached AllInjected within %ds — NOT recording a "
+                "%s not confirmed (allinjected=%s, effect=%s) — NOT recording a "
                 "ground-truth incident (would be phantom). Re-run with "
                 "--allow-unverified to override.",
-                scenario.id, inject_timeout,
+                scenario.id, allinjected, effect_ok,
             )
             return []
-        if not injected:
-            logger.warning(
-                "%s injection unconfirmed; proceeding under --allow-unverified.",
-                scenario.id,
-            )
+        if allow_unverified and not (allinjected or effect_ok):
+            logger.warning("%s unconfirmed; proceeding under --allow-unverified.", scenario.id)
 
         # Stamp the window around the CONFIRMED fault, not the apply/delete wrapper.
         inject_start = _now()
@@ -358,8 +573,8 @@ def run_scenario(
         time.sleep(hold_seconds)
         inject_end = _now()
     finally:
-        # Always tear down, even on interrupt — a stuck chaos poisons later runs.
-        # Uses the same (possibly node-repointed) manifest that was applied.
+        # Always tear down, even on interrupt — a stuck fault poisons later runs.
+        # (CRD delete, or flagd flag reset — whichever was applied.)
         _teardown()
 
     if inject_start is None or inject_end is None:
@@ -368,6 +583,30 @@ def run_scenario(
     incidents = _build_incidents(scenario, inject_start, inject_end, node_name)
     _persist(incidents, scenario, out_dir=out_dir, write_db=write_db)
     return incidents
+
+
+def _probe_effect(
+    nodes: list[str],
+    window: Window,
+    *,
+    namespace: str | None,
+    prometheus_url: str,
+    error_floor: float,
+) -> bool:
+    """Build a Prometheus-backed adapter and check for an observable effect on
+    `nodes`. Returns False if Prometheus is unreachable (the caller then treats
+    the run as unconfirmed). Kept thin so `_effect_observed` stays unit-testable
+    with a fake adapter."""
+    from ingest.adapters import TelemetryAdapter  # lazy: keeps the harness import light
+
+    adapter = TelemetryAdapter.from_defaults(prometheus_url=prometheus_url, namespace=namespace)
+    try:
+        return _effect_observed(adapter, nodes, window, namespace, error_floor=error_floor)
+    except Exception as exc:  # network/backend error → unconfirmed, not a crash
+        logger.error("effect probe failed: %s", exc)
+        return False
+    finally:
+        adapter.close()
 
 
 def _persist(
@@ -425,6 +664,15 @@ def main(argv: list[str] | None = None) -> int:
                    help="seconds to wait for AllInjected before treating the run as failed")
     p.add_argument("--allow-unverified", action="store_true",
                    help="record a ground-truth row even if injection can't be confirmed")
+    p.add_argument("--verify-effect", action="store_true",
+                   help="require an observable metric effect on the target before recording "
+                        "(required for flagd scenarios like S0 to avoid phantom incidents)")
+    p.add_argument("--probe-seconds", type=int, default=30,
+                   help="settle time before the --verify-effect probe reads metrics")
+    p.add_argument("--prometheus-url", default=_DEFAULT_PROM_URL,
+                   help="Prometheus base URL for --verify-effect")
+    p.add_argument("--error-floor", type=float, default=_DEFAULT_ERROR_FLOOR,
+                   help="min peak error_rate fraction counted as an effect (--verify-effect)")
     p.add_argument("--out", type=Path, default=None, help="dir for ground-truth JSON")
     p.add_argument("--write-db", action="store_true", help="write to Postgres groundtruth schema")
     p.add_argument("--dry-run", action="store_true", help="don't apply/delete CRDs; print only")
@@ -447,6 +695,10 @@ def main(argv: list[str] | None = None) -> int:
         node_name=args.node,
         inject_timeout=args.inject_timeout,
         allow_unverified=args.allow_unverified,
+        verify_effect=args.verify_effect,
+        probe_seconds=args.probe_seconds,
+        prometheus_url=args.prometheus_url,
+        error_floor=args.error_floor,
     )
     return 0
 

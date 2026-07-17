@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Mapping, Sequence
 
 from contracts import METRICS, AnomalyOutput, Baseline, Thresholds, Window
 
@@ -101,6 +101,18 @@ def anomaly_series(
     return out
 
 
+def peak(series: Sequence[AnomalyOutput]) -> AnomalyOutput | None:
+    """
+    The worst (max anomaly_score) sample in a scored series, or None if empty.
+
+    The single definition of "the node's score for a window" shared by anomaly()
+    here and node_anomaly() in deviation.py, so the two C2 accessors can never
+    disagree on which sample they report (audit M1). Peak, not latest: a spike
+    that has since receded is still a deviation the engine must see.
+    """
+    return max(series, key=lambda o: o.anomaly_score, default=None)
+
+
 def anomaly(
     node: str,
     window: Window,
@@ -111,11 +123,17 @@ def anomaly(
     metrics: tuple[str, ...] = METRICS,
     namespace: str | None = None,
 ) -> AnomalyOutput:
-    """The latest anomaly_score for a node in the window (contract C2)."""
-    series = anomaly_series(
+    """
+    The node's PEAK anomaly_score over the window (contract C2).
+
+    Peak, not the latest sample: a transient spike that has already receded by
+    the end of the window still counts (audit M1). This is the score-only
+    accessor; node_anomaly() returns the SAME peak plus its FirstDeviationTime.
+    """
+    the_peak = peak(anomaly_series(
         node, window, adapter, baselines, thresholds,
         metrics=metrics, namespace=namespace,
-    )
-    if series:
-        return series[-1]
+    ))
+    if the_peak is not None:
+        return the_peak
     return AnomalyOutput(node=node, anomaly_score=0.0, dev_vector={}, window_ts=None)

@@ -9,7 +9,7 @@ AnomalyOutput + FirstDeviationTime. Imports only `contracts` and `ingest`.
     from anomaly import save_baselines, load_baselines
 
     base = capture_warmup(adapter, nodes, healthy_window, namespace="otel-demo")
-    out  = anomaly("cartservice", incident_window, adapter, base, thresholds())
+    out  = anomaly("cartservice", incident_window, adapter, base, thresholds())  # peak score
     t0   = first_deviation("cartservice", incident_window, adapter, base)  # None = slow-burn
 """
 
@@ -24,7 +24,7 @@ from .deviation import (
     node_anomaly,
     thresholds,
 )
-from .score import anomaly, anomaly_series, dev, dev_vector, score_values
+from .score import anomaly, anomaly_series, dev, dev_vector, peak, score_values
 from .store import load_baselines, save_baselines
 
 __all__ = [
@@ -41,6 +41,7 @@ __all__ = [
     "anomaly_series",
     "dev",
     "dev_vector",
+    "peak",
     "score_values",
     # deviation
     "first_deviation",

@@ -18,7 +18,7 @@
       ] } ]
     },
     {
-      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "checkoutservice" } } ] },
+      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "checkout" } } ] },
       "scopeSpans": [ { "spans": [
         {
           "spanId": "b1", "parentSpanId": "a2", "name": "checkout.PlaceOrder", "kind": 2,
@@ -30,7 +30,7 @@
           "startTimeUnixNano": "1784548800070000000", "endTimeUnixNano": "1784548800300000000",
           "attributes": [
             { "key": "rpc.system", "value": { "stringValue": "grpc" } },
-            { "key": "net.peer.name", "value": { "stringValue": "productcatalogservice" } }
+            { "key": "net.peer.name", "value": { "stringValue": "product-catalog" } }
           ],
           "status": { "code": 2, "message": "" }
         },
@@ -46,7 +46,7 @@
       ] } ]
     },
     {
-      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "productcatalogservice" } } ] },
+      "resource": { "attributes": [ { "key": "service.name", "value": { "stringValue": "product-catalog" } } ] },
       "scopeSpans": [ { "spans": [
         {
           "spanId": "c1", "parentSpanId": "b2", "name": "productcatalog.GetProduct", "kind": 2,

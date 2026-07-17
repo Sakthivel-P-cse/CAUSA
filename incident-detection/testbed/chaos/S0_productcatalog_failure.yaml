@@ -3,20 +3,22 @@
 # True root: product-catalog. Fault class: AppLogic (feature-flag fault).
 #
 # CANONICAL S0 is the demo's flagd `productCatalogFailure` feature flag (an
-# app-logic fault that makes GetProduct fail). The harness special-cases S0 by
-# patching flagd rather than applying a Chaos Mesh CRD:
+# app-logic fault that makes GetProduct fail). run_scenario flips that flag
+# itself — it patches `flagd-config` `defaultVariant → on`, holds, then resets —
+# and does NOT apply the CRD below. Because a flagd flip has no AllInjected
+# object to poll, S0 records a ground-truth row ONLY with --verify-effect (or
+# --allow-unverified), so an ineffective injection can't mint a phantom (M2):
 #
-#   kubectl -n otel-demo patch configmap flagd-config --type merge -p \
-#     '{"data":{"demo.flagd.json":"...productCatalogFailure defaultVariant=on..."}}'
+#   python -m testbed.harness.run_scenario --scenario S0 --verify-effect --out gt/
 #
-# The HTTPChaos below is a Chaos-Mesh-native STAND-IN so S0 can run uniformly
-# through the harness on clusters where flagd patching is inconvenient. It aborts
-# a fraction of inbound calls to product-catalog → errors cascade to frontend.
+# The HTTPChaos below is a Chaos-Mesh-native STAND-IN kept for clusters where
+# flagd patching is unavailable; apply it BY HAND (`kubectl apply -f`) there. It
+# aborts a fraction of inbound calls to product-catalog → errors cascade.
 #
 # CAVEAT: product-catalog is a gRPC (HTTP/2) service. HTTPChaos `target: Request`
-# may NOT intercept gRPC on all Chaos-Mesh versions — if S0 shows no effect,
-# prefer the canonical flagd `productCatalogFailure` flag above (the harness
-# warns about this). This stand-in is best-effort, not the source of truth.
+# may NOT intercept gRPC on all Chaos-Mesh versions — if the stand-in shows no
+# effect, use the canonical flagd flag (what the harness does). This stand-in is
+# best-effort, not the source of truth.
 # ------------------------------------------------------------
 apiVersion: chaos-mesh.org/v1alpha1
 kind: HTTPChaos

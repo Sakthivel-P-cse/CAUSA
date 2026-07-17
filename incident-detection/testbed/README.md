@@ -59,7 +59,11 @@ injected truth before its output is scored. Enforced by grants, not convention.
 - **Chaos label selectors** (`app.kubernetes.io/name: …`) must match your
   deployed demo's labels — reconcile with `kubectl -n otel-demo get pods --show-labels`.
 - **S0 is not Chaos Mesh** — its canonical form is the flagd `productCatalogFailure`
-  feature flag; the harness applies an HTTPChaos stand-in and warns.
+  feature flag. The harness flips that flag itself (patch `flagd-config`, hold, reset).
+  A flag flip has no `AllInjected` signal, so S0 records only with `--verify-effect`
+  (confirm an observable effect) or `--allow-unverified` — never on the ineffective
+  HTTPChaos stand-in alone (audit M2). The stand-in CRD is kept for manual use where
+  flagd patching is unavailable.
 - **`scripts/e2e_all_services_rca.sh`** (scale-zero) stays as a smoke test of the
   trigger→RCA→Postgres loop — it is an availability fault, NOT part of the S-catalog corpus.
 - **N is bounded by wall-clock** (real chaos runs cost minutes) — report whatever

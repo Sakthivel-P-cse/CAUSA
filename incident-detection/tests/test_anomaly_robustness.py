@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from anomaly import (
+    anomaly,
     first_deviation_from_scores,
     load_baselines,
     node_anomaly,
@@ -62,6 +63,28 @@ def test_node_anomaly_carries_first_deviation(fake_adapter_cls, base_unix):
     out = node_anomaly("cart", win, adapter, base, thresholds())
     assert out.anomaly_score > 0.9
     assert out.first_deviation is not None                         # crossed → onset set
+
+
+def test_anomaly_reports_peak_not_latest(fake_adapter_cls, base_unix):
+    # Audit M1: anomaly() must report the window's PEAK deviation, not its last
+    # sample. A spike that recedes by the end of the window (last value healthy)
+    # must still score high, and must equal node_anomaly()'s anomaly_score.
+    win = Window(datetime.fromtimestamp(base_unix, tz=timezone.utc),
+                 datetime.fromtimestamp(base_unix + 600, tz=timezone.utc))
+    # error_rate spikes at t+90..150 then recovers to baseline by the last sample
+    series = [
+        [base_unix + 0, 0.0], [base_unix + 30, 0.0], [base_unix + 60, 0.0],
+        [base_unix + 90, 0.9], [base_unix + 120, 0.95], [base_unix + 150, 0.9],
+        [base_unix + 180, 0.0], [base_unix + 210, 0.0],   # receded — latest is healthy
+    ]
+    adapter = fake_adapter_cls({("cart", "error_rate"): series})
+    base = {("cart", "error_rate"): Baseline(0.0, 1e-6, 50)}
+
+    out = anomaly("cart", win, adapter, base, thresholds())
+    assert out.anomaly_score > 0.9                         # peak, not the ~0 latest sample
+    # anomaly() and node_anomaly() agree on the score by construction (shared peak()).
+    summ = node_anomaly("cart", win, adapter, base, thresholds())
+    assert out.anomaly_score == summ.anomaly_score
 
 
 def test_save_baselines_rejects_non_finite(tmp_path):
