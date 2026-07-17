@@ -27,8 +27,15 @@ from contracts import OrderingSource, SpanEnvelope, TelemetryReference, TraceSpa
 
 def enrich_spans_with_dag(spans: list[TraceSpan], trace_id: str) -> list[SpanEnvelope]:
     """
-    Attach causal DAG depth + sibling logical_seq to each span, and record which
-    tier of the causality hierarchy fixed its order.
+    Attach causal DAG depth + sibling logical_seq to each span, record which tier
+    of the causality hierarchy fixed its order, and return the envelopes in
+    TOPOLOGICAL order — every parent precedes its children.
+
+    A trace is a tree (one parent per span), so ordering by ascending `dag_depth`
+    is a valid topological sort; ties are broken by `logical_seq` (within-parent
+    wall-time) then `span_id` for determinism. This makes the adapter's
+    "DAG-ordered" promise true positionally, not just via the `dag_depth` field
+    a consumer would otherwise have to re-sort on (audit M6).
 
     depth 0 = root. logical_seq orders children of the same parent by wall time
     (a within-parent tiebreak, not a cross-trace clock).
@@ -44,19 +51,33 @@ def enrich_spans_with_dag(spans: list[TraceSpan], trace_id: str) -> list[SpanEnv
 
     depth_cache: dict[str, int] = {}
 
-    def depth_of(span_id: str) -> int:
-        if span_id in depth_cache:
-            return depth_cache[span_id]
-        span = by_id.get(span_id)
-        if span is None:
-            return 0
-        parent = span.parent_span_id
-        if not parent or parent not in by_id:
-            depth_cache[span_id] = 0
-            return 0
-        d = depth_of(parent) + 1
-        depth_cache[span_id] = d
-        return d
+    def depth_of(start_id: str) -> int:
+        """Depth via an ITERATIVE walk up the parent chain — cycle- and
+        recursion-safe: a self/ancestor-referential span (malformed data) or a
+        very deep chain degrades gracefully instead of hitting RecursionError
+        (audit L3)."""
+        chain: list[str] = []
+        seen: set[str] = set()
+        cur = start_id
+        top_depth = 0
+        while True:
+            if cur in depth_cache:
+                top_depth = depth_cache[cur] + 1   # node below a known one is +1
+                break
+            span = by_id.get(cur)
+            if span is None or cur in seen:
+                top_depth = 0                       # dangling/cycle → treat as root
+                break
+            seen.add(cur)
+            parent = span.parent_span_id
+            chain.append(cur)
+            if not parent or parent not in by_id:
+                top_depth = 0                       # genuine root
+                break
+            cur = parent
+        for i, sid in enumerate(reversed(chain)):   # top of chain gets top_depth
+            depth_cache[sid] = top_depth + i
+        return depth_cache.get(start_id, 0)
 
     ref = TelemetryReference(backend="tempo", kind="trace", locator=trace_id)
 
@@ -83,4 +104,13 @@ def enrich_spans_with_dag(spans: list[TraceSpan], trace_id: str) -> list[SpanEnv
                     reference=ref,
                 )
             )
+
+    # Topological order: parent (lower depth) before child (higher depth).
+    envelopes.sort(
+        key=lambda e: (
+            e.dag_depth if e.dag_depth is not None else 0,
+            e.logical_seq if e.logical_seq is not None else 0,
+            e.span.span_id,
+        )
+    )
     return envelopes

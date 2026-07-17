@@ -31,9 +31,11 @@ data:
         -- Stage 2 conclusion: the actual root cause
         root_cause_service  TEXT,
 
-        -- One of: Application Logic Fault / Configuration Fault /
-        -- Infrastructure Fault / Dependency Fault / Resource Saturation /
-        -- Data Integrity Fault / Unknown
+        -- The engine's classified fault class. Use the SAME tokens as the C5
+        -- contract's FaultClass enum (contracts/ground_truth.py) so rca_reports
+        -- joins cleanly to groundtruth.ground_truth.fault_class:
+        --   AppLogic / Config / Infra / Dependency / Resource / Data
+        -- (Timing is a ground-truth-only S3 marker, excluded from classification.)
         failure_type        TEXT,
 
         -- Routing decision from failure classification

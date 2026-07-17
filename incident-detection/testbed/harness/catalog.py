@@ -45,7 +45,7 @@ class Scenario:
 CATALOG: dict[str, Scenario] = {
     "S0": Scenario("S0", "S0_productcatalog_failure.yaml", "sanity (control)",
                    (Fault("product-catalog", "AppLogic"),), special="flagd"),
-    "S1": Scenario("S1", "S1_redis_memory_slowburn.yaml", "T / slow-burn leaf",
+    "S1": Scenario("S1", "S1_valkey_memory_slowburn.yaml", "T / slow-burn leaf",
                    (Fault("valkey-cart", "Resource"),)),
     "S2": Scenario("S2", "S2_retry_storm_delay.yaml", "edge orientation / D",
                    (Fault("product-catalog", "Dependency"),)),

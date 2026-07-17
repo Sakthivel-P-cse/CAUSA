@@ -61,6 +61,24 @@ def test_forward_success_no_outbox(monkeypatch):
     assert store.outbox == []
 
 
+def test_submit_returns_false_when_queue_saturated():
+    # Audit L3: a saturated queue must be a clean drop signal (→ 503), NOT an
+    # unguarded queue.Full escaping as a 500.
+    import queue as _queue
+
+    disp = Dispatcher(_FakeStore(), reader_factory=lambda: None,
+                      forward_url=None, workers=1, run_outbox=False)
+
+    class _FullQ:
+        maxsize = 1000
+
+        def put_nowait(self, item):
+            raise _queue.Full
+
+    disp._q = _FullQ()
+    assert disp.submit([], {"alerts": []}) is False
+
+
 @respx.mock
 def test_forward_failure_buffers_to_outbox(monkeypatch):
     monkeypatch.setattr(app_mod.time, "sleep", lambda *_: None)

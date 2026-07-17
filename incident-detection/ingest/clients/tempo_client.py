@@ -41,6 +41,11 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _traceql_string(value: str) -> str:
+    """Escape a value for a double-quoted TraceQL string literal (`= "..."`)."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _attr_value(value: Any) -> str:
     """
     Unwrap an OTLP AnyValue to a string. Covers the full AnyValue union
@@ -110,14 +115,19 @@ class TempoClient:
         lookback_minutes: int = 10,
         limit: int = 5,
     ) -> list[str]:
-        """Search Tempo for recent ERROR trace IDs from a service (most recent first)."""
+        """Search Tempo for recent ERROR trace IDs from a service (most recent first).
+
+        Uses TraceQL (`q={ ... status = error }`), NOT the tag API: `status` is a
+        span intrinsic, not a searchable attribute, so `tags=status=error` matches
+        nothing and the "error trace" search silently degrades to empty (audit M7).
+        """
         end = _utcnow()
         start = end - timedelta(minutes=lookback_minutes)
-        tags = []
+        selectors = ["status = error"]
         if service:
-            tags.append(f"service.name={service}")
-        tags.append("status=error")
-        return self._search(" ".join(tags), start, end, limit)
+            selectors.append(f'resource.service.name = "{_traceql_string(service)}"')
+        query = "{ " + " && ".join(selectors) + " }"
+        return self._search_traceql(query, start, end, limit)
 
     def search_traces(
         self,
@@ -166,6 +176,31 @@ class TempoClient:
             return [t["traceID"] for t in traces if t.get("traceID")]
         except Exception as exc:
             logger.warning("Tempo search failed (tags=%r): %s", tags, exc)
+            return []
+
+    def _search_traceql(
+        self,
+        query: str,
+        start: datetime,
+        end: datetime,
+        limit: int,
+    ) -> list[str]:
+        """TraceQL search (`/api/search?q={...}`) — used where a match needs a
+        span intrinsic like `status` that the tag API can't express (M7)."""
+        params = {
+            "q": query,
+            "start": int(start.timestamp()),
+            "end": int(end.timestamp()),
+            "limit": limit,
+        }
+        try:
+            resp = self._http.get(f"{self._base}/api/search", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            traces = data.get("traces", [])
+            return [t["traceID"] for t in traces if t.get("traceID")]
+        except Exception as exc:
+            logger.warning("Tempo TraceQL search failed (q=%r): %s", query, exc)
             return []
 
     # ── Parse Tempo response into TraceSpan objects ────────────────────

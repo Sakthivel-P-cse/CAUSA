@@ -129,6 +129,14 @@ class TelemetryReader:
             lookback_minutes=lookback_minutes,
         )
         telemetry.spans = adapter.traces(window, service=alerted_service)
+        # traces() samples up to `limit` recent traces and may NOT include the
+        # specifically-resolved (error) trace_id, leaving the incident's headline
+        # trace_id disjoint from its spans (audit L3). If it's missing, fetch that
+        # trace and prepend so trace_id and spans are coherent.
+        if telemetry.trace_id and telemetry.trace_id not in {
+            e.trace_id for e in telemetry.spans
+        }:
+            telemetry.spans = adapter.trace(telemetry.trace_id) + telemetry.spans
         if telemetry.spans:
             telemetry.references.append(
                 TelemetryReference(

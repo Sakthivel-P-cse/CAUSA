@@ -17,6 +17,7 @@ Hardening vs the previous version:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -112,6 +113,25 @@ class PrometheusClient:
         if not result:
             return default
         return float(result[0]["value"][1])
+
+    # ── Label-value escaping (audit M11) ──────────────────────────────
+    #
+    # `service`/`namespace` come from telemetry (span service.name) and
+    # Alertmanager labels, not trusted constants, so they must be escaped before
+    # being interpolated into PromQL — otherwise a `"` breaks the selector or
+    # injects extra matchers (the Loki client already does this; parity here).
+
+    @staticmethod
+    def _esc(value: str) -> str:
+        """Escape a value for a double-quoted PromQL matcher (`=` / `!=`)."""
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
+    @staticmethod
+    def _esc_re(value: str) -> str:
+        """Escape a value used inside a PromQL regex matcher (`=~` / `!~`):
+        regex-escape metacharacters (so a `.` in a name isn't a wildcard), then
+        string-escape the result for the quoted literal."""
+        return PrometheusClient._esc(re.escape(value))
 
     # ── Service Dependency edges ──────────────────────────────────────
 
@@ -287,12 +307,13 @@ class PrometheusClient:
         self, service: str, start: datetime, end: datetime, step: str = "1m"
     ) -> list[list[float]]:
         """Error rate time series for a service over [start, end]."""
+        svc = self._esc(service)
         results = self._range_safe(
             (
                 f'sum(rate(traces_service_graph_request_failed_total'
-                f'{{server="{service}"}}[1m])) / '
+                f'{{server="{svc}"}}[1m])) / '
                 f'sum(rate(traces_service_graph_request_total'
-                f'{{server="{service}"}}[1m]))'
+                f'{{server="{svc}"}}[1m]))'
             ),
             start, end, step=step,
         )
@@ -314,11 +335,12 @@ class PrometheusClient:
         self, service: str, quantile: float,
         start: datetime, end: datetime, step: str = "1m",
     ) -> list[list[float]]:
+        svc = self._esc(service)
         results = self._range_safe(
             (
                 f'histogram_quantile({quantile}, sum by (le) '
                 f'(rate(traces_service_graph_request_server_seconds_bucket'
-                f'{{server="{service}"}}[1m]))) * 1000'
+                f'{{server="{svc}"}}[1m]))) * 1000'
             ),
             start, end, step=step,
         )
@@ -328,8 +350,9 @@ class PrometheusClient:
         self, service: str, start: datetime, end: datetime, step: str = "1m"
     ) -> list[list[float]]:
         """Request rate time series for a service over [start, end]."""
+        svc = self._esc(service)
         results = self._range_safe(
-            f'sum(rate(traces_service_graph_request_total{{server="{service}"}}[1m]))',
+            f'sum(rate(traces_service_graph_request_total{{server="{svc}"}}[1m]))',
             start, end, step=step,
         )
         return _series_points(results[0]["values"]) if results else []
@@ -339,19 +362,20 @@ class PrometheusClient:
         start: datetime, end: datetime, step: str = "1m",
     ) -> list[list[float]]:
         """Container memory usage % (vs limit) over [start, end] as [[ts, val]]."""
+        ns, svc_re = self._esc(namespace), self._esc_re(service)
         pod_selector = self._pod_label_selector(service, namespace)
         query_label = (
-            f'sum(container_memory_usage_bytes{{namespace="{namespace}",container!=""}} '
+            f'sum(container_memory_usage_bytes{{namespace="{ns}",container!=""}} '
             f'* on(pod) group_left() {pod_selector}) '
-            f'/ sum(kube_pod_container_resource_limits{{namespace="{namespace}",resource="memory"}} '
+            f'/ sum(kube_pod_container_resource_limits{{namespace="{ns}",resource="memory"}} '
             f'* on(pod) group_left() {pod_selector}) * 100'
         )
         results = self._range_safe(query_label, start, end, step=step)
         if not results:
             query_prefix = (
-                f'sum(container_memory_usage_bytes{{namespace="{namespace}",pod=~"{service}-.*"}}) '
+                f'sum(container_memory_usage_bytes{{namespace="{ns}",pod=~"{svc_re}-.*"}}) '
                 f'/ sum(kube_pod_container_resource_limits'
-                f'{{namespace="{namespace}",pod=~"{service}-.*",resource="memory"}}) * 100'
+                f'{{namespace="{ns}",pod=~"{svc_re}-.*",resource="memory"}}) * 100'
             )
             results = self._range_safe(query_prefix, start, end, step=step)
         return _series_points(results[0]["values"]) if results else []
@@ -361,28 +385,31 @@ class PrometheusClient:
         start: datetime, end: datetime, step: str = "1m",
     ) -> list[list[float]]:
         """Container CPU usage % (vs limit) over [start, end] as [[ts, val]]."""
+        ns, svc_re = self._esc(namespace), self._esc_re(service)
         pod_selector = self._pod_label_selector(service, namespace)
         query_label = (
-            f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",container!=""}}[2m]) '
+            f'sum(rate(container_cpu_usage_seconds_total{{namespace="{ns}",container!=""}}[2m]) '
             f'* on(pod) group_left() {pod_selector}) '
-            f'/ sum(kube_pod_container_resource_limits{{namespace="{namespace}",resource="cpu"}} '
+            f'/ sum(kube_pod_container_resource_limits{{namespace="{ns}",resource="cpu"}} '
             f'* on(pod) group_left() {pod_selector}) * 100'
         )
         results = self._range_safe(query_label, start, end, step=step)
         if not results:
             query_prefix = (
                 f'sum(rate(container_cpu_usage_seconds_total'
-                f'{{namespace="{namespace}",pod=~"{service}-.*",container!=""}}[2m])) '
+                f'{{namespace="{ns}",pod=~"{svc_re}-.*",container!=""}}[2m])) '
                 f'/ sum(kube_pod_container_resource_limits'
-                f'{{namespace="{namespace}",pod=~"{service}-.*",resource="cpu"}}) * 100'
+                f'{{namespace="{ns}",pod=~"{svc_re}-.*",resource="cpu"}}) * 100'
             )
             results = self._range_safe(query_prefix, start, end, step=step)
         return _series_points(results[0]["values"]) if results else []
 
     @staticmethod
     def _pod_label_selector(service: str, namespace: str) -> str:
+        # service/namespace are exact label values here → string-escape (M11).
+        svc, ns = PrometheusClient._esc(service), PrometheusClient._esc(namespace)
         return (
-            f'(kube_pod_labels{{namespace="{namespace}",label_app="{service}"}} or '
-            f'kube_pod_labels{{namespace="{namespace}",label_app_kubernetes_io_name="{service}"}} or '
-            f'kube_pod_labels{{namespace="{namespace}",label_k8s_app="{service}"}})'
+            f'(kube_pod_labels{{namespace="{ns}",label_app="{svc}"}} or '
+            f'kube_pod_labels{{namespace="{ns}",label_app_kubernetes_io_name="{svc}"}} or '
+            f'kube_pod_labels{{namespace="{ns}",label_k8s_app="{svc}"}})'
         )

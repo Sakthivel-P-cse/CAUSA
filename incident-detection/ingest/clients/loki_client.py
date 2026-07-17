@@ -105,6 +105,25 @@ class LokiClient:
         return value.replace("\\", "\\\\").replace('"', '\\"')
 
     @staticmethod
+    def _level_line_regex(level: str) -> str:
+        """
+        A case-insensitive line-filter regex for a severity that lives INSIDE the
+        log line rather than in a stream label. Mirrors get_error_logs' pattern
+        for `error`; other levels match their own token. The alternation is
+        embedded in a double-quoted LogQL string, so it is string-escaped.
+        """
+        lowered = level.strip().lower()
+        groups = {
+            "error": "error|exception|fail|refused|timeout|oom",
+            "warn": "warn|warning",
+            "warning": "warn|warning",
+            "info": "info",
+            "debug": "debug",
+        }
+        alt = groups.get(lowered) or re.escape(lowered)
+        return LokiClient._escape_logql_string(f"(?i)({alt})")
+
+    @staticmethod
     def _service_from_labels(stream_labels: dict[str, Any]) -> str:
         pod = stream_labels.get("pod", "")
         job = stream_labels.get("job", "")
@@ -203,7 +222,16 @@ class LokiClient:
             safe = self._escape_logql_string(search)
             logql_candidates = [f'{selector} |= "{safe}"' for selector in selectors]
         else:
-            logql_candidates = selectors
+            logql_candidates = list(selectors)
+            # Fallback: on stacks where the level is NOT promoted to a stream
+            # label, the label-matched selectors above all return empty. Append
+            # line-filter candidates over service-only selectors so logs(level=…)
+            # still finds them (audit M8). Tried only AFTER the label path, so a
+            # label-bearing stack keeps its exact-match behavior.
+            if level:
+                base_selectors = self._candidate_selectors(service=service, level=None)
+                line_re = self._level_line_regex(level)
+                logql_candidates += [f'{sel} |~ "{line_re}"' for sel in base_selectors]
 
         results = self._query_range_first_available(logql_candidates, start, end, limit=limit)
 

@@ -1,6 +1,7 @@
 # ============================================================
 # S1 — Slow-burn leaf. Stresses: T (origin deviates LATE) + leaf.
-# True root: valkey-cart (the cart cache). Fault class: Resource.
+# True root: valkey-cart (the cart cache; formerly "redis-cart" in older OTel
+# Demo releases — hence the historical "redis" naming). Fault class: Resource.
 # Expected weak signal: leans on D's self-term + arbitration.
 #
 # A memory ramp on the cart cache. The origin (valkey) may never individually
@@ -10,7 +11,7 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: StressChaos
 metadata:
-  name: s1-redis-memory-slowburn
+  name: s1-valkey-memory-slowburn
   namespace: otel-demo
   labels:
     causa/scenario: S1

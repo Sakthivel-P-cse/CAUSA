@@ -14,7 +14,9 @@ Key guarantees (vs the naive apply→sleep→delete→stamp):
     phantom incidents entering the corpus as "real"); override with
     --allow-unverified only when you know status polling is unavailable.
   • S5's infra root is the CONCRETE node name (resolved from --node or the CRD's
-    node selector), never the literal placeholder "NODE".
+    node selector), never the literal placeholder "NODE" — and when --node is
+    given the APPLIED CRD's node selector is patched to that same node, so the
+    node actually stressed always equals the recorded true_root_node.
   • --dry-run neither sleeps nor persists — it just prints what would run.
 
 The Incident is written OUT-OF-BAND (a JSON file and/or the role-isolated
@@ -60,6 +62,18 @@ def _kubectl(args: list[str], context: str | None = None) -> None:
     cmd += args
     logger.info("$ %s", " ".join(cmd))
     subprocess.run(cmd, check=True)
+
+
+def _kubectl_stdin(args: list[str], manifest: str, context: str | None = None) -> None:
+    """Like `_kubectl`, but feeds a rendered manifest to kubectl via stdin
+    (`-f -`) instead of a file path — used when the CRD's node selector is
+    patched at run time (S5 --node)."""
+    cmd = ["kubectl"]
+    if context:
+        cmd += ["--context", context]
+    cmd += args
+    logger.info("$ %s   (manifest via stdin)", " ".join(cmd))
+    subprocess.run(cmd, check=True, input=manifest, text=True)
 
 
 def _kubectl_capture(args: list[str], context: str | None = None) -> str | None:
@@ -136,6 +150,45 @@ def _node_from_crd(path: Path) -> str | None:
 def _resolve_node(scenario: Scenario, node_name: str | None) -> str | None:
     """Concrete node name for an infra scenario: --node wins, else the CRD's."""
     return node_name or _node_from_crd(scenario.crd_path)
+
+
+def _render_crd(path: Path, node_override: str | None) -> str:
+    """
+    CRD manifest text with its node selector repointed to `node_override`.
+
+    Without an override the file is returned VERBATIM (multi-doc D1–D3 files pass
+    through untouched — the regex only runs when we actually repoint a node). With
+    an override, every `nodes:` selector (block or inline form, mirroring
+    `_crd_documents`) is rewritten to the single override node, so the pod set that
+    is actually stressed matches the node recorded as `true_root_node`. Text-level
+    substitution keeps the no-PyYAML-dependency contract.
+    """
+    text = path.read_text()
+    if not node_override:
+        return text
+
+    def _replace_block(m: re.Match) -> str:
+        indent = m.group(1)                       # indent of the `nodes:` key
+        item_m = re.match(r"([ \t]*)-", m.group(2))
+        item_indent = item_m.group(1) if item_m else indent + "  "
+        return f'{indent}nodes:\n{item_indent}- "{node_override}"\n'
+
+    text, n_block = re.subn(
+        r"(?m)^([ \t]*)nodes:[ \t]*$\n((?:[ \t]*-[ \t]*.+\n?)+)",
+        _replace_block,
+        text,
+    )
+    text, n_inline = re.subn(
+        r"(?m)^([ \t]*)nodes:[ \t]*\[.*?\][ \t]*$",
+        lambda m: f'{m.group(1)}nodes: ["{node_override}"]',
+        text,
+    )
+    if n_block + n_inline == 0:
+        logger.warning(
+            "--node %s given but %s has no `nodes:` selector to patch; "
+            "applying the CRD unchanged.", node_override, path.name,
+        )
+    return text
 
 
 def _build_incidents(
@@ -250,14 +303,38 @@ def run_scenario(
         )
         return incidents
 
+    # Object kind/name/namespace (used for status polling) are unaffected by a
+    # node repoint, so targets come from the on-disk CRD either way.
     targets = _crd_documents(scenario.crd_path)
+
+    # When --node is given, apply a manifest whose node selector is repointed to
+    # that node (so we stress the node we record); otherwise apply the file as-is.
+    manifest = _render_crd(scenario.crd_path, node_name) if node_name else None
+
+    def _apply() -> None:
+        if manifest is not None:
+            _kubectl_stdin(["apply", "-f", "-", "-n", namespace], manifest, context)
+        else:
+            _kubectl(["apply", "-f", str(scenario.crd_path), "-n", namespace], context)
+
+    def _teardown() -> None:
+        if manifest is not None:
+            _kubectl_stdin(
+                ["delete", "-f", "-", "-n", namespace, "--ignore-not-found"],
+                manifest, context,
+            )
+        else:
+            _kubectl(
+                ["delete", "-f", str(scenario.crd_path), "-n", namespace, "--ignore-not-found"],
+                context,
+            )
 
     injected = False
     inject_start: datetime | None = None
     inject_end: datetime | None = None
     try:
         # apply INSIDE the try so a partial multi-doc apply is still torn down.
-        _kubectl(["apply", "-f", str(scenario.crd_path), "-n", namespace], context)
+        _apply()
 
         injected = _wait_injected(targets, namespace, context, inject_timeout)
         if not injected and not allow_unverified:
@@ -282,10 +359,8 @@ def run_scenario(
         inject_end = _now()
     finally:
         # Always tear down, even on interrupt — a stuck chaos poisons later runs.
-        _kubectl(
-            ["delete", "-f", str(scenario.crd_path), "-n", namespace, "--ignore-not-found"],
-            context,
-        )
+        # Uses the same (possibly node-repointed) manifest that was applied.
+        _teardown()
 
     if inject_start is None or inject_end is None:
         return []

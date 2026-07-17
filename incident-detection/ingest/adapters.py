@@ -83,6 +83,9 @@ class TelemetryAdapter:
         # Container CPU/mem series (cpu, saturation) are namespaced; the incident
         # namespace is set here so metrics(node, "cpu", ...) can resolve them.
         self._namespace = namespace
+        # Warn-once guard: surface a missing namespace loudly (once per metric)
+        # instead of silently dropping cpu/saturation (audit M9).
+        self._warned_missing_ns: set[str] = set()
 
     @classmethod
     def from_defaults(
@@ -128,6 +131,17 @@ class TelemetryAdapter:
             envelopes.extend(enrich_spans_with_dag(spans, tid))
         return envelopes
 
+    def trace(self, trace_id: str) -> list[SpanEnvelope]:
+        """All spans of ONE trace by id, DAG-ordered. Lets the reader guarantee
+        the incident's resolved trace_id is represented in the span set even when
+        the windowed `traces()` sample didn't include it (audit L3)."""
+        try:
+            spans = self._tempo.get_trace(trace_id)
+        except Exception as exc:
+            logger.warning("Failed to load trace %s: %s", trace_id, exc)
+            return []
+        return enrich_spans_with_dag(spans, trace_id)
+
     # ── C1: metrics(node, metric, window) ──────────────────────────────
 
     def metrics(
@@ -160,18 +174,36 @@ class TelemetryAdapter:
             return self._prom.get_request_rate_series(node, start, end, step)
         if metric == "cpu":
             if not ns:
+                self._warn_missing_namespace(metric, node)
                 return []
             return self._prom.get_container_cpu_pct_series(node, ns, start, end, step)
         if metric == "saturation":
             if not ns:
+                self._warn_missing_namespace(metric, node)
                 return []
             return self._prom.get_container_memory_pct_series(node, ns, start, end, step)
         if metric == "retry_rate":
             # No first-class retry counter on the OTel Demo out of the box.
-            # Left as a documented gap; anomaly's max-composite tolerates it.
+            # Accepted V1 gap (audit M9): S2 leans on error_rate/latency instead,
+            # and anomaly's max-composite tolerates the absent metric. Never
+            # synthesized — a faked retry series would poison the baseline.
             return []
         logger.debug("Unknown metric requested: %s", metric)
         return []
+
+    def _warn_missing_namespace(self, metric: str, node: str) -> None:
+        """Loudly surface (once per metric) that a namespaced infra metric was
+        requested with no namespace configured, so S1/S5 infra deviations don't
+        silently vanish (audit M9)."""
+        if metric in self._warned_missing_ns:
+            return
+        self._warned_missing_ns.add(metric)
+        logger.warning(
+            "metrics(node=%s, metric=%r) needs a namespace but none is configured "
+            "(pass TelemetryAdapter(namespace=…) or set CAUSA_APP_NAMESPACE). "
+            "Returning [] — container %s deviation (S1/S5) will be invisible until set.",
+            node, metric, metric,
+        )
 
     def metric_point(
         self, node: str, metric: str, window: Window, namespace: str | None = None

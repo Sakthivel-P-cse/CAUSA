@@ -98,10 +98,24 @@ class Dispatcher:
                 target=self._drain_outbox_loop, name="trigger-outbox", daemon=True
             ).start()
 
-    def submit(self, alerts: list[Alert], payload: dict) -> None:
-        # Non-blocking: if the queue is saturated we drop rather than stall the
-        # webhook (Alertmanager will re-deliver a firing alert anyway).
-        self._q.put_nowait((alerts, payload))
+    def submit(self, alerts: list[Alert], payload: dict) -> bool:
+        """Enqueue for background processing without blocking the webhook thread.
+
+        Returns False if the queue is saturated so the caller can answer 503 and
+        let Alertmanager re-deliver — `put_nowait` raises `queue.Full`, which
+        (unguarded) would escape do_POST as a 500 and neither ACK nor retry the
+        alert (audit L3). We never stall the request thread, and never silently
+        drop the incident.
+        """
+        try:
+            self._q.put_nowait((alerts, payload))
+            return True
+        except queue.Full:
+            logger.warning(
+                "Trigger queue saturated (maxsize=%d) — 503 for Alertmanager retry.",
+                self._q.maxsize,
+            )
+            return False
 
     def _run(self) -> None:
         while True:
@@ -284,9 +298,13 @@ class TriggerHandler(BaseHTTPRequestHandler):
             return
 
         # ACK fast; the dispatcher does snapshot/persist/forward off-thread.
-        # Forward only the monitored alerts (scope-filtered) to Stage-2.
-        self.dispatcher.submit(alerts, scoped_forward_payload(payload))
-        self._send(202, {"accepted": [a.incident_id for a in alerts]})
+        # Forward only the monitored alerts (scope-filtered) to Stage-2. On a
+        # saturated queue, answer 503 so Alertmanager re-delivers (not a 500,
+        # not a silent drop).
+        if self.dispatcher.submit(alerts, scoped_forward_payload(payload)):
+            self._send(202, {"accepted": [a.incident_id for a in alerts]})
+        else:
+            self._send(503, {"error": "trigger busy, retry later"})
 
 
 def make_server(
