@@ -102,6 +102,11 @@ def load_incident_s0() -> tuple[Topology, tuple[Trace, ...], AnomalyOutput, Grou
     )
 
     ground_truth = GroundTruth(
+        incident_id="s0-db-cascade",
+        true_root_node="cart-db",
+        fault_class="Dependency",
+        inject_start=0.0,
+        inject_end=30.0,
         expected_cluster_count=1,
         origin_nodes=frozenset({"cart-db"}),
     )

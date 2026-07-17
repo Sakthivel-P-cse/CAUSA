@@ -13,6 +13,10 @@ Pipeline::
       → T/D/P → layer arbitration
       → RootCauseCandidate list (templated explanations)
 
+Docs:
+  - ``docs/rca_kernel.md`` — M6 kernel writeup + explanation examples
+  - ``docs/scorer_c4.md`` — C4 Scorer seam for Dev C
+
 Owned packages: ``contracts/``, ``graphs/``, ``scoring/``, ``isolation/``.
-Fixtures live in ``fixtures/`` (S0 DB-origin, S1 infra-origin).
+Fixtures: golden, S0, S1, S5, D1–D3 under ``fixtures/``.
 """

@@ -83,6 +83,11 @@ def load_incident_s1() -> tuple[Topology, tuple[Trace, ...], AnomalyOutput, Grou
     )
 
     ground_truth = GroundTruth(
+        incident_id="s1-infra-pressure",
+        true_root_node="node-b",
+        fault_class="Infra",
+        inject_start=0.0,
+        inject_end=30.0,
         expected_cluster_count=1,
         origin_nodes=frozenset({"node-b"}),
     )

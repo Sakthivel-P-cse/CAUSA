@@ -1,8 +1,10 @@
-"""End-to-end pipeline on S0 and S1 fixtures."""
+"""End-to-end pipeline on golden, S0, S1, and S5 fixtures."""
 
 from contracts.types import Role
+from fixtures.golden_incident import load_golden_incident
 from fixtures.incident_s0 import load_incident_s0
 from fixtures.incident_s1 import load_incident_s1
+from fixtures.incident_s5 import load_incident_s5
 from graphs.construction import (
     build_infrastructure_graph,
     build_service_dependency_graph,
@@ -43,6 +45,8 @@ def test_e2e_s0_origin_db():
     assert db.role == Role.ORIGIN
     assert db.T == 0.5 or db.T > 0.5  # earliest → high T (not slow-burn)
     assert db.T > 0.9
+    assert db.confidence >= 0.0
+    assert db.node_kind.value in {"infra", "dependency", "service"}
 
 
 def test_e2e_s1_infra_origin():
@@ -57,3 +61,37 @@ def test_e2e_s1_infra_origin():
     # Top candidate should be the infra origin (or near top).
     top3 = [c.node_id for c in result.candidates[:3]]
     assert "node-b" in top3
+
+
+def test_e2e_s5_victim_of_infra():
+    """DoD S5: infra above service; hosted service role=victim-of-infra."""
+    topology, traces, anomaly, gt = load_incident_s5()
+    sub = build_incident_subgraph(topology, traces, anomaly)
+    result = score(sub, incident_id=gt.incident_id)
+    by_id = {c.node_id: c for c in result.candidates}
+
+    assert result.incident_id == gt.incident_id
+    assert by_id["catalog"].role == Role.VICTIM_OF_INFRA
+    assert by_id["node-b"].node_kind.value == "infra"
+    assert by_id["catalog"].node_kind.value == "service"
+    idx = {c.node_id: i for i, c in enumerate(result.candidates)}
+    assert idx["node-b"] < idx["catalog"]
+    for c in result.candidates:
+        assert c.confidence >= 0.0
+        assert hasattr(c.signals, "T")
+
+
+def test_e2e_golden_db_origin():
+    topology, traces, anomaly, gt, expected = load_golden_incident()
+    sub = build_incident_subgraph(topology, traces, anomaly)
+    ig = build_influence_graph(sub)
+    assert ig.out_degree("cart-db") > 0
+
+    result = score(sub, ig=ig, incident_id=gt.incident_id)
+    top = result.candidates[0]
+    assert top.node_id == expected.node_id == gt.true_root_node
+    assert top.role == Role.ORIGIN
+    assert top.node_kind.value == "dependency"
+    assert top.dev_vector.get("p95_latency", 0) > 0
+    assert top.confidence > 0
+    assert result.incident_id == gt.incident_id

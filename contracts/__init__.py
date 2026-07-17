@@ -2,6 +2,7 @@
 
 from .types import (
     AnomalyOutput,
+    AnomalyThresholds,
     CallType,
     Edge,
     GroundTruth,
@@ -10,13 +11,16 @@ from .types import (
     RankedResult,
     Role,
     RootCauseCandidate,
+    SignalScores,
     Span,
+    TelemetryAdapters,
     Topology,
     Trace,
 )
 
 __all__ = [
     "AnomalyOutput",
+    "AnomalyThresholds",
     "CallType",
     "Edge",
     "GroundTruth",
@@ -25,7 +29,9 @@ __all__ = [
     "RankedResult",
     "Role",
     "RootCauseCandidate",
+    "SignalScores",
     "Span",
+    "TelemetryAdapters",
     "Topology",
     "Trace",
 ]

@@ -1,7 +1,15 @@
-"""T / D / P signal computation on the Influence Graph."""
+"""T / D / P signal computation on the Influence Graph.
+
+Math matches ``RCA_Engine_Spec.md`` §2:
+  - T: ``t0 = min FirstDeviationTime`` over subgraph nodes that have one
+  - D: pure Out/InInfluence = Σ anomaly_score of successors/predecessors
+  - P: consistent only when temporal order AND edge.degraded
+  - betweenness: undirected shortest-path (Brandes), for amplifier role
+"""
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 from contracts.types import AnomalyOutput, Role
@@ -39,6 +47,18 @@ class SignalResult:
     horizon: float
 
 
+def _subgraph_t0(anomaly: AnomalyOutput, node_ids: set[str]) -> float:
+    """Earliest FirstDeviationTime among subgraph nodes that have one."""
+    times = [
+        t
+        for nid, t in anomaly.first_deviation_time.items()
+        if nid in node_ids and t is not None
+    ]
+    if not times:
+        return anomaly.t0
+    return min(times)
+
+
 def _max_subgraph_delta(anomaly: AnomalyOutput, node_ids: set[str]) -> float:
     times = [
         t
@@ -54,10 +74,12 @@ def compute_T(
     node_id: str,
     anomaly: AnomalyOutput,
     horizon: float,
+    t0: float,
 ) -> tuple[float, dict[str, bool]]:
     """Temporal primacy — time-delta, not rank.
 
     No-deviation / slow-burn → T=0.5 flagged neutral.
+    ``t0`` is the subgraph-wide min FirstDeviationTime (spec §2.1).
     """
     flags: dict[str, bool] = {}
     fdt = anomaly.first_deviation_time.get(node_id)
@@ -65,7 +87,6 @@ def compute_T(
         flags["slow_burn_T"] = True
         return 0.5, flags
 
-    t0 = anomaly.t0
     T = clamp01(1.0 - (fdt - t0) / (horizon + EPS))
     return T, flags
 
@@ -80,22 +101,18 @@ def compute_D(
     anomaly: AnomalyOutput,
     alpha: float = ALPHA,
 ) -> tuple[float, float, float]:
-    """Cascade direction on IG.
+    """Cascade direction on IG (spec §2.2).
 
-    D = (α·a + Out) / (α·a + Out + In + ε)
+    OutInfluence / InInfluence = pure Σ anomaly_score of successors /
+    predecessors — no degree fudge term.
     """
     a = anomaly.anomaly_score.get(node_id, 0.0)
     out_inf = sum(
         _influence_weight(anomaly, e.dst) for e in ig.out_edges(node_id)
     )
-    # Also count structural out-degree lightly so a pure origin with low
-    # downstream anomaly still gets OutInfluence > 0.
-    out_inf += 0.1 * ig.out_degree(node_id)
-
     in_inf = sum(
         _influence_weight(anomaly, e.src) for e in ig.in_edges(node_id)
     )
-    in_inf += 0.1 * ig.in_degree(node_id)
 
     D = (alpha * a + out_inf) / (alpha * a + out_inf + in_inf + EPS)
     return clamp01(D), out_inf, in_inf
@@ -106,10 +123,10 @@ def compute_P(
     ig: InfluenceGraph,
     anomaly: AnomalyOutput,
 ) -> tuple[float, int, int, dict[str, bool]]:
-    """Propagation consistency on IG.
+    """Propagation consistency on IG (spec §2.3).
 
-    Fraction of outgoing influence edges N→M where N deviated before M AND
-    the edge metric degraded, anomaly-weighted.
+    consistent(N→M) only when FirstDeviationTime(N) ≤ FirstDeviationTime(M)
+    AND edge.degraded. No partial credit.
     Zero out-degree → P=0, flagged.
     """
     flags: dict[str, bool] = {}
@@ -125,45 +142,70 @@ def compute_P(
     total = 0
 
     for e in out:
-        w = max(anomaly.anomaly_score.get(e.dst, 0.0), 0.05)
+        w = max(anomaly.anomaly_score.get(e.dst, 0.0), EPS)
         weighted_total += w
         total += 1
 
         fdt_m = anomaly.first_deviation_time.get(e.dst)
-        # If N has no deviation time, it cannot satisfy "before"; edge fails
-        # temporal check (slow-burn origins still rank via T/D).
         before = (
             fdt_n is not None
             and fdt_m is not None
             and fdt_n <= fdt_m
         )
-        degraded = e.degraded
-        if before and degraded:
+        if before and e.degraded:
             weighted_ok += w
             consistent += 1
-        elif before and not degraded:
-            # Temporal order ok but metric not marked degraded — partial credit.
-            weighted_ok += 0.5 * w
-            consistent += 1  # count as order-consistent for explanation nums
 
     P = weighted_ok / (weighted_total + EPS) if weighted_total > 0 else 0.0
     return clamp01(P), consistent, total, flags
 
 
-def _approx_betweenness(ig: InfluenceGraph) -> dict[str, float]:
-    """Cheap undirected degree-centrality proxy for role derivation.
+def _betweenness_centrality(ig: InfluenceGraph) -> dict[str, float]:
+    """Undirected shortest-path betweenness (Brandes), normalized to [0, 1]."""
+    nodes = list(ig.nodes.keys())
+    if len(nodes) <= 2:
+        return {nid: 0.0 for nid in nodes}
 
-    Full pairwise shortest-path betweenness is unnecessary for role labels;
-    high (in+out) degree stands in for "high betweenness + incoming".
-    """
-    if not ig.nodes:
-        return {}
-    raw = {
-        nid: float(ig.in_degree(nid) + ig.out_degree(nid))
-        for nid in ig.nodes
-    }
-    mx = max(raw.values()) or 1.0
-    return {nid: v / mx for nid, v in raw.items()}
+    adj: dict[str, set[str]] = {nid: set() for nid in nodes}
+    for e in ig.edges:
+        adj[e.src].add(e.dst)
+        adj[e.dst].add(e.src)
+
+    betweenness = {nid: 0.0 for nid in nodes}
+
+    for s in nodes:
+        stack: list[str] = []
+        pred: dict[str, list[str]] = {w: [] for w in nodes}
+        sigma = {w: 0.0 for w in nodes}
+        sigma[s] = 1.0
+        dist = {w: -1 for w in nodes}
+        dist[s] = 0
+        q: deque[str] = deque([s])
+        while q:
+            v = q.popleft()
+            stack.append(v)
+            for w in adj[v]:
+                if dist[w] < 0:
+                    dist[w] = dist[v] + 1
+                    q.append(w)
+                if dist[w] == dist[v] + 1:
+                    sigma[w] += sigma[v]
+                    pred[w].append(v)
+        delta = {w: 0.0 for w in nodes}
+        while stack:
+            w = stack.pop()
+            for v in pred[w]:
+                if sigma[w] > 0:
+                    delta[v] += (sigma[v] / sigma[w]) * (1.0 + delta[w])
+            if w != s:
+                betweenness[w] += delta[w]
+
+    # Undirected: each pair counted twice.
+    for nid in nodes:
+        betweenness[nid] /= 2.0
+
+    mx = max(betweenness.values()) or 1.0
+    return {nid: v / mx for nid, v in betweenness.items()}
 
 
 def derive_role(
@@ -193,17 +235,18 @@ def compute_signals(
     H: float = H_DEFAULT,
 ) -> SignalResult:
     node_ids = ig.node_ids()
+    t0 = _subgraph_t0(anomaly, node_ids)
     max_delta = _max_subgraph_delta(anomaly, node_ids)
     horizon = min(max_delta, H) if max_delta > 0 else H
     # Avoid degenerate horizon of 0.
     if horizon <= 0:
         horizon = H
 
-    betweenness = _approx_betweenness(ig)
+    betweenness = _betweenness_centrality(ig)
     by_node: dict[str, NodeSignals] = {}
 
     for nid in node_ids:
-        T, t_flags = compute_T(nid, anomaly, horizon)
+        T, t_flags = compute_T(nid, anomaly, horizon, t0)
         D, out_inf, in_inf = compute_D(nid, ig, anomaly, alpha=alpha)
         P, p_ok, p_tot, p_flags = compute_P(nid, ig, anomaly)
         a = anomaly.anomaly_score.get(nid, 0.0)
@@ -223,4 +266,4 @@ def compute_signals(
             betweenness=betweenness.get(nid, 0.0),
         )
 
-    return SignalResult(by_node=by_node, t0=anomaly.t0, horizon=horizon)
+    return SignalResult(by_node=by_node, t0=t0, horizon=horizon)

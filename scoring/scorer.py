@@ -1,4 +1,21 @@
-"""C4 Scorer interface — pure scoring for ablation / weight sweeps."""
+"""C4 Scorer interface — pure scoring for ablation / weight sweeps.
+
+See also ``docs/scorer_c4.md`` for Dev C harness integration notes.
+
+Call::
+
+    from scoring.scorer import score, Scorer, DEFAULT_WEIGHTS
+
+    result = score(
+        subgraph,
+        weights={"T": 0.5, "D": 0.3, "P": 0.2},  # default 1/3 each
+        enabled_signals={"T", "D", "P"},          # disabled → zeroed internally
+    )
+
+Disabled signals contribute **0** regardless of the weight dict — the scorer
+zeros them so ablation harnesses can leave weights unchanged while dropping
+signals. Deterministic and side-effect free given the same inputs.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +26,7 @@ from graphs.incident_subgraph import IncidentSubgraph
 from graphs.influence_graph import InfluenceGraph, build_influence_graph
 
 from .arbitration import arbitrate
-from .output import build_candidates
+from .output import build_candidates, stamp_confidence
 from .signals import compute_signals
 
 DEFAULT_WEIGHTS: dict[str, float] = {"T": 1.0 / 3.0, "D": 1.0 / 3.0, "P": 1.0 / 3.0}
@@ -25,8 +42,9 @@ def score(
     anomaly: AnomalyOutput | None = None,
     top_c: int = 5,
     run_arbitration: bool = True,
+    incident_id: str = "",
 ) -> RankedResult:
-    """Deterministic RCA scoring over an incident subgraph.
+    """Deterministic RCA scoring over an incident subgraph (C4).
 
     Parameters
     ----------
@@ -47,10 +65,14 @@ def score(
         Top-C window for layer arbitration.
     run_arbitration:
         When True, apply infra-vs-service re-ranking pass.
+    incident_id:
+        Stamped onto ``RankedResult.incident_id`` for Dev C eval join.
 
     Returns
     -------
     RankedResult with candidates sorted by score descending (deterministic).
+    Each candidate carries ``node_kind``, nested ``signals``, ``confidence``
+    (raw §5 formula; calibration is Dev C), and ``dev_vector``.
 
     Notes
     -----
@@ -88,12 +110,18 @@ def score(
 
     if run_arbitration:
         candidates = arbitrate(candidates, ig, anomaly, top_c=top_c)
+        # Re-stamp confidence after possible score bumps / reordering.
+        stamp_confidence(candidates)
 
-    return RankedResult(candidates=candidates)
+    return RankedResult(candidates=candidates, incident_id=incident_id)
 
 
 class Scorer:
-    """Thin callable wrapper around :func:`score` (C4 seam)."""
+    """Thin callable wrapper around :func:`score` (C4 seam).
+
+    Dev C's tuning / ablation harness should call this (or ``score``) with
+    arbitrary ``weights`` and ``enabled_signals`` — never reimplement T/D/P.
+    """
 
     def score(
         self,

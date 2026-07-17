@@ -60,6 +60,12 @@ def arbitrate(
         if svc is None or infra is None:
             continue
         svc.role = Role.VICTIM_OF_INFRA
+        # Keep templated explanation role in sync with the re-rank annotation.
+        if ". Role: " in svc.explanation:
+            svc.explanation = (
+                svc.explanation.rsplit(". Role: ", 1)[0]
+                + f". Role: {svc.role.value}."
+            )
         if infra.score <= svc.score:
             infra.score = svc.score + 1e-3
 

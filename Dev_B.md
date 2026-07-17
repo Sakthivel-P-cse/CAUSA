@@ -101,13 +101,13 @@ Four stages on `IG` restricted to the incident subgraph: (1) connected component
 
 ## Definition of done
 
-- [ ] `IG` reversal verified on a real sync leaf (DB gains outgoing influence edges).
-- [ ] T uses time-delta; slow-burn node scores `T=0.5`, not 0 or 1.
-- [ ] D scores a true origin high even when its victims are still ramping (self-term α works).
-- [ ] `role` is populated and matches intuition on S0 (origin) and S5 (victim-of-infra after arbitration).
-- [ ] Every candidate has a non-empty, accurate explanation sentence.
-- [ ] `Scorer` runs with arbitrary weights + dropped signals for Dev C's ablation.
-- [ ] (M3.5) isolation returns the right *number* of clusters on D1/D2 and abstains on D3.
+- [x] `IG` reversal verified on a real sync leaf (DB gains outgoing influence edges). *(fixture-verified on golden/S0; live pending A)*
+- [x] T uses time-delta; slow-burn node scores `T=0.5`, not 0 or 1. *(fixture-verified)*
+- [x] D scores a true origin high even when its victims are still ramping (self-term α works). *(fixture-verified)*
+- [x] `role` is populated and matches intuition on S0 (origin) and S5 (victim-of-infra after arbitration). *(fixture-verified; live pending A)*
+- [x] Every candidate has a non-empty, accurate explanation sentence. *(fixture-verified; examples in `docs/rca_kernel.md`)*
+- [x] `Scorer` runs with arbitrary weights + dropped signals for Dev C's ablation. *(C4 + `docs/scorer_c4.md`; weight-sweep sanity test)*
+- [x] (M3.5) isolation returns the right *number* of clusters on D1/D2 and abstains on D3. *(fixture-verified; live chaos pending A)*
 
 ---
 
