@@ -4,7 +4,8 @@ Dev A owns the shared Postgres and its ground-truth store (`groundtruth.ground_t
 contract C5). The **anti-circularity invariant** — the RCA engine must never read a
 ground-truth row before its output is scored — is enforced at the **grant level**, not
 by convention. The roles and grants live in this chart's `templates/configmap.yaml`
-(`init.sql`) and are created on first startup of an empty data volume.
+(`init.sql`). A post-install/post-upgrade Helm hook reapplies the RCA restrictions
+and grants so upgrades are also safe when Postgres uses an existing PVC.
 
 ## Roles (created by init.sql)
 
@@ -30,16 +31,16 @@ deploy them, wire the DB connection to the **right role**, not the owner `causa`
 
 ## Deployment slot
 
-Dev A's `deploy.sh` deploys the observability stack + Postgres + the ingest trigger,
-and in **dev** stands up `helm/stage2-mock` (a trivial 200-returning receiver at the
-`stage2-rca` service) so the trigger's forward path is testable end-to-end. Deploy
-your real chart into the **`stage2-rca` namespace with a `stage2-rca` Service** and it
-swaps in cleanly (uninstall `stage2-mock` first). In **prod**, `deploy.sh` deploys no
-mock — the ingest trigger buffers forwards to the durable `stage2_outbox` table until
-your engine is reachable, so nothing is lost in the gap.
+`deploy.sh` installs the real `helm/stage2-rca` chart by default in both environments.
+For focused development without the engine, `deploy.sh dev --stage2 mock` explicitly
+installs `helm/stage2-mock` into the same Helm release and service slot. Switching the
+profile is a normal Helm upgrade and cannot leave both implementations selecting the
+`stage2-rca` Service.
 
 ## Existing clusters
 
-`init.sql` runs **once, on an empty data volume**. On a cluster whose Postgres volume
-already exists, the roles/grants above must be applied **by hand** (run the
-`CREATE ROLE` / `REVOKE` / `GRANT` block from `init.sql`).
+`init.sql` still runs **once, on an empty data volume**. On every chart install or
+upgrade, the `postgres-rca-engine-grants` hook waits for Postgres and idempotently
+creates the role if needed, revokes ground-truth access, and applies only the engine's
+required table grants. The hook fails the Helm operation if required tables are
+missing instead of silently deploying an over-privileged or unusable engine.

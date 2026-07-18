@@ -27,6 +27,11 @@ packages = [
     "ingest.clients",
     "ingest.trigger",
     "anomaly",
+    "graphs",
+    "isolation",
+    "rca",
+    "rca.trigger",
+    "scoring",
     # The ground-truth harness (contract C5) is part of the lane's deliverable,
     # so it ships with the distribution rather than living only in-tree.
     "testbed",

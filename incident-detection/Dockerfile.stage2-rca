@@ -1,0 +1,30 @@
+# Causa Stage-2 RCA image.
+# Build context is incident-detection/:
+#   docker build -f Dockerfile.stage2-rca -t causa/stage2-rca:latest .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy the package inputs explicitly so deployment-only files and tests never
+# enter the runtime image. The trigger extra provides psycopg.
+COPY pyproject.toml ./
+COPY contracts/ ./contracts/
+COPY ingest/ ./ingest/
+COPY anomaly/ ./anomaly/
+COPY graphs/ ./graphs/
+COPY isolation/ ./isolation/
+COPY rca/ ./rca/
+COPY scoring/ ./scoring/
+COPY testbed/ ./testbed/
+
+RUN pip install --no-cache-dir ".[trigger]"
+
+RUN useradd --uid 10001 --create-home causa
+USER causa
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+
+CMD ["python", "-m", "rca.trigger.app"]

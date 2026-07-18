@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "postgres.fullname" . }}-rca-engine-grants
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-rca-engine-grants
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: rca-engine-grants
+        app.kubernetes.io/part-of: causa
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: grants
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgres.secretName" . }}
+                  key: {{ .Values.auth.existingSecretKey }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until pg_isready \
+                --host={{ include "postgres.fullname" . | quote }} \
+                --port={{ .Values.service.port }} \
+                --username={{ .Values.auth.username | quote }} \
+                --dbname={{ .Values.auth.database | quote }}; do
+                sleep 2
+              done
+
+              psql \
+                --host={{ include "postgres.fullname" . | quote }} \
+                --port={{ .Values.service.port }} \
+                --username={{ .Values.auth.username | quote }} \
+                --dbname={{ .Values.auth.database | quote }} \
+                --set=ON_ERROR_STOP=1 <<'SQL'
+              DO $$
+              BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
+                      CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
+                  END IF;
+              END
+              $$;
+
+              REVOKE ALL ON SCHEMA groundtruth FROM PUBLIC;
+              REVOKE ALL ON ALL TABLES IN SCHEMA groundtruth FROM PUBLIC;
+              REVOKE USAGE ON SCHEMA groundtruth FROM rca_engine;
+              REVOKE ALL ON ALL TABLES IN SCHEMA groundtruth FROM rca_engine;
+              ALTER DEFAULT PRIVILEGES IN SCHEMA groundtruth
+                  REVOKE ALL ON TABLES FROM rca_engine;
+
+              GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
+              GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
+              SQL

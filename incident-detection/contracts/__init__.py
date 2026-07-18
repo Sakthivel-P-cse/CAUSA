@@ -28,6 +28,15 @@ from .telemetry import (
 # C2 — anomaly
 from .anomaly import METRICS, AnomalyOutput, Baseline, Thresholds
 
+# C3/C4 — RCA output and scorer seam
+from .rca import (
+    NodeKind,
+    RankedResult,
+    Role,
+    RootCauseCandidate,
+    SignalScores,
+)
+
 # C5 — ground truth
 from .ground_truth import FaultClass, Incident
 
@@ -51,6 +60,12 @@ __all__ = [
     "AnomalyOutput",
     "Baseline",
     "Thresholds",
+    # C3/C4
+    "NodeKind",
+    "RankedResult",
+    "Role",
+    "RootCauseCandidate",
+    "SignalScores",
     # C5
     "FaultClass",
     "Incident",

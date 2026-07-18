@@ -1,9 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  # MUST be `stage2-rca` so http://stage2-rca.stage2-rca.svc:8080/trigger (the
-  # ingest trigger's STAGE2_WEBHOOK_URL) resolves here. Dev B's real chart
-  # provides the same service name in this namespace — a clean swap.
+  # MUST be `stage2-rca` so the ingest webhook URL is identical in the explicit
+  # mock profile and the default real-engine profile.
   name: stage2-rca
   namespace: {{ .Release.Namespace }}
   labels:

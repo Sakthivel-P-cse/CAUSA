@@ -3,7 +3,7 @@
 # deploy.sh — Deploy the full Causa observability stack
 #
 # Usage:
-#   ./scripts/deploy.sh [dev|prod]
+#   ./scripts/deploy.sh [dev|prod] [--stage2 real|mock]
 #
 # Deploys all components in dependency order:
 #   1.  Namespaces
@@ -21,12 +21,10 @@
 #  13.  OTel Agent          (per-node DaemonSet — collect + forward)
 #  14.  Alertmanager       (alert routing → Stage 2 webhook)
 #  15.  Postgres           (incident + ground-truth + RCA report storage)
-#  16.  Stage-2 mock       (DEV ONLY — trivial receiver so the trigger forward
-#                           is testable; Dev B replaces it with the real engine)
+#  16.  Stage-2 RCA        (real engine by default; explicit dev mock available)
 #  17.  Causa Ingest       (Dev-A trigger: opens window/state, forwards to Stage 2)
 #
-# NOT deployed here (other lanes): the real stage2-rca engine (Dev B) and the
-# causa-dashboard UI (Dev C). See helm/postgres/DB_ROLE_CONTRACT.md.
+# Dev C's causa-dashboard UI is intentionally not deployed here.
 #
 # Deploy order: each MinIO must be up before the backend that uses it.
 #   minio-tempo → tempo   (Tempo writes trace blocks to minio-tempo)
@@ -50,11 +48,45 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HELM_DIR="${ROOT_DIR}/helm"
 MANIFESTS_DIR="${ROOT_DIR}/manifests"
 
-ENV="${1:-dev}"
+ENV="dev"
+STAGE2_PROFILE="${STAGE2_PROFILE:-real}"
+
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  ENV="$1"
+  shift
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stage2)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --stage2 requires 'real' or 'mock'."
+        exit 1
+      fi
+      STAGE2_PROFILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "ERROR: unknown option '$1'."
+      echo "Usage: $0 [dev|prod] [--stage2 real|mock]"
+      exit 1
+      ;;
+  esac
+done
 
 if [[ "${ENV}" != "dev" && "${ENV}" != "prod" ]]; then
   echo "ERROR: environment must be 'dev' or 'prod'. Got: '${ENV}'"
-  echo "Usage: $0 [dev|prod]"
+  echo "Usage: $0 [dev|prod] [--stage2 real|mock]"
+  exit 1
+fi
+
+if [[ "${STAGE2_PROFILE}" != "real" && "${STAGE2_PROFILE}" != "mock" ]]; then
+  echo "ERROR: --stage2 must be 'real' or 'mock'. Got: '${STAGE2_PROFILE}'"
+  exit 1
+fi
+
+if [[ "${STAGE2_PROFILE}" == "mock" && "${ENV}" != "dev" ]]; then
+  echo "ERROR: the Stage-2 mock is an explicit development-only profile."
   exit 1
 fi
 
@@ -66,6 +98,7 @@ STORAGE_CLASS="${STORAGE_CLASS:-standard}"
 
 echo "========================================================"
 echo "  Causa Observability Stack — Deploying [${ENV^^}]"
+echo "  Stage-2 profile: ${STAGE2_PROFILE}"
 echo "========================================================"
 echo ""
 
@@ -193,9 +226,6 @@ if [[ "${ENV}" == "prod" ]]; then
   fi
   echo "  ✓ minio-loki-secret exists"
 
-  # NOTE: stage2-rca (Dev B) and causa-dashboard (Dev C) are NOT deployed by this
-  # script — they own those charts + their secrets. See helm/postgres/DB_ROLE_CONTRACT.md.
-
   if ! kubectl -n causa-ingest get secret causa-ingest-secret &>/dev/null; then
     echo ""
     echo "ERROR: Production secret 'causa-ingest-secret' not found in namespace 'causa-ingest'."
@@ -207,6 +237,17 @@ if [[ "${ENV}" == "prod" ]]; then
     exit 1
   fi
   echo "  ✓ causa-ingest-secret exists"
+
+  if ! kubectl -n stage2-rca get secret stage2-rca-secret &>/dev/null; then
+    echo ""
+    echo "ERROR: Production secret 'stage2-rca-secret' not found in namespace 'stage2-rca'."
+    echo "  Its PGPASSWORD value must match the Postgres rca_engine role."
+    echo "  kubectl create namespace stage2-rca --dry-run=client -o yaml | kubectl apply -f -"
+    echo "  kubectl -n stage2-rca create secret generic stage2-rca-secret \\"
+    echo "    --from-literal=PGPASSWORD='<RCA_ENGINE_PASSWORD>'"
+    exit 1
+  fi
+  echo "  ✓ stage2-rca-secret exists"
 
   # Verify the storage class exists on this cluster
   if ! kubectl get storageclass "${STORAGE_CLASS}" &>/dev/null; then
@@ -233,10 +274,11 @@ echo ""
 # Helper function for Helm install/upgrade
 helm_deploy() {
   local release="${1}"
-  local chart_dir="${HELM_DIR}/${release}"
   local namespace="${2}"
   local step="${3}"
   local total="${4}"
+  local chart="${5:-${release}}"
+  local chart_dir="${HELM_DIR}/${chart}"
 
   echo "──────────────────────────────────────────────────────"
   echo "[${step}/${total}] Deploying ${release} → namespace: ${namespace}"
@@ -266,8 +308,9 @@ helm_deploy() {
   echo ""
 }
 
-# Total component count for the progress display: dev includes the stage2 mock.
-if [[ "${ENV}" == "dev" ]]; then TOTAL=17; else TOTAL=16; fi
+# The real Stage-2 engine is part of both environments. The explicit dev mock
+# occupies the same Helm release and service slot, so the count stays constant.
+TOTAL=17
 
 # ── Deploy components (in dependency order) ────────────────────
 helm_deploy "kube-state-metrics" "kube-state-metrics" 2  "${TOTAL}"
@@ -285,18 +328,19 @@ helm_deploy "otel-agent"         "otel-agent"         13 "${TOTAL}"
 helm_deploy "alertmanager"       "alertmanager"       14 "${TOTAL}"
 helm_deploy "postgres"           "postgres"           15 "${TOTAL}"
 
-# Dev B's real RCA engine and Dev C's dashboard are deployed by THEM, not here
-# (out of the Dev-A lane). In DEV we stand up a trivial mock receiver so the
-# trigger's forward path + Alertmanager routing are testable end-to-end; it
-# provides the `stage2-rca` service, which Dev B's chart swaps in cleanly. In
-# PROD no mock runs — the trigger buffers forwards to stage2_outbox until Dev B's
-# engine is reachable. See helm/postgres/DB_ROLE_CONTRACT.md.
-if [[ "${ENV}" == "dev" ]]; then
-  helm_deploy "stage2-mock"      "stage2-rca"         16 "${TOTAL}"
-  helm_deploy "causa-ingest"     "causa-ingest"       17 "${TOTAL}"
-else
-  helm_deploy "causa-ingest"     "causa-ingest"       16 "${TOTAL}"
+# Remove the old mock release name once, if a previous Dev-A deployment used it.
+# Both current profiles use release `stage2-rca`, so switching profiles is an
+# atomic Helm upgrade and cannot leave two deployments selecting the Service.
+if helm status stage2-mock --namespace stage2-rca &>/dev/null; then
+  helm uninstall stage2-mock --namespace stage2-rca --wait
 fi
+
+if [[ "${STAGE2_PROFILE}" == "mock" ]]; then
+  helm_deploy "stage2-rca"       "stage2-rca"         16 "${TOTAL}" "stage2-mock"
+else
+  helm_deploy "stage2-rca"       "stage2-rca"         16 "${TOTAL}"
+fi
+helm_deploy "causa-ingest"       "causa-ingest"       17 "${TOTAL}"
 
 # ── Summary ────────────────────────────────────────────────
 echo "========================================================"
@@ -315,9 +359,7 @@ echo ""
   echo "    Postgres:        kubectl -n postgres port-forward svc/postgres 5432:5432"
   echo "    Ingest trigger:  kubectl -n causa-ingest port-forward svc/causa-ingest 8080:8080"
   echo "                     → POST http://localhost:8080/trigger"
-  if [[ "${ENV}" == "dev" ]]; then
-  echo "    Stage-2 (mock):  kubectl -n stage2-rca port-forward svc/stage2-rca 8081:8080  (dev placeholder)"
-  fi
+  echo "    Stage-2 (${STAGE2_PROFILE}): kubectl -n stage2-rca port-forward svc/stage2-rca 8081:8080"
 echo ""
 echo "  Run validation:"
 echo "    ./scripts/validate.sh"
