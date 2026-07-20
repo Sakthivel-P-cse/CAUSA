@@ -15,7 +15,9 @@ def test_all_seven_nonempty_subsets():
     topology, traces, anomaly, _ = load_incident_s0()
     sub = build_incident_subgraph(topology, traces, anomaly)
     ig = build_influence_graph(sub)
-    sigs = compute_signals(ig, anomaly)
+    # Same normalization basis the scorer uses, or the arithmetic check compares
+    # signals computed over two different bases (see IncidentSubgraph.seed_ids).
+    sigs = compute_signals(ig, anomaly, seed_ids=sub.seed_ids)
 
     for r in range(1, 4):
         for subset in combinations(SIGNALS, r):

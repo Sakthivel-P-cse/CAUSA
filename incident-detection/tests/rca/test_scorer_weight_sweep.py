@@ -12,7 +12,9 @@ def test_increasing_T_weight_raises_high_T_node_score():
     topology, traces, anomaly, _ = load_incident_s0()
     sub = build_incident_subgraph(topology, traces, anomaly)
     ig = build_influence_graph(sub)
-    sigs = compute_signals(ig, anomaly)
+    # Same normalization basis the scorer uses, or the arithmetic check compares
+    # signals computed over two different bases (see IncidentSubgraph.seed_ids).
+    sigs = compute_signals(ig, anomaly, seed_ids=sub.seed_ids)
     origin = "cart-db"
     assert sigs.by_node[origin].T > sigs.by_node["frontend"].T
 
@@ -37,7 +39,9 @@ def test_disabled_signal_zeros_contribution():
     topology, traces, anomaly, _ = load_incident_s0()
     sub = build_incident_subgraph(topology, traces, anomaly)
     ig = build_influence_graph(sub)
-    sigs = compute_signals(ig, anomaly)
+    # Same normalization basis the scorer uses, or the arithmetic check compares
+    # signals computed over two different bases (see IncidentSubgraph.seed_ids).
+    sigs = compute_signals(ig, anomaly, seed_ids=sub.seed_ids)
 
     result = score(
         sub,

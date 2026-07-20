@@ -25,6 +25,14 @@ class IncidentSubgraph:
     anomaly: KernelAnomaly | None = None
     theta_fire: float = THETA_FIRE
     theta_low: float = THETA_LOW
+    # Nodes admitted on DIRECT deviation evidence (fire threshold, resource
+    # deviation, or anomalous-trace participation) as opposed to connectivity
+    # expansion. Membership is deliberately permissive for recall — a slow-burn
+    # origin must not be filtered out — but that makes the node set a bad basis
+    # for TEMPORAL NORMALIZATION: t0 is a min over the set, so one merely
+    # ADJACENT node that happened to deviate earlier rescales T for everyone.
+    # Signals normalize over these seeds; ranking still covers every node.
+    seed_ids: set[str] = field(default_factory=set)
 
     def node_ids(self) -> set[str]:
         return set(self.nodes.keys())
@@ -119,10 +127,22 @@ def build_incident_subgraph(
         if e.src in nodes and e.dst in nodes
     ]
 
+    # Direct-evidence nodes only: the θ_fire / resource / anomalous-trace rules.
+    # Deliberately excludes the connectivity expansion above, whose whole point
+    # is to admit nodes that show no deviation evidence of their own.
+    seed_ids = {
+        nid
+        for nid in nodes
+        if scores.get(nid, 0.0) > theta_fire
+        or resource.get(nid, False)
+        or nid in trace_participants
+    }
+
     return IncidentSubgraph(
         nodes=nodes,
         edges=edges,
         anomaly=anomaly,
         theta_fire=theta_fire,
         theta_low=theta_low,
+        seed_ids=seed_ids,
     )

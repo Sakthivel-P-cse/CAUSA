@@ -217,8 +217,21 @@ def derive_role(
     in_influence: float,
     *,
     theta_low: float = THETA_LOW,
+    temporally_preceded: bool = False,
 ) -> Role:
-    """origin: high D + high anomaly; amplifier: mid D + high betweenness/in; else victim."""
+    """origin: high D + high anomaly; amplifier: mid D + high betweenness/in; else victim.
+
+    `temporally_preceded` — an influencing node fired strictly earlier, so this
+    node is downstream of an earlier fault. It bars ORIGIN outright: D measures
+    direction, and in a cycle direction is symmetric, so without this both ends
+    of a mutual call are labelled origin.
+    """
+    if temporally_preceded:
+        # Downstream of an earlier fault. High D still means it propagates
+        # outward, which is what an amplifier does.
+        if D >= 0.35 and (betweenness >= 0.5 or in_influence >= 0.5):
+            return Role.AMPLIFIER
+        return Role.VICTIM
     if D >= 0.55 and anomaly_score >= 0.5:
         return Role.ORIGIN
     if 0.35 <= D < 0.55 and (betweenness >= 0.5 or in_influence >= 0.5):
@@ -235,21 +248,71 @@ def derive_role(
     return Role.UNKNOWN
 
 
+def _temporally_preceded(
+    node_id: str, ig: InfluenceGraph, anomaly: KernelAnomaly, theta_fire: float
+) -> bool:
+    """True if some node influencing `node_id` deviated strictly earlier.
+
+    IG edges point along influence (sync calls are reversed), so a predecessor
+    that both fired and fired FIRST means this node sits downstream of an
+    earlier fault and cannot itself be the origin.
+
+    This is what disambiguates a cycle. Mutual calls become a 2-cycle after
+    reversal, where D is symmetric by construction and labelled BOTH ends
+    origin; temporal precedence is the evidence D structurally cannot see.
+    """
+    fdt = anomaly.first_deviation_time.get(node_id)
+    if fdt is None:
+        return False
+    for pred in ig.predecessors(node_id):
+        if pred == node_id:
+            continue
+        p_fdt = anomaly.first_deviation_time.get(pred)
+        if p_fdt is None:
+            continue
+        if p_fdt < fdt and anomaly.anomaly_score.get(pred, 0.0) >= theta_fire:
+            return True
+    return False
+
+
 def compute_signals(
     ig: InfluenceGraph,
     anomaly: KernelAnomaly,
     *,
     alpha: float = ALPHA,
     H: float = H_DEFAULT,
+    seed_ids: set[str] | None = None,
+    horizon: float | None = None,
 ) -> SignalResult:
+    """T / D / P over the influence graph.
+
+    `seed_ids` restricts the TEMPORAL NORMALIZATION basis to nodes with direct
+    deviation evidence. t0 is a min, so including connectivity-expanded
+    neighbours lets a merely-adjacent node that deviated earlier rescale T for
+    every node in the graph. Ranking still covers the full node set; only the
+    normalization narrows. Defaults to all nodes when not supplied.
+
+    `horizon` overrides the computed timescale. Isolation passes ONE horizon
+    across all clusters so per-cluster T values stay commensurable — each
+    cluster keeps its own t0 (its own incident start) but is measured in shared
+    units, so the merged cross-cluster ranking compares like with like.
+    """
     node_ids = ig.node_ids()
-    t0 = _subgraph_t0(anomaly, node_ids)
-    max_delta = _max_subgraph_delta(anomaly, node_ids)
-    horizon = min(max_delta, H) if max_delta > 0 else H
+    basis = (node_ids & seed_ids) if seed_ids else node_ids
+    if not basis:
+        # No direct-evidence node in this graph (e.g. an all-slow-burn cluster);
+        # fall back to the full node set rather than losing the timescale.
+        basis = node_ids
+
+    t0 = _subgraph_t0(anomaly, basis)
+    if horizon is None:
+        max_delta = _max_subgraph_delta(anomaly, basis)
+        horizon = min(max_delta, H) if max_delta > 0 else H
     # Avoid degenerate horizon of 0.
     if horizon <= 0:
         horizon = H
 
+    theta_fire = anomaly.thresholds.theta_fire
     betweenness = _betweenness_centrality(ig)
     by_node: dict[str, NodeSignals] = {}
 
@@ -258,8 +321,13 @@ def compute_signals(
         D, out_inf, in_inf = compute_D(nid, ig, anomaly, alpha=alpha)
         P, p_ok, p_tot, p_flags = compute_P(nid, ig, anomaly)
         a = anomaly.anomaly_score.get(nid, 0.0)
-        role = derive_role(D, a, betweenness.get(nid, 0.0), in_inf)
+        preceded = _temporally_preceded(nid, ig, anomaly, theta_fire)
+        role = derive_role(
+            D, a, betweenness.get(nid, 0.0), in_inf, temporally_preceded=preceded
+        )
         flags = {**t_flags, **p_flags}
+        if preceded:
+            flags["temporally_preceded"] = True
         by_node[nid] = NodeSignals(
             node_id=nid,
             T=T,

@@ -11,6 +11,7 @@ Abstain with "MULTI-INCIDENT — ambiguous" when faults are causally adjacent.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from contracts import RankedResult
@@ -281,7 +282,39 @@ def _restrict_subgraph(
         anomaly=subgraph.anomaly,
         theta_fire=subgraph.theta_fire,
         theta_low=subgraph.theta_low,
+        # Carry the direct-evidence basis through, or each cluster silently
+        # renormalizes time over its full membership including expanded
+        # neighbours (see IncidentSubgraph.seed_ids).
+        seed_ids=subgraph.seed_ids & node_ids,
     )
+
+
+def _shared_horizon(
+    subgraph: IncidentSubgraph,
+    anomaly: KernelAnomaly,
+    clusters: list[set[str]],
+) -> float | None:
+    """One timescale for every cluster: the largest within-cluster spread.
+
+    Measured per cluster and maximized, NOT taken across all clusters at once —
+    the gap between two independent incidents is not part of either one's
+    propagation timescale, and folding it in would flatten T everywhere.
+    Returns None when no cluster has two timed nodes, leaving the default.
+    """
+    spreads: list[float] = []
+    for cluster in clusters:
+        basis = (subgraph.seed_ids & cluster) or cluster
+        times = [
+            t
+            for nid, t in anomaly.first_deviation_time.items()
+            if nid in basis and t is not None
+        ]
+        if len(times) >= 2:
+            spreads.append(max(times) - min(times))
+    if not spreads:
+        return None
+    widest = max(spreads)
+    return widest if widest > 0 else None
 
 
 def isolate(
@@ -291,7 +324,12 @@ def isolate(
     anomaly: KernelAnomaly | None = None,
     delta: float = DEFAULT_DELTA,
     theta_low: float = THETA_LOW,
+    weights: dict[str, float] | None = None,
+    enabled_signals: Iterable[str] | None = None,
 ) -> IsolationResult:
+    """`weights` / `enabled_signals` pass straight through to `score`, so an
+    ablation or sweep can run the real production path rather than bypassing
+    isolation and measuring something the engine never executes."""
     anomaly = anomaly or subgraph.anomaly
     if anomaly is None:
         raise ValueError("anomaly required")
@@ -312,14 +350,31 @@ def isolate(
             return IsolationResult(clusters=[], abstain_reason=result)
         final_clusters.extend(result)
 
-    # Stage 4 — independent scoring per cluster
+    # Stage 4 — independent scoring per cluster, on ONE shared timescale.
+    #
+    # Each cluster keeps its own t0 (its own incident start), but the horizon is
+    # computed once over every direct-evidence node and passed to all of them.
+    # Scoring each cluster in isolation derived the horizon from that cluster's
+    # own spread, so a 3s cluster and a 50s cluster produced T values on
+    # different normalizations — and the orchestrator then merges every
+    # cluster's candidates and sorts by raw score, comparing them as if
+    # commensurable. A shared horizon makes that merge meaningful.
+    shared_horizon = _shared_horizon(subgraph, anomaly, final_clusters)
+
     ranked_by_cluster: dict[str, RankedResult] = {}
     for i, cluster in enumerate(final_clusters):
         cid = f"cluster-{i}"
         sub = _restrict_subgraph(subgraph, cluster)
         # Build IG scoped to cluster nodes.
         cluster_ig = build_influence_graph(sub)
-        result = score(sub, ig=cluster_ig, anomaly=anomaly)
+        result = score(
+            sub,
+            weights,
+            enabled_signals,
+            ig=cluster_ig,
+            anomaly=anomaly,
+            horizon=shared_horizon,
+        )
         # Stamp cluster_id
         for c in result.candidates:
             c.cluster_id = cid

@@ -111,6 +111,49 @@ def _node_dev_vector(anomaly: KernelAnomaly, node_id: str) -> dict[str, float]:
     return {"anomaly": anomaly.anomaly_score.get(node_id, 0.0)}
 
 
+def resolve_origins(candidates: list[RootCauseCandidate]) -> None:
+    """Keep ORIGIN on the top-ranked candidate only; demote the rest in place.
+
+    ORIGIN is a claim about the INCIDENT — "this is what caused it" — but
+    ``derive_role`` decides it from one node's own signals, which cannot express
+    a comparative claim. The two readings disagree wherever the influence graph
+    has more than one source, and that is the common case: D is a ratio of
+    outward to inward influence, so ANY zero-in-degree node scores D=1.0 by
+    construction, clears the ORIGIN threshold, and is published as a cause. S5
+    injects one fault and reported three origins that way — the real root plus a
+    barely-deviating dependency and an unrelated side branch, both of which the
+    ranking had already placed 2nd and 4th on combined T/D/P evidence.
+
+    This runs after ranking (and after arbitration, which can reorder the top),
+    so the label follows the evidence the score integrated rather than a
+    threshold on one signal. Because ``score`` is invoked per cluster, "top" is
+    per cluster: a genuine multi-fault incident keeps one origin per independent
+    cluster rather than collapsing to a single global winner.
+
+    Demoted nodes become AMPLIFIER when they still propagate degradation onward
+    (P > 0 — some outgoing influence is both temporally consistent and
+    degraded), else UNKNOWN. UNKNOWN is deliberate: a node that deviated, causes
+    nothing downstream, and is not itself explained by anything upstream is
+    genuinely uncharacterized, and saying so beats inventing a role for it.
+
+    Does NOT touch VICTIM_OF_INFRA — that is arbitration's cross-layer verdict,
+    which is a different axis from origin-vs-not.
+
+    Callers MUST pass ``candidates`` already sorted by descending score.
+    """
+    for index, candidate in enumerate(candidates):
+        if index == 0 or candidate.role != Role.ORIGIN:
+            continue
+        candidate.role = Role.AMPLIFIER if candidate.P > 0.0 else Role.UNKNOWN
+        # Keep the templated explanation's role suffix in sync, as arbitration does.
+        if ". Role: " in candidate.explanation:
+            candidate.explanation = (
+                candidate.explanation.rsplit(". Role: ", 1)[0]
+                + f". Role: {candidate.role.value}."
+            )
+        candidate.flags["demoted_secondary_origin"] = True
+
+
 def stamp_confidence(candidates: list[RootCauseCandidate]) -> None:
     """Raw confidence from spec §5 (isotonic/ECE calibration is Dev C).
 

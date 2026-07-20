@@ -28,7 +28,7 @@ from rca.types import KernelAnomaly
 
 from .arbitration import arbitrate
 from .fault_class import derive_fault_class
-from .output import build_candidates, stamp_confidence
+from .output import build_candidates, resolve_origins, stamp_confidence
 from .signals import compute_signals
 
 DEFAULT_WEIGHTS: dict[str, float] = {"T": 1.0 / 3.0, "D": 1.0 / 3.0, "P": 1.0 / 3.0}
@@ -45,6 +45,8 @@ def score(
     top_c: int = 5,
     run_arbitration: bool = True,
     incident_id: str = "",
+    seed_ids: set[str] | None = None,
+    horizon: float | None = None,
 ) -> RankedResult:
     """Deterministic RCA scoring over an incident subgraph (C4).
 
@@ -97,7 +99,11 @@ def score(
     if ig is None:
         ig = build_influence_graph(subgraph)
 
-    signals = compute_signals(ig, anomaly)
+    # Normalize time over direct-evidence nodes, not the permissively expanded
+    # membership — see IncidentSubgraph.seed_ids. Explicit `seed_ids` wins so
+    # isolation can pass a cluster-local basis.
+    basis = seed_ids if seed_ids is not None else (subgraph.seed_ids or None)
+    signals = compute_signals(ig, anomaly, seed_ids=basis, horizon=horizon)
 
     raw_scores: dict[str, float] = {}
     for nid, sig in signals.by_node.items():
@@ -114,6 +120,10 @@ def score(
         candidates = arbitrate(candidates, ig, anomaly, top_c=top_c)
         # Re-stamp confidence after possible score swaps / reordering.
         stamp_confidence(candidates)
+
+    # ORIGIN is a claim about the incident, so it can only be settled once the
+    # ranking is final — including any arbitration reorder above.
+    resolve_origins(candidates)
 
     return RankedResult(
         candidates=candidates,
