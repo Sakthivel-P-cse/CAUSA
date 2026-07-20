@@ -30,7 +30,10 @@ def load_incident_s1() -> tuple[
     nodes = (
         Node("api", NodeKind.SERVICE, "api"),
         Node("catalog", NodeKind.SERVICE, "catalog", runs_on="node-b"),
-        Node("catalog-db", NodeKind.INFRA, "catalog-db"),
+        # DEPENDENCY, matching S5's identically-named node — S1 typed it INFRA
+        # and S5 typed it DEPENDENCY, so the two fixtures disagreed about the
+        # same conceptual node.
+        Node("catalog-db", NodeKind.DEPENDENCY, "catalog-db"),
         Node("search", NodeKind.SERVICE, "search"),
         Node("node-b", NodeKind.INFRA, "node-b"),
     )

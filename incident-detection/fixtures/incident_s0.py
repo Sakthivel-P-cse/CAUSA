@@ -31,7 +31,7 @@ def load_incident_s0() -> tuple[
     nodes = (
         Node("frontend", NodeKind.SERVICE, "frontend"),
         Node("cart-service", NodeKind.SERVICE, "cart-service", runs_on="node-a"),
-        Node("cart-db", NodeKind.INFRA, "cart-db"),  # treated as sync leaf / DB
+        Node("cart-db", NodeKind.DEPENDENCY, "cart-db"),  # uninstrumented sync leaf
         Node("payment-service", NodeKind.SERVICE, "payment-service"),
         Node("notifier", NodeKind.SERVICE, "notifier"),
         Node("node-a", NodeKind.INFRA, "node-a"),

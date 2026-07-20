@@ -104,6 +104,16 @@ data:
     CREATE INDEX IF NOT EXISTS idx_rca_alert_name
         ON rca_reports (alert_name);
 
+    -- One report per incident. Alertmanager re-sends a firing alert every
+    -- repeat_interval, and the trigger's in-process dedup does not survive a
+    -- restart or span replicas — without this, a single incident accumulates
+    -- duplicate reports and the dashboard's "recent incidents" list shows the
+    -- same incident N times. Partial so pre-isolation rows with a NULL
+    -- incident_id (which are not identified incidents) stay permitted.
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_rca_incident_id
+        ON rca_reports (incident_id)
+        WHERE incident_id IS NOT NULL;
+
     -- --------------------------------------------------------
     -- incidents: ingestion-owned incident WINDOW state (PRD2 §9).
     -- Written by the Dev-A trigger service (ingest.trigger) when an

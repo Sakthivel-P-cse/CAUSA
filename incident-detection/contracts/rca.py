@@ -8,6 +8,30 @@ from typing import Any
 
 
 class NodeKind(str, Enum):
+    """What a graph node IS, defined structurally so the classification is
+    derivable from telemetry rather than from naming convention.
+
+    Each kind is separated by an observable property, not by intuition about the
+    name — `cart-db` looking like a database is not evidence:
+
+      SERVICE    — an instrumented workload: it emits spans under its own
+                   service name, and/or originates calls to others.
+      DEPENDENCY — a backing store, queue, or external endpoint that is CALLED
+                   but is not instrumented: it emits no spans of its own and
+                   originates no calls (a pure sink in the call graph).
+      INFRA      — a host: workloads run ON it. Structurally, the source of a
+                   runs-on edge. NOT "anything that isn't a service".
+      SPAN       — a span vertex in the trace execution graph.
+
+    INFRA and DEPENDENCY were previously conflated, with INFRA used loosely for
+    "not a service" (a DB was typed INFRA in some fixtures and DEPENDENCY in
+    others, and `adapt_incident` emitted only INFRA/SERVICE so DEPENDENCY never
+    appeared on live data at all). They are distinct causal layers: a saturated
+    HOST explains every workload on it, while a degraded DEPENDENCY explains
+    only its callers. Layer arbitration is meaningful for the first and wrong
+    for the second, so the distinction has to survive into the graph.
+    """
+
     SERVICE = "service"
     INFRA = "infra"
     DEPENDENCY = "dependency"

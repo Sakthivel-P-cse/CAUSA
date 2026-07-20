@@ -51,19 +51,23 @@ class Graph:
 
 
 def build_infrastructure_graph(topology: Topology) -> Graph:
-    """Persistent infra graph: infra nodes + runs-on edges (+ DB/cache as infra)."""
+    """Hosting layer: hosts, the workloads placed on them, and runs-on edges.
+
+    INFRA now means "a host" specifically (see NodeKind), so this graph no longer
+    sweeps in databases and caches — those are DEPENDENCY nodes and belong to the
+    call graph, where a degraded one explains its callers rather than everything
+    co-located with it.
+    """
     g = Graph()
+    # Hosts, plus any workload that names a host (so its runs-on edge has both
+    # endpoints). Bare hosts with no placed workload are included too.
     for n in topology.nodes:
         if n.kind == NodeKind.INFRA or n.runs_on is not None:
-            # Include services that have a host so the edge is representable,
-            # but primary nodes of interest are INFRA.
-            g.add_node(n)
-        if n.kind == NodeKind.INFRA:
             g.add_node(n)
 
     for e in topology.edges:
         if e.call_type == CallType.RUNS_ON:
-            # Ensure endpoints exist.
+            # Ensure endpoints exist even if the node list was incomplete.
             src = _lookup(topology, e.src)
             dst = _lookup(topology, e.dst)
             if src:
@@ -72,22 +76,18 @@ def build_infrastructure_graph(topology: Topology) -> Graph:
                 g.add_node(dst)
             g.add_edge(e)
 
-    # Also include bare INFRA nodes even with no edges.
-    for n in topology.nodes:
-        if n.kind == NodeKind.INFRA:
-            g.add_node(n)
-
     return g
 
 
 def build_service_dependency_graph(topology: Topology) -> Graph:
-    """Persistent service dependency graph: logical services + sync/async edges."""
+    """Call layer: services, the dependencies they call, and sync/async edges."""
     g = Graph()
     for n in topology.nodes:
+        # Services seed the graph; DEPENDENCY sinks join via the edge loop below
+        # (which adds both endpoints), so a called store is present without
+        # pulling in unrelated dependencies that this incident never touched.
         if n.kind == NodeKind.SERVICE:
             g.add_node(n)
-        # DBs that services call are useful as dependency sinks — include INFRA
-        # that appear as sync/async edge endpoints.
     for e in topology.edges:
         if e.call_type in {CallType.SYNC, CallType.ASYNC}:
             src = _lookup(topology, e.src)

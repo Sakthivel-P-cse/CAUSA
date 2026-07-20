@@ -66,9 +66,17 @@ def capture_warmup(
     *,
     metrics: tuple[str, ...] = METRICS,
     namespace: str | None = None,
+    kind: str = "service",
 ) -> dict[tuple[str, str], Baseline]:
     """
     Learn baselines for every (node, metric) over a healthy `window`.
+
+    `kind` selects the resource layer `cpu` / `saturation` resolve to — pass
+    "infra" for k8s node names. It MUST match the kind the reader uses at
+    incident time: dev_vector drops any metric with no (node, metric) baseline,
+    so an infra node warmed as a service silently scores 0.0 forever, and layer
+    arbitration (which needs both an anomaly score and a FirstDeviationTime for
+    the infra node) can never fire.
 
     Metrics with no data for a node are simply omitted (a node/metric with no
     baseline contributes nothing to its anomaly_score — max-composite tolerates
@@ -77,7 +85,9 @@ def capture_warmup(
     baselines: dict[tuple[str, str], Baseline] = {}
     for node in nodes:
         for metric in metrics:
-            series = adapter.metrics(node, metric, window, namespace=namespace)
+            series = adapter.metrics(
+                node, metric, window, namespace=namespace, kind=kind
+            )
             if not series:
                 continue
             b = robust_baseline(v[1] for v in series)

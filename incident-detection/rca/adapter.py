@@ -64,8 +64,21 @@ def adapt_incident(
     service_names = {telemetry.alerted_service}
     infra_names: set[str] = set()
     runs_on: dict[str, str] = {}
+    # Positive evidence for classification. A node is DEPENDENCY only when it is
+    # demonstrably CALLED (in `callees`) yet neither emits spans of its own nor
+    # calls anyone — being absent from emitters/callers is not itself evidence,
+    # since a node known only from an anomaly row has no call-graph presence at
+    # all and must not be demoted on that silence.
+    emitters: set[str] = set()
+    callers: set[str] = set()
+    callees: set[str] = set()
+
     for infra in telemetry.infra_nodes:
-        infra_names.add(infra.name)
+        # Only HOSTS are infra. `get_infra_nodes` also returns pod rows, and
+        # adding those names made every pod in the cluster an isolated INFRA
+        # vertex — a pod is where a workload runs, not a layer of its own.
+        if infra.kind == "node":
+            infra_names.add(infra.name)
         if infra.host_node:
             infra_names.add(infra.host_node)
         if infra.service_name and infra.host_node:
@@ -74,8 +87,11 @@ def adapt_incident(
 
     for envelope in telemetry.spans:
         service_names.add(envelope.span.service)
+        emitters.add(envelope.span.service)
     for edge in telemetry.service_edges:
         service_names.update((edge.caller, edge.callee))
+        callers.add(edge.caller)
+        callees.add(edge.callee)
     for edge in telemetry.edges:
         if edge.call_type is CallType.RUNS_ON:
             infra_names.add(edge.src)
@@ -83,12 +99,25 @@ def adapt_incident(
             runs_on[edge.dst] = edge.src
         else:
             service_names.update((edge.src, edge.dst))
+            callers.add(edge.src)
+            callees.add(edge.dst)
+
+    def _classify(name: str) -> NodeKind:
+        if name in infra_names:
+            return NodeKind.INFRA
+        # DEPENDENCY requires positive evidence: something calls it, and it
+        # neither emits spans nor calls anything itself. Everything else —
+        # including a node with no call-graph presence at all — stays SERVICE
+        # rather than being demoted on absent evidence.
+        if name in callees and name not in emitters and name not in callers:
+            return NodeKind.DEPENDENCY
+        return NodeKind.SERVICE
 
     all_names = service_names | infra_names | set(by_node)
     nodes = tuple(
         Node(
             node_id=name,
-            kind=NodeKind.INFRA if name in infra_names else NodeKind.SERVICE,
+            kind=_classify(name),
             name=name,
             runs_on=runs_on.get(name),
         )

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
 from contracts import AnomalyOutput, Baseline, IncidentTelemetry, RankedResult, Role
+
+logger = logging.getLogger(__name__)
 
 
 def _libpq_kv(key: str, value: str) -> str:
@@ -148,7 +151,7 @@ class RCAStore:
         )
 
         with self._connect() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO rca_reports (
                     triggered_at, alert_name, alerted_service, root_cause_service,
@@ -159,6 +162,8 @@ class RCAStore:
                 ) VALUES (
                     %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
                 )
+                ON CONFLICT (incident_id) WHERE incident_id IS NOT NULL
+                DO NOTHING
                 """,
                 (
                     incident.triggered_at,
@@ -187,3 +192,11 @@ class RCAStore:
                     incident.resolved_at,
                 ),
             )
+            # DO NOTHING is the desired outcome for an Alertmanager resend, but
+            # it must not be invisible — a silent no-op here reads identically
+            # to a successful write.
+            if cursor.rowcount == 0:
+                logger.info(
+                    "RCA report for incident %s already exists; skipped duplicate insert",
+                    incident.incident_id,
+                )

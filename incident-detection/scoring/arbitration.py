@@ -67,11 +67,21 @@ def arbitrate(
                 svc.explanation.rsplit(". Role: ", 1)[0]
                 + f". Role: {svc.role.value}."
             )
-        if infra.score <= svc.score:
-            infra.score = svc.score + 1e-3
+        # Promote by SWAPPING scores, not by bumping infra to svc + 1e-3.
+        # The bump made the top-2 margin exactly 0.001, so stamp_confidence
+        # reported ~0.001 for a correctly infra-rooted incident — the mechanism
+        # destroyed the confidence of the answer it exists to promote. A swap
+        # is the honest reading of arbitration anyway: it asserts the infra node
+        # deserves the hosted service's rank, and it leaves the score
+        # distribution (and so every margin below) untouched.
+        if infra.score < svc.score:
+            infra.score, svc.score = svc.score, infra.score
 
     ranked = sorted(ranked, key=lambda c: (-c.score, c.node_id))
 
+    # A genuine tie survives the swap; break it toward infra so the promotion
+    # is not silently undone by the lexical tie-break. The margin really is ~0
+    # here, and the resulting low confidence is the correct signal.
     for infra_id, service_id in promotions:
         idx = {c.node_id: i for i, c in enumerate(ranked)}
         if infra_id not in idx or service_id not in idx:

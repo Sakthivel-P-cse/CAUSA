@@ -66,36 +66,50 @@ def _path_exists_quiet_relay(
 ) -> bool:
     """True if a path of quiet-relay nodes connects a and b with monotonic time."""
     # BFS on undirected view; nodes on path (excluding endpoints) must be
-    # ≤ theta_low anomaly (quiet), and first_deviation times along directed
-    # IG orientation must be non-decreasing when edge follows influence.
+    # ≤ theta_low anomaly (quiet), and first_deviation times along the path must
+    # be non-decreasing.
+    #
+    # The two constraints need different handling, which the previous global
+    # `visited` set got wrong. Quietness is a NODE property, so filtering on it
+    # during expansion is sound. Monotonic time is a PATH property — marking a
+    # node visited on enqueue meant only the first path reaching it was ever
+    # examined, so a path failing the time check aborted the search rather than
+    # letting an alternative route through. Gap repair then silently
+    # under-merged clusters that a valid quiet relay did connect.
+    #
+    # State is therefore (node, last_seen_deviation_time), pruned by dominance:
+    # reaching a node with a SMALLER carried time is strictly more permissive
+    # for every continuation, so only the minimum per node is worth expanding.
+    # That keeps the search bounded without discarding viable paths.
     adj: dict[str, set[str]] = {nid: set() for nid in ig.nodes}
     for e in ig.edges:
-        adj[e.src].add(e.dst)
-        adj[e.dst].add(e.src)
+        adj.setdefault(e.src, set()).add(e.dst)
+        adj.setdefault(e.dst, set()).add(e.src)
 
     from collections import deque
 
-    q: deque[tuple[str, list[str]]] = deque([(a, [a])])
-    visited = {a}
+    neg_inf, inf = float("-inf"), float("inf")
+    start = anomaly.first_deviation_time.get(a)
+    start_t = float(start) if start is not None else neg_inf
+
+    q: deque[tuple[str, float]] = deque([(a, start_t)])
+    best: dict[str, float] = {a: start_t}
     while q:
-        node, path = q.popleft()
-        if node == b and len(path) > 1:
-            # Check quiet-relay + weak monotonicity on deviation times.
-            middle = path[1:-1]
-            if any(anomaly.anomaly_score.get(m, 0.0) > theta_low for m in middle):
-                continue
-            times = [
-                anomaly.first_deviation_time.get(p)
-                for p in path
-                if anomaly.first_deviation_time.get(p) is not None
-            ]
-            if times == sorted(times):
-                return True
-            continue
-        for nbr in adj[node]:
-            if nbr not in visited:
-                visited.add(nbr)
-                q.append((nbr, path + [nbr]))
+        node, last_t = q.popleft()
+        for nbr in adj.get(node, ()):
+            t = anomaly.first_deviation_time.get(nbr)
+            if t is not None and float(t) < last_t:
+                continue  # would break non-decreasing deviation order
+            # A node with no FirstDeviationTime doesn't constrain the order.
+            new_last = float(t) if t is not None else last_t
+            if nbr == b:
+                return True  # endpoints are exempt from the quiet requirement
+            if anomaly.anomaly_score.get(nbr, 0.0) > theta_low:
+                continue  # intermediates must be quiet relays
+            if best.get(nbr, inf) <= new_last:
+                continue  # already reached under a looser time constraint
+            best[nbr] = new_last
+            q.append((nbr, new_last))
     return False
 
 

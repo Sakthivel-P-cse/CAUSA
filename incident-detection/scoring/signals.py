@@ -12,13 +12,14 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 
-from contracts import Role
+from contracts import Role, Thresholds
 from graphs.influence_graph import InfluenceGraph
 from rca.types import KernelAnomaly
 
 EPS = 1e-9
 ALPHA = 0.5
 H_DEFAULT = 60.0  # seconds
+THETA_LOW = Thresholds().theta_low  # 0.25 — "quiet but non-zero" (spec §1.1)
 
 
 def clamp01(x: float) -> float:
@@ -214,6 +215,8 @@ def derive_role(
     anomaly_score: float,
     betweenness: float,
     in_influence: float,
+    *,
+    theta_low: float = THETA_LOW,
 ) -> Role:
     """origin: high D + high anomaly; amplifier: mid D + high betweenness/in; else victim."""
     if D >= 0.55 and anomaly_score >= 0.5:
@@ -222,8 +225,12 @@ def derive_role(
         return Role.AMPLIFIER
     if D < 0.45:
         return Role.VICTIM
-    # Mid/high D but modest anomaly — still lean origin if outward-heavy.
-    if D >= 0.55:
+    # Mid/high D but modest anomaly — still lean origin if outward-heavy, but
+    # only for a node that actually deviated. Ungated, this branch labelled
+    # essentially-healthy nodes ORIGIN purely for pointing outward (S0 emitted
+    # node-a at anomaly 0.20 and payment-service as origins), which polluted
+    # `origin_candidates` in every persisted report.
+    if D >= 0.55 and anomaly_score >= theta_low:
         return Role.ORIGIN
     return Role.UNKNOWN
 

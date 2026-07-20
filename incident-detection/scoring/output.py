@@ -114,14 +114,27 @@ def _node_dev_vector(anomaly: KernelAnomaly, node_id: str) -> dict[str, float]:
 def stamp_confidence(candidates: list[RootCauseCandidate]) -> None:
     """Raw confidence from spec §5 (isotonic/ECE calibration is Dev C).
 
-    Top: ``S(top) * (S(top) - S(second)) / (S(top) + ε)``.
-    Others: same margin formula vs the next-ranked score (0 when tied/last).
+    Top: ``S(top) * (S(top) - S(second)) / (S(top) + ε)``, exactly per spec.
+    Others: the same local-margin formula, then clamped by a running minimum.
+
+    The clamp enforces the invariant the raw formula violates: confidence must
+    be non-increasing with rank. Without it a mid-list candidate sitting above
+    a big gap outscores the top on confidence, and the last candidate — which
+    compares against a 0.0 sentinel and so appears infinitely separated from
+    nothing — keeps its full score. ``insert_report`` persists ``top.confidence``
+    as the report's ``confidence_score``, so a non-monotone stamp makes the
+    persisted number uninterpretable as a ranking confidence.
+
+    Callers MUST pass ``candidates`` already sorted by descending score.
     """
     n = len(candidates)
+    ceiling = float("inf")
     for i, c in enumerate(candidates):
         next_score = candidates[i + 1].score if i + 1 < n else 0.0
         margin = max(0.0, c.score - next_score)
-        c.confidence = c.score * margin / (c.score + EPS)
+        raw = c.score * margin / (c.score + EPS)
+        c.confidence = min(raw, ceiling)
+        ceiling = c.confidence
 
 
 def build_candidates(

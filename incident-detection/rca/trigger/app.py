@@ -32,6 +32,12 @@ class Dispatcher:
         self.orchestrator = orchestrator
         self._q: queue.Queue[str] = queue.Queue(maxsize=queue_size)
         self._submit_lock = threading.Lock()
+        # Incidents queued or currently being processed. Alertmanager re-sends a
+        # firing alert every repeat_interval, so without this the same incident
+        # is re-analyzed on every resend — wasted work, and duplicate reports
+        # before the DB's uq_rca_incident_id index rejects them. That index is
+        # the durable guarantee; this is the cheap in-process one.
+        self._inflight: set[str] = set()
         for index in range(max(1, workers)):
             threading.Thread(
                 target=self._run,
@@ -41,13 +47,28 @@ class Dispatcher:
 
     def submit(self, incident_ids: list[str]) -> bool:
         with self._submit_lock:
-            if (
-                self._q.maxsize
-                and self._q.qsize() + len(incident_ids) > self._q.maxsize
-            ):
-                return False
+            # Dedupe against in-flight work AND within this batch — callers are
+            # not required to pre-uniquify, and a repeated id in one payload
+            # would otherwise be enqueued twice.
+            fresh: list[str] = []
             for incident_id in incident_ids:
+                if incident_id in self._inflight:
+                    continue
+                self._inflight.add(incident_id)
+                fresh.append(incident_id)
+            if self._q.maxsize and self._q.qsize() + len(fresh) > self._q.maxsize:
+                # Roll back the reservations; nothing was enqueued.
+                self._inflight.difference_update(fresh)
+                return False
+            for incident_id in fresh:
                 self._q.put_nowait(incident_id)
+        if len(fresh) != len(incident_ids):
+            logger.info(
+                "Skipped %d already-inflight incident(s)",
+                len(incident_ids) - len(fresh),
+            )
+        # Accepted either way: an already-inflight incident IS being handled, so
+        # reporting failure would make Alertmanager retry something in progress.
         return True
 
     def _run(self) -> None:
@@ -58,6 +79,8 @@ class Dispatcher:
             except Exception:
                 logger.exception("RCA failed for incident %s", incident_id)
             finally:
+                with self._submit_lock:
+                    self._inflight.discard(incident_id)
                 self._q.task_done()
 
 

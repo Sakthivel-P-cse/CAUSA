@@ -19,8 +19,11 @@ NOW = datetime(2026, 7, 18, 4, 0, tzinfo=timezone.utc)
 
 
 class _Cursor:
-    def __init__(self, rows):
+    def __init__(self, rows, rowcount=None):
         self.rows = rows
+        # psycopg exposes rowcount on every cursor; insert_report reads it to
+        # tell a real write from an ON CONFLICT DO NOTHING no-op.
+        self.rowcount = len(rows) if rowcount is None else rowcount
 
     def fetchone(self):
         return self.rows[0] if self.rows else None

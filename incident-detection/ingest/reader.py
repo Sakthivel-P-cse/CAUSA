@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 # scored metric); `retry_rate` has no first-class OTel-Demo counter and is a
 # documented gap (adapter returns [], never synthesized).
 _SERVICE_METRICS = ("error_rate", "p95_latency", "request_rate")
+# Node-level resource metrics, scored under the same contract names as the
+# container ones so infra flows through dev_vector unchanged. Not namespaced —
+# a k8s node is cluster-scoped.
+_INFRA_METRICS = ("cpu", "saturation")
 _CONTAINER_METRICS = ("cpu", "saturation")
 
 
@@ -187,6 +191,23 @@ class TelemetryReader:
             for svc in sorted(s for s in services if s and s != "unknown"):
                 for metric in metrics:
                     point = adapter.metric_point(svc, metric, window, namespace=namespace)
+                    if point is not None:
+                        telemetry.metric_points.append(point)
+                        if point.reference:
+                            telemetry.references.append(point.reference)
+
+            # ── Per-infra-node metric series ──────────────────────────
+            # Infra nodes were previously fetched for topology only (instant
+            # cpu/mem via get_infra_nodes), so they entered the kernel with no
+            # series → anomaly_score 0.0 and first_deviation None. Layer
+            # arbitration needs both, so infra could never win on live data.
+            # Query the same host names the runs-on edges use, so the anomaly
+            # node IDs and the graph node IDs match.
+            for host in sorted(
+                {n.name for n in telemetry.infra_nodes if n.kind == "node" and n.name}
+            ):
+                for metric in _INFRA_METRICS:
+                    point = adapter.metric_point(host, metric, window, kind="infra")
                     if point is not None:
                         telemetry.metric_points.append(point)
                         if point.reference:

@@ -27,6 +27,7 @@ from graphs.influence_graph import InfluenceGraph, build_influence_graph
 from rca.types import KernelAnomaly
 
 from .arbitration import arbitrate
+from .fault_class import derive_fault_class
 from .output import build_candidates, stamp_confidence
 from .signals import compute_signals
 
@@ -111,10 +112,16 @@ def score(
 
     if run_arbitration:
         candidates = arbitrate(candidates, ig, anomaly, top_c=top_c)
-        # Re-stamp confidence after possible score bumps / reordering.
+        # Re-stamp confidence after possible score swaps / reordering.
         stamp_confidence(candidates)
 
-    return RankedResult(candidates=candidates, incident_id=incident_id)
+    return RankedResult(
+        candidates=candidates,
+        incident_id=incident_id,
+        # Structural floor only — None when the kernel can't justify a class.
+        # Full classification is Dev C's; see scoring.fault_class.
+        fault_class=derive_fault_class(candidates, ig),
+    )
 
 
 class Scorer:
