@@ -19,6 +19,9 @@ from rca.types import KernelAnomaly
 EPS = 1e-9
 ALPHA = 0.5
 H_DEFAULT = 60.0  # seconds
+# Neutral pseudo-evidence mass smoothing D's ratio (see compute_D). In
+# anomaly-score units, where one node contributes at most 1.0.
+D_PRIOR = 1.0
 THETA_LOW = Thresholds().theta_low  # 0.25 — "quiet but non-zero" (spec §1.1)
 
 
@@ -102,12 +105,37 @@ def compute_D(
     ig: InfluenceGraph,
     anomaly: KernelAnomaly,
     alpha: float = ALPHA,
+    prior: float | None = None,
 ) -> tuple[float, float, float]:
-    """Cascade direction on IG (spec §2.2).
+    """Cascade direction on IG (spec §2.2), smoothed toward neutral.
 
-    OutInfluence / InInfluence = pure Σ anomaly_score of successors /
-    predecessors — no degree fudge term.
+    OutInfluence / InInfluence = Σ anomaly_score of successors / predecessors.
+
+    D is a RATIO, and an unsmoothed ratio is degenerate when the denominator is
+    thin. A node with no inbound influence edges divides by its own numerator and
+    scores D=1.0 — maximum directional evidence — no matter how little evidence
+    there actually is. That is an ABSENCE of contrastive evidence being read as
+    its opposite, and it is not rare: every source of the influence graph hits
+    it. In D2 the shared dependency deviated 20s AFTER the true root, caused
+    nothing, and still scored D=1.0 purely for having zero in-degree, which is
+    the shape of every shared database, cache, queue, or auth service.
+
+    ``prior`` adds a pseudo-observation of neutral evidence to both sides
+    (standard additive smoothing). With no evidence at all D → 0.5 rather than
+    1.0; as real influence accumulates the prior is swamped and D approaches the
+    raw ratio. So a genuine origin with strongly anomalous downstream neighbours
+    still scores high, while a node that is merely unreached no longer
+    outranks it on nothing.
+
+    The prior is expressed in anomaly-score units (each node contributes ≤ 1.0),
+    so ``D_PRIOR = 1.0`` reads as "trust the direction no more than you would
+    after observing one neutral neighbour."
     """
+    # Resolved at CALL time, not bound as a default — a default argument would
+    # freeze D_PRIOR at import and silently ignore any override, which makes the
+    # prior look insensitive when it is simply never being varied.
+    prior = D_PRIOR if prior is None else prior
+
     a = anomaly.anomaly_score.get(node_id, 0.0)
     out_inf = sum(
         _influence_weight(anomaly, e.dst) for e in ig.out_edges(node_id)
@@ -116,7 +144,8 @@ def compute_D(
         _influence_weight(anomaly, e.src) for e in ig.in_edges(node_id)
     )
 
-    D = (alpha * a + out_inf) / (alpha * a + out_inf + in_inf + EPS)
+    evidence = alpha * a + out_inf + in_inf
+    D = (alpha * a + out_inf + prior * 0.5) / (evidence + prior + EPS)
     return clamp01(D), out_inf, in_inf
 
 

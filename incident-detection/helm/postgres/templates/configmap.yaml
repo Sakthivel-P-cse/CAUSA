@@ -47,7 +47,18 @@ data:
         -- Human-readable RCA summary
         root_cause_summary  TEXT,
 
-        -- Ranked origin candidates + related RCA expansion fields
+        -- Ranked origin candidates + related RCA expansion fields.
+        --
+        -- origin_candidates: ranked [candidate] objects that could be the CAUSE
+        --   — nodes concluded to be effects (role victim / victim-of-infra) are
+        --   excluded. Each carries node_id, score, confidence, role, signals,
+        --   dev_vector, explanation, cluster_id, flags. Exactly one node per
+        --   cluster carries role='origin'; the rest are ranked alternatives.
+        -- amplifier_nodes:   node ids with role='amplifier'.
+        -- blast_radius:      node ids the incident REACHED — anomaly_score at or
+        --   above theta_fire, excluding the origin(s). Not a copy of the
+        --   candidate list; subgraph neighbours below theta_fire are not in it.
+        -- anomaly_scores:    {node: score} for every scored node, unfiltered.
         origin_candidates   JSONB,
         amplifier_nodes     JSONB,
         blast_radius        JSONB,

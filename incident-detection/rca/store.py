@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
-from contracts import AnomalyOutput, Baseline, IncidentTelemetry, RankedResult, Role
+from contracts import (
+    AnomalyOutput,
+    Baseline,
+    IncidentTelemetry,
+    RankedResult,
+    Role,
+    Thresholds,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,17 +120,43 @@ class RCAStore:
         telemetry: IncidentTelemetry,
         anomalies: list[AnomalyOutput],
         result: RankedResult,
+        thresholds: Thresholds | None = None,
     ) -> None:
-        candidates = [candidate.to_dict() for candidate in result.candidates]
+        thresholds = thresholds or Thresholds()
         top = result.candidates[0] if result.candidates else None
+        anomaly_scores = {
+            output.node: output.anomaly_score for output in anomalies
+        }
+
+        # A node we have CONCLUDED is an effect is not a candidate cause. Both
+        # of these columns previously received the entire ranked list, so
+        # `origin_candidates` contained known victims and `blast_radius` was a
+        # copy of it rather than a radius. Consumers keying on the column names
+        # — Dev C's classifier among them — got the wrong set.
+        effects = {Role.VICTIM, Role.VICTIM_OF_INFRA}
+        origin_candidates = [
+            candidate.to_dict()
+            for candidate in result.candidates
+            if candidate.role not in effects
+        ]
         amplifiers = [
             candidate.node_id
             for candidate in result.candidates
             if candidate.role == Role.AMPLIFIER
         ]
-        anomaly_scores = {
-            output.node: output.anomaly_score for output in anomalies
+        origins = {
+            candidate.node_id
+            for candidate in result.candidates
+            if candidate.role == Role.ORIGIN
         }
+        # What the incident actually reached: nodes that genuinely deviated,
+        # minus the cause itself. Connectivity-expanded neighbours sitting below
+        # θ_fire were never impacted and do not belong in a blast radius.
+        blast_radius = sorted(
+            node
+            for node, score in anomaly_scores.items()
+            if score >= thresholds.theta_fire and node not in origins
+        )
         evidence = [
             {
                 "node": candidate.node_id,
@@ -173,9 +206,9 @@ class RCAStore:
                     result.fault_class,
                     incident.incident_id,
                     summary,
-                    json.dumps(candidates, allow_nan=False),
+                    json.dumps(origin_candidates, allow_nan=False),
                     json.dumps(amplifiers, allow_nan=False),
-                    json.dumps([candidate.node_id for candidate in result.candidates]),
+                    json.dumps(blast_radius),
                     json.dumps(anomaly_scores, allow_nan=False),
                     json.dumps(
                         {

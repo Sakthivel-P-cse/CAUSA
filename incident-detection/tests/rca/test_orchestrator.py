@@ -41,8 +41,8 @@ class _Store:
     def load_baselines(self):
         return self.baselines
 
-    def insert_report(self, state, telemetry, anomalies, result):
-        self.saved.append((state, telemetry, anomalies, result))
+    def insert_report(self, state, telemetry, anomalies, result, thresholds=None):
+        self.saved.append((state, telemetry, anomalies, result, thresholds))
 
 
 def test_orchestrator_loads_exact_window_scores_and_persists():

@@ -40,8 +40,13 @@ from isolation.pipeline import isolate
 
 logger = logging.getLogger("causa.evaluate")
 
-# Kernel fixtures. S3/S4 have chaos CRDs but no fixture yet; they are reported
-# as coverage gaps rather than silently omitted.
+# Kernel fixtures. The IDs echo the chaos catalog's, but with ONE exception
+# (S2, authored from its CRD) these are NOT models of those scenarios — they are
+# abstract minimal graphs, each built to exercise one kernel mechanism, with
+# invented node names and their own roots and fault classes. S0's fixture roots
+# at `cart-db`/Dependency while chaos S0 targets `product-catalog`/AppLogic, and
+# so on for S1, S5, D1, D2, D3. Do not read a result here as a statement about
+# the corresponding chaos scenario. `--check-catalog` prints the divergence.
 FIXTURES: tuple[tuple[str, str, str], ...] = (
     ("S0", "fixtures.incident_s0", "load_incident_s0"),
     ("S1", "fixtures.incident_s1", "load_incident_s1"),
@@ -52,6 +57,7 @@ FIXTURES: tuple[tuple[str, str, str], ...] = (
     ("D3", "fixtures.incident_d3", "load_incident_d3"),
 )
 
+"""Chaos scenarios with no kernel fixture at all."""
 CATALOGUED_WITHOUT_FIXTURE: tuple[str, ...] = ("S3", "S4")
 
 SIGNALS = ("T", "D", "P")
@@ -70,12 +76,36 @@ class ScenarioResult:
     cluster_count: int = 0
     cluster_count_expected: int = 1
     roots_in_distinct_clusters: bool | None = None
+    cluster_tops: list[str] = field(default_factory=list)
     fault_class: str | None = None
     fault_class_truth: str | None = None
 
     @property
     def top1(self) -> bool:
-        return self.predicted_root == self.true_root
+        """Did the engine name A true root?
+
+        NOT `predicted == true_root_node`. A dual scenario has two genuine roots
+        and `true_root_node` designates one of them arbitrarily, so the strict
+        form scores a coin flip between two equally-correct answers as a failure.
+        For single-root scenarios `origin_truth` holds exactly one node and this
+        is identical to the strict comparison.
+        """
+        if not self.origin_truth:
+            return self.predicted_root == self.true_root
+        return self.predicted_root in self.origin_truth
+
+    @property
+    def roots_found(self) -> float | None:
+        """Fraction of true roots that top their own cluster.
+
+        The metric that actually matters for a multi-fault incident: finding one
+        of two faults is half a result, and top-1 alone cannot express that.
+        """
+        if not self.origin_truth:
+            return None
+        return sum(r in self.cluster_tops for r in self.origin_truth) / len(
+            self.origin_truth
+        )
 
     @property
     def reciprocal_rank(self) -> float:
@@ -146,6 +176,11 @@ def evaluate_scenario(
         return result
 
     result.cluster_count = len(isolated.ranked_by_cluster)
+    result.cluster_tops = [
+        ranked.candidates[0].node_id
+        for ranked in isolated.ranked_by_cluster.values()
+        if ranked.candidates
+    ]
 
     # Merge exactly as the orchestrator does, then rank.
     merged = [
@@ -154,8 +189,12 @@ def evaluate_scenario(
     merged.sort(key=lambda c: (-c.score, c.node_id))
     if merged:
         result.predicted_root = merged[0].node_id
+        # Rank of the BEST-placed true root, for the same reason top1 accepts
+        # any true root: a dual scenario's `true_root_node` designates one of two
+        # equals, so ranking the other one first is not a miss.
+        targets = set(result.origin_truth) or {truth.true_root_node}
         for position, candidate in enumerate(merged, start=1):
-            if candidate.node_id == truth.true_root_node:
+            if candidate.node_id in targets:
                 result.rank = position
                 break
 
@@ -216,6 +255,7 @@ def summarize(results: list[ScenarioResult]) -> dict[str, float]:
     classified = [r for r in results if r.fault_class is not None]
     return {
         "top1": sum(r.top1 for r in ranked) / n,
+        "roots_found": sum(r.roots_found or 0.0 for r in ranked) / n,
         "mrr": sum(r.reciprocal_rank for r in ranked) / n,
         "origin_exact": sum(r.origin_exact for r in ranked) / n,
         "origin_precision": sum(r.origin_precision or 0.0 for r in ranked) / n,
@@ -264,16 +304,20 @@ def print_report(results: list[ScenarioResult]) -> None:
     s = summarize(results)
     print("-" * 62)
     print(f"scored {int(s['scored'])}/{len(results)}  "
-          f"top1={s['top1']:.2f}  MRR={s['mrr']:.3f}  "
-          f"origin_exact={s['origin_exact']:.2f} "
+          f"top1={s['top1']:.2f}  roots_found={s['roots_found']:.2f}  "
+          f"MRR={s['mrr']:.3f}  origin_exact={s['origin_exact']:.2f} "
           f"(P={s['origin_precision']:.2f} R={s['origin_recall']:.2f})")
     print(f"cluster_count={s['cluster_count']:.2f}  "
           f"abstention={s['abstention']:.2f}  "
           f"fault_class={s['fault_class']:.2f} "
           f"(coverage {s['fault_class_coverage']:.2f})")
-    if CATALOGUED_WITHOUT_FIXTURE:
-        print(f"\nCOVERAGE GAP: {', '.join(CATALOGUED_WITHOUT_FIXTURE)} are in the "
-              f"chaos catalog but have no kernel fixture — unmeasured here.")
+    print(
+        "\nSCOPE: these are KERNEL fixtures — abstract graphs exercising one "
+        "mechanism each.\nExcept S2 they do NOT model the chaos scenario whose "
+        f"ID they share ({'--check-catalog' } shows the divergence), so these "
+        "numbers say\nnothing about accuracy on real incidents. "
+        f"{', '.join(CATALOGUED_WITHOUT_FIXTURE)} have no fixture at all."
+    )
 
 
 def print_sweep(rows: list[tuple[str, dict[str, float]]]) -> None:
@@ -285,6 +329,34 @@ def print_sweep(rows: list[tuple[str, dict[str, float]]]) -> None:
 
 
 # ── CLI ───────────────────────────────────────────────────────────────
+
+
+def print_catalog_divergence() -> None:
+    """Show, per ID, whether the kernel fixture models the chaos scenario.
+
+    Exists so the mismatch is inspectable rather than folklore: anyone reading a
+    fixture named S1 will reasonably assume it models chaos scenario S1.
+    """
+    from testbed.harness.catalog import CATALOG
+
+    print(f"{'id':4s} {'chaos CRD target':34s} {'kernel fixture':34s}")
+    print("-" * 74)
+    for sid, module_path, fn_name in FIXTURES:
+        _, _, _, truth = getattr(importlib.import_module(module_path), fn_name)()
+        scenario = CATALOG.get(sid)
+        chaos = (
+            ", ".join(f"{f.true_root_node}/{f.fault_class}" for f in scenario.faults)
+            if scenario else "(not in catalog)"
+        )
+        kernel = f"{truth.true_root_node}/{truth.fault_class}"
+        flag = "" if scenario and truth.true_root_node in scenario.true_roots else "  <-- diverges"
+        print(f"{sid:4s} {chaos:34s} {kernel:34s}{flag}")
+    for sid in CATALOGUED_WITHOUT_FIXTURE:
+        scenario = CATALOG.get(sid)
+        chaos = ", ".join(
+            f"{f.true_root_node}/{f.fault_class}" for f in scenario.faults
+        ) if scenario else "?"
+        print(f"{sid:4s} {chaos:34s} {'(no fixture)':34s}  <-- unmeasured")
 
 
 def _parse_weights(raw: str) -> dict[str, float]:
@@ -322,7 +394,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="score every non-empty subset of {T, D, P}")
     parser.add_argument("--top", type=int, default=12,
                         help="rows to show for --sweep (ranked by MRR)")
+    parser.add_argument("--check-catalog", action="store_true",
+                        help="show where kernel fixtures diverge from the chaos CRDs")
     args = parser.parse_args(argv)
+
+    if args.check_catalog:
+        print_catalog_divergence()
+        return 0
 
     if args.sweep:
         rows = []

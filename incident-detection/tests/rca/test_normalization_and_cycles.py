@@ -12,6 +12,8 @@ Three defects that all corrupt ranking without failing loudly:
 
 from __future__ import annotations
 
+import pytest
+
 from contracts import CallType, NodeKind
 from fixtures.incident_s0 import load_incident_s0
 from graphs.incident_subgraph import IncidentSubgraph, build_incident_subgraph
@@ -213,3 +215,87 @@ def test_precedence_requires_the_predecessor_to_have_fired():
     )
     signals = compute_signals(ig, anomaly)
     assert not signals.by_node["origin"].flags.get("temporally_preceded")
+
+
+# ── D's zero-in-degree degeneracy ─────────────────────────────────────
+
+
+def _source_vs_root():
+    """A true root and an unreached bystander, both with zero in-degree."""
+    ig = InfluenceGraph(
+        nodes={
+            n: Node(n, NodeKind.SERVICE, n)
+            for n in ("root", "victim", "bystander")
+        },
+        edges=[
+            Edge("root", "victim", CallType.SYNC, degraded=True),
+            Edge("bystander", "victim", CallType.SYNC, degraded=False),
+        ],
+    )
+    anomaly = KernelAnomaly(
+        anomaly_score={"root": 0.90, "victim": 0.80, "bystander": 0.05},
+        first_deviation_time={"root": 0.0, "victim": 20.0, "bystander": 40.0},
+        resource_deviation={},
+    )
+    return ig, anomaly
+
+
+def test_unreached_bystander_does_not_score_maximal_direction():
+    """Zero in-degree means NO contrastive evidence, not maximal evidence.
+
+    Unsmoothed, the ratio divides by its own numerator and returns exactly 1.0
+    for any node nothing points at — identical to a genuine origin.
+    """
+    ig, anomaly = _source_vs_root()
+    from scoring.signals import compute_D
+
+    d_bystander, _, _ = compute_D("bystander", ig, anomaly)
+    d_root, _, _ = compute_D("root", ig, anomaly)
+
+    assert d_bystander < 1.0, "absence of inbound influence is not evidence"
+    assert d_root > d_bystander, (
+        "a root with strongly anomalous downstream must beat an idle source"
+    )
+
+
+def test_unsmoothed_d_ties_them_at_exactly_one():
+    """Documents the defect the prior fixes: without smoothing the two are
+    indistinguishable, both pinned at the ceiling."""
+    ig, anomaly = _source_vs_root()
+    from scoring.signals import compute_D
+
+    # Not exactly 1.0 only because EPS guards the denominator.
+    assert compute_D("bystander", ig, anomaly, prior=0.0)[0] == pytest.approx(1.0)
+    assert compute_D("root", ig, anomaly, prior=0.0)[0] == pytest.approx(1.0)
+
+
+def test_prior_is_swamped_by_strong_evidence():
+    """Smoothing must not blunt a clear signal — as influence accumulates D
+    approaches the raw ratio."""
+    from scoring.signals import compute_D
+
+    ig = InfluenceGraph(
+        nodes={n: Node(n, NodeKind.SERVICE, n) for n in ("a", "b", "c", "d")},
+        edges=[
+            Edge("a", "b", CallType.SYNC, degraded=True),
+            Edge("a", "c", CallType.SYNC, degraded=True),
+            Edge("a", "d", CallType.SYNC, degraded=True),
+        ],
+    )
+    anomaly = KernelAnomaly(
+        anomaly_score={"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0},
+        first_deviation_time={"a": 0.0, "b": 1.0, "c": 2.0, "d": 3.0},
+        resource_deviation={},
+    )
+    assert compute_D("a", ig, anomaly)[0] > 0.75
+
+
+def test_prior_is_configurable_at_call_time():
+    """A default argument would freeze D_PRIOR at import, silently ignoring any
+    override and making the prior look insensitive when it never varied."""
+    from scoring.signals import compute_D
+
+    ig, anomaly = _source_vs_root()
+    low = compute_D("bystander", ig, anomaly, prior=0.1)[0]
+    high = compute_D("bystander", ig, anomaly, prior=5.0)[0]
+    assert low > high, "a larger prior must pull further toward neutral"

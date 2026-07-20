@@ -152,7 +152,9 @@ class RCAOrchestrator:
                 candidates.sort(key=lambda candidate: (-candidate.score, candidate.node_id))
                 result = RankedResult(candidates=candidates, incident_id=incident_id)
 
-        self.store.insert_report(state, telemetry, anomalies, result)
+        self.store.insert_report(
+            state, telemetry, anomalies, result, self.thresholds
+        )
         return result
 
     def _load_telemetry(self, state: IncidentState) -> IncidentTelemetry:
