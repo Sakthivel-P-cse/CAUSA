@@ -1,0 +1,38 @@
+name: Causa ABC Integration CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-and-golden:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: incident-detection
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package + deps
+        run: |
+          pip install -e ".[dev]"
+          pip install -r requirements-devc.txt
+      - name: A+B unit tests
+        run: PYTHONPATH=. pytest -q tests --ignore=tests/test_infra_end_to_end.py -x
+      - name: Dev C lane + golden smoke
+        run: |
+          PYTHONPATH=. python -m eval.runner
+          PYTHONPATH=. pytest -q tests/test_dev_c.py
+      - name: Demo loop (auto-approve + canary breach)
+        run: |
+          PYTHONPATH=. python -m remediation.cli --auto-approve
+          PYTHONPATH=. python -m remediation.cli --auto-approve --breach
+      - name: Fixture-smoke artifacts
+        run: PYTHONPATH=. python -m eval.report
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: causa-fixture-smoke
+          path: incident-detection/artifacts/

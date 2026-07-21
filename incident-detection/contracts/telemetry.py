@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Protocol
 
 
 # ─────────────────────────────────────────────────────────────
@@ -244,6 +244,30 @@ class LogRecordEnvelope:
     timestamp: datetime | None = None
     labels: dict[str, str] = field(default_factory=dict)
     reference: TelemetryReference | None = None
+
+
+@dataclass(frozen=True)
+class LogRecord:
+    """Narrow C1 log shape for classification (Dev C)."""
+
+    timestamp: datetime
+    node_id: str
+    severity: str
+    message: str
+    attributes: dict[str, str] = field(default_factory=dict)
+
+
+class LogsPort(Protocol):
+    def logs(
+        self,
+        node_id: str,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> list[LogRecord]:
+        ...
+
+
+TelemetryAdapters = LogsPort
 
 
 # ─────────────────────────────────────────────────────────────

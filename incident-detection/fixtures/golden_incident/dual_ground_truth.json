@@ -1,0 +1,17 @@
+{
+  "incident_id": "golden-dual-d1",
+  "true_root_nodes": ["product-catalog", "currency"],
+  "fault_classes": ["AppLogic", "Config"],
+  "node_to_fault": {
+    "product-catalog": 0,
+    "checkout": 0,
+    "frontend": 0,
+    "currency": 1,
+    "cart": 0,
+    "valkey-cart": 0
+  },
+  "inject_start": "2026-07-16T12:03:30+00:00",
+  "inject_end": "2026-07-16T12:10:00+00:00",
+  "scenario": "D1",
+  "expect_abstention": false
+}

@@ -21,3 +21,6 @@ htmlcov/
 # Dev-A operational output (generated, not source)
 baselines/
 ground_truth/
+
+# Fixture-smoke artifacts (regenerated in CI)
+incident-detection/artifacts/

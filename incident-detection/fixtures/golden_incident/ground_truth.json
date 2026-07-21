@@ -4,5 +4,7 @@
   "true_root_node": "product-catalog",
   "fault_class": "AppLogic",
   "inject_start": "2026-07-16T12:03:30+00:00",
-  "inject_end": "2026-07-16T12:10:00+00:00"
+  "inject_end": "2026-07-16T12:10:00+00:00",
+  "scenario": "S0",
+  "injection_site": "product-catalog"
 }

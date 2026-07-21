@@ -1,0 +1,26 @@
+{
+  "product-catalog": [
+    {
+      "timestamp": "2026-07-16T12:04:05Z",
+      "severity": "error",
+      "message": "panic: nil pointer in GetProduct; exception stack trace",
+      "attributes": {"component": "product-catalog", "fault_hint": "applogic"}
+    }
+  ],
+  "checkout": [
+    {
+      "timestamp": "2026-07-16T12:05:10Z",
+      "severity": "error",
+      "message": "upstream product-catalog unavailable; retrying",
+      "attributes": {"upstream": "product-catalog"}
+    }
+  ],
+  "frontend": [
+    {
+      "timestamp": "2026-07-16T12:05:20Z",
+      "severity": "warn",
+      "message": "checkout returned errors for catalog browse",
+      "attributes": {"upstream": "checkout"}
+    }
+  ]
+}

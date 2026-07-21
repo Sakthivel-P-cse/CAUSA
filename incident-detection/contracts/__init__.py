@@ -8,65 +8,102 @@ Dev C consume them. Changing anything here requires all three devs' approval
 
 from __future__ import annotations
 
-# C1 — telemetry
 from .telemetry import (
     CallType,
     Edge,
     IncidentTelemetry,
     InfraNode,
+    LogRecord,
     LogRecordEnvelope,
+    LogsPort,
     MetricPointEnvelope,
     OrderingSource,
     ServiceEdge,
     SpanEnvelope,
     SpanKind,
+    TelemetryAdapters,
     TelemetryReference,
     TraceSpan,
     Window,
 )
 
-# C2 — anomaly
-from .anomaly import METRICS, AnomalyOutput, Baseline, Thresholds
+from .anomaly import (
+    METRICS,
+    AnomalyBag,
+    AnomalyOutput,
+    AnomalyThresholds,
+    Baseline,
+    NodeAnomaly,
+    Thresholds,
+)
 
-# C3/C4 — RCA output and scorer seam
 from .rca import (
+    ABSTENTION_FLAG,
     NodeKind,
+    NodeRole,
+    RankedCluster,
     RankedResult,
     Role,
     RootCauseCandidate,
     SignalScores,
 )
 
-# C5 — ground truth
-from .ground_truth import FaultClass, Incident
+from .scorer_port import (
+    EnabledSignals,
+    Scorer,
+    Weights,
+    normalize_enabled,
+    normalize_weights,
+)
+
+from .ground_truth import (
+    CLASSIFICATION_TARGETS,
+    DualInjectionGroundTruth,
+    FaultClass,
+    Incident,
+    ScenarioId,
+)
 
 __all__ = [
-    # C1
     "CallType",
     "Edge",
     "IncidentTelemetry",
     "InfraNode",
+    "LogRecord",
     "LogRecordEnvelope",
+    "LogsPort",
     "MetricPointEnvelope",
     "OrderingSource",
     "ServiceEdge",
     "SpanEnvelope",
     "SpanKind",
+    "TelemetryAdapters",
     "TelemetryReference",
     "TraceSpan",
     "Window",
-    # C2
     "METRICS",
+    "AnomalyBag",
     "AnomalyOutput",
+    "AnomalyThresholds",
     "Baseline",
+    "NodeAnomaly",
     "Thresholds",
-    # C3/C4
+    "ABSTENTION_FLAG",
     "NodeKind",
+    "NodeRole",
+    "RankedCluster",
     "RankedResult",
     "Role",
     "RootCauseCandidate",
     "SignalScores",
-    # C5
+    "EnabledSignals",
+    "Scorer",
+    "Weights",
+    "normalize_enabled",
+    "normalize_weights",
+    "CLASSIFICATION_TARGETS",
+    "DualInjectionGroundTruth",
     "FaultClass",
     "Incident",
+    "ScenarioId",
 ]
