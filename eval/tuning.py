@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from itertools import product
 from typing import Sequence
 
-from contracts.c2_anomaly import AnomalyOutput
-from contracts.c4_scorer import Scorer, Weights
-from contracts.c5_ground_truth import Incident
+from contracts import AnomalyBag, Incident, Scorer, Weights
 from eval.metrics import EvalMetrics
 from eval.runner import EvalRunner
 from eval.splits import Split
@@ -38,10 +36,8 @@ def _weight_grid(steps: Sequence[float] | None = None) -> list[Weights]:
     for wt, wd, wp in product(vals, repeat=3):
         if wt + wd + wp <= 0:
             continue
-        # Normalize to sum 1
         s = wt + wd + wp
         out.append(Weights(w_T=wt / s, w_D=wd / s, w_P=wp / s))
-    # Deduplicate roughly
     seen: set[tuple[float, float, float]] = set()
     uniq: list[Weights] = []
     for w in out:
@@ -55,7 +51,7 @@ def _weight_grid(steps: Sequence[float] | None = None) -> list[Weights]:
 def tune_weights(
     scorer: Scorer,
     split: Split,
-    anomaly_by_id: dict[str, AnomalyOutput],
+    anomaly_by_id: dict[str, AnomalyBag],
     subgraph_by_id: dict[str, dict],
     steps: Sequence[float] | None = None,
 ) -> TuningResult:

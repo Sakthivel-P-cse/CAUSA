@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts.c3_candidates import RankedResult, RootCauseCandidate
+from contracts import RankedResult, RootCauseCandidate
 
 
 def propose_code_fix_pr(
@@ -22,7 +22,7 @@ def propose_code_fix_pr(
             f"- role: {candidate.role.value}",
             f"- signals: T={candidate.signals.T:.2f} D={candidate.signals.D:.2f} P={candidate.signals.P:.2f}",
             "",
-            "## Proposed diff (illustrative)",
+            "## Proposed diff (payload only — never auto-merged)",
             "```diff",
             f"--- a/services/{candidate.node_id}/handler.py",
             f"+++ b/services/{candidate.node_id}/handler.py",
@@ -31,7 +31,7 @@ def propose_code_fix_pr(
             "+ # guarded path with timeout + retry budget",
             "```",
             "",
-            "**Status:** proposed only — never auto-merged.",
+            "**Status:** proposed PR payload only — never auto-merged.",
         ]
     )
     return {

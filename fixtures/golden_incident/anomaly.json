@@ -1,6 +1,6 @@
 {
   "incident_id": "golden-001",
-  "thresholds": {"theta_fire": 0.5, "k_persist": 3, "theta_low": 0.2},
+  "thresholds": {"theta_fire": 0.5, "k_persist": 3, "theta_low": 0.25, "kappa": 3.0},
   "nodes": {
     "cart-redis": {
       "anomaly_score": 0.95,

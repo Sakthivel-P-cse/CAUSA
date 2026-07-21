@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from contracts.c3_candidates import FaultClass, RankedResult, RootCauseCandidate
+from contracts import FaultClass, RankedResult, RootCauseCandidate
 from remediation.branches.applogic import propose_code_fix_pr
 from remediation.branches.config import propose_config_patch
 from remediation.branches.dependency import propose_rollback
@@ -45,7 +45,7 @@ class RemediationRouter:
                 fault_class=fault_class,
                 action="code_fix_pr",
                 depth="deep",
-                summary=f"Open proposed PR for {candidate.node_id} (never auto-merged)",
+                summary=f"Propose code-fix PR payload for {candidate.node_id} (never auto-merged)",
                 details=details,
                 candidate=candidate,
             )

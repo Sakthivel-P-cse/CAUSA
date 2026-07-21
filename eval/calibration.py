@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from contracts.c3_candidates import RankedResult, RootCauseCandidate
+from contracts import RankedResult, RootCauseCandidate
 
 
 EPS = 1e-9

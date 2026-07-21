@@ -1,4 +1,7 @@
-"""Classify top candidate into AppLogic|Config|Infra|Dependency|Resource|Data."""
+"""Classify top candidate into AppLogic|Config|Infra|Dependency|Resource|Data.
+
+Depends only on C3 candidates (+ optional log messages). No ingest/scoring imports.
+"""
 
 from __future__ import annotations
 
@@ -6,10 +9,9 @@ import re
 from dataclasses import dataclass
 from typing import Sequence
 
-from contracts.c3_candidates import FaultClass, NodeKind, RootCauseCandidate
+from contracts import CLASSIFICATION_TARGETS, FaultClass, NodeKind, RootCauseCandidate
 
 
-# Log / message signatures (natural confounding — rules, not ML)
 _PATTERNS: list[tuple[FaultClass, re.Pattern[str]]] = [
     (FaultClass.DEPENDENCY, re.compile(r"redis|kafka|timeout|connection refused|upstream|circuit", re.I)),
     (FaultClass.RESOURCE, re.compile(r"oom|maxmemory|cpu|memory|saturation|throttl", re.I)),
@@ -21,7 +23,7 @@ _PATTERNS: list[tuple[FaultClass, re.Pattern[str]]] = [
 
 
 def _score_from_logs(messages: Sequence[str]) -> dict[FaultClass, float]:
-    scores = {fc: 0.0 for fc in FaultClass}
+    scores = {fc: 0.0 for fc in CLASSIFICATION_TARGETS}
     for msg in messages:
         for fc, pat in _PATTERNS:
             if pat.search(msg):
@@ -30,7 +32,7 @@ def _score_from_logs(messages: Sequence[str]) -> dict[FaultClass, float]:
 
 
 def _score_from_dev_vector(dev: dict[str, float]) -> dict[FaultClass, float]:
-    scores = {fc: 0.0 for fc in FaultClass}
+    scores = {fc: 0.0 for fc in CLASSIFICATION_TARGETS}
     sat = max(dev.get("saturation", 0.0), dev.get("cpu", 0.0), dev.get("memory", 0.0))
     err = dev.get("error_rate", 0.0)
     retry = dev.get("retry_rate", 0.0)
@@ -44,7 +46,7 @@ def _score_from_dev_vector(dev: dict[str, float]) -> dict[FaultClass, float]:
 
 
 def _score_from_kind(kind: NodeKind) -> dict[FaultClass, float]:
-    scores = {fc: 0.0 for fc in FaultClass}
+    scores = {fc: 0.0 for fc in CLASSIFICATION_TARGETS}
     if kind == NodeKind.DEPENDENCY:
         scores[FaultClass.DEPENDENCY] += 1.5
     elif kind == NodeKind.INFRA:
@@ -66,7 +68,7 @@ def classify_candidate(
     log_messages: Sequence[str] | None = None,
 ) -> ClassificationResult:
     logs = list(log_messages or [])
-    combined: dict[FaultClass, float] = {fc: 0.0 for fc in FaultClass}
+    combined: dict[FaultClass, float] = {fc: 0.0 for fc in CLASSIFICATION_TARGETS}
     for part in (
         _score_from_logs(logs),
         _score_from_dev_vector(candidate.dev_vector),
@@ -75,10 +77,11 @@ def classify_candidate(
         for fc, v in part.items():
             combined[fc] += v
 
-    # Prefer highest score; stable tie-break by enum order
-    best = max(FaultClass, key=lambda fc: (combined[fc], -list(FaultClass).index(fc)))
+    best = max(
+        CLASSIFICATION_TARGETS,
+        key=lambda fc: (combined[fc], -list(CLASSIFICATION_TARGETS).index(fc)),
+    )
     if all(v == 0.0 for v in combined.values()):
-        # Fallback from node kind
         if candidate.node_kind == NodeKind.DEPENDENCY:
             best = FaultClass.DEPENDENCY
         elif candidate.node_kind == NodeKind.INFRA:
@@ -88,7 +91,8 @@ def classify_candidate(
 
     rationale = (
         f"class={best.value} from node_kind={candidate.node_kind.value}, "
-        f"role={candidate.role.value}, top_dev={max(candidate.dev_vector.values()) if candidate.dev_vector else 0:.2f}, "
+        f"role={candidate.role.value}, "
+        f"top_dev={max(candidate.dev_vector.values()) if candidate.dev_vector else 0:.2f}, "
         f"logs={len(logs)}"
     )
     return ClassificationResult(
@@ -99,7 +103,7 @@ def classify_candidate(
 
 
 class FaultClassifier:
-    """Callable classifier; optional log adapter lookup by node."""
+    """Callable classifier; optional log lookup by node (injected, not imported)."""
 
     def __init__(self, logs_by_node: dict[str, list[str]] | None = None):
         self.logs_by_node = logs_by_node or {}

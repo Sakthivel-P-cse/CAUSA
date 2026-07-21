@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from adapters.logs import messages_from_fixture_logs
 from classify.classifier import FaultClassifier
 from fixtures import load_logs, load_ranked_result
 from remediation.approval_cli import ApprovalCLI, ApprovalDecision
@@ -33,13 +34,12 @@ def main() -> int:
     args = parser.parse_args()
 
     ranked = load_ranked_result()
-    logs = load_logs()
-    logs_by_node = {k: [e["message"] for e in v] for k, v in logs.items()}
+    logs_by_node = messages_from_fixture_logs(load_logs())
     clf = FaultClassifier(logs_by_node)
     router = RemediationRouter()
 
     plans = []
-    for cand in ranked.primary_candidates:
+    for cand in ranked.candidates:
         pred = clf.classify(cand)
         plans.append(router.route(pred.fault_class, cand, ranked))
 

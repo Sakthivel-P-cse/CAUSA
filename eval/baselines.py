@@ -5,29 +5,31 @@ from __future__ import annotations
 import random
 from typing import Sequence
 
-from contracts.c2_anomaly import AnomalyOutput
-from contracts.c3_candidates import (
+from contracts import (
+    AnomalyBag,
     NodeKind,
-    NodeRole,
-    RankedCluster,
     RankedResult,
+    Role,
     RootCauseCandidate,
     SignalScores,
 )
 
 
-def _as_candidates(node_ids: Sequence[str], anomaly: AnomalyOutput | None) -> list[RootCauseCandidate]:
+def _as_candidates(
+    node_ids: Sequence[str],
+    anomaly: AnomalyBag | None,
+) -> list[RootCauseCandidate]:
     out: list[RootCauseCandidate] = []
     for i, nid in enumerate(node_ids):
         score = anomaly.score(nid) if anomaly else float(len(node_ids) - i)
-        dev = anomaly.nodes[nid].dev_vector if anomaly and nid in anomaly.nodes else {}
+        dev = anomaly.dev_vector(nid) if anomaly else {}
         out.append(
             RootCauseCandidate(
                 node_id=nid,
                 node_kind=NodeKind.SERVICE,
                 score=score,
                 confidence=0.0,
-                role=NodeRole.ORIGIN if i == 0 else NodeRole.VICTIM,
+                role=Role.ORIGIN if i == 0 else Role.VICTIM,
                 signals=SignalScores(),
                 dev_vector=dev,
                 explanation=f"baseline candidate rank={i + 1}",
@@ -39,28 +41,25 @@ def _as_candidates(node_ids: Sequence[str], anomaly: AnomalyOutput | None) -> li
 def random_rank(
     incident_id: str,
     node_ids: Sequence[str],
-    anomaly: AnomalyOutput | None = None,
+    anomaly: AnomalyBag | None = None,
     seed: int = 0,
 ) -> RankedResult:
     nodes = list(node_ids)
     rng = random.Random(seed)
     rng.shuffle(nodes)
-    cands = _as_candidates(nodes, anomaly)
     return RankedResult(
         incident_id=incident_id,
-        clusters=[RankedCluster(fault_id=None, candidates=cands, node_ids=list(nodes))],
+        candidates=_as_candidates(nodes, anomaly),
     )
 
 
 def most_anomalous_rank(
     incident_id: str,
     node_ids: Sequence[str],
-    anomaly: AnomalyOutput,
+    anomaly: AnomalyBag,
 ) -> RankedResult:
-    """Sort subgraph by anomaly_score descending — strong cheap baseline."""
     ranked = sorted(node_ids, key=lambda n: anomaly.score(n), reverse=True)
-    cands = _as_candidates(ranked, anomaly)
     return RankedResult(
         incident_id=incident_id,
-        clusters=[RankedCluster(fault_id=None, candidates=cands, node_ids=list(ranked))],
+        candidates=_as_candidates(ranked, anomaly),
     )

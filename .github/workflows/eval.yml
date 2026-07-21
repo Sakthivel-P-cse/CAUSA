@@ -1,4 +1,4 @@
-name: Dev C Eval Gate
+name: Dev C Fixture Smoke Gate
 
 on:
   push:
@@ -14,14 +14,14 @@ jobs:
           python-version: "3.12"
       - name: Install deps
         run: pip install -r requirements-devc.txt
-      - name: Golden fixture eval (CI gate)
+      - name: Golden fixture smoke (CI gate)
         run: PYTHONPATH=. python -m eval.runner
       - name: Unit tests
         run: PYTHONPATH=. pytest -q tests/test_dev_c.py
-      - name: Generate demo artifacts
+      - name: Generate fixture-smoke artifacts
         run: PYTHONPATH=. python -m eval.report
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: causa-devc-artifacts
+          name: causa-devc-fixture-smoke
           path: artifacts/

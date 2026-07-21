@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, TextIO
 
-from contracts.c3_candidates import RankedResult
+from contracts import RankedResult
 from remediation.router import RemediationPlan
 
 

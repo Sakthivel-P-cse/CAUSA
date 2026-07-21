@@ -1,4 +1,6 @@
 {
+  "kind": "fixture_smoke",
+  "disclaimer": "Artifacts from golden fixture n=1 only. Not a multi-incident portfolio claim.",
   "golden_eval": {
     "Random": {
       "method": "Random",
@@ -382,6 +384,7 @@
     "confusion_golden": {
       "n": 1,
       "accuracy": 1.0,
+      "skipped_timing": 0,
       "matrix": {
         "AppLogic": {
           "AppLogic": 0,
@@ -434,250 +437,13 @@
       },
       "hard_confusions": []
     },
-    "confusion_demo": {
-      "n": 8,
-      "accuracy": 0.75,
-      "matrix": {
-        "AppLogic": {
-          "AppLogic": 1,
-          "Config": 0,
-          "Infra": 0,
-          "Dependency": 0,
-          "Resource": 0,
-          "Data": 0
-        },
-        "Config": {
-          "AppLogic": 1,
-          "Config": 1,
-          "Infra": 0,
-          "Dependency": 0,
-          "Resource": 0,
-          "Data": 0
-        },
-        "Infra": {
-          "AppLogic": 0,
-          "Config": 0,
-          "Infra": 1,
-          "Dependency": 0,
-          "Resource": 0,
-          "Data": 0
-        },
-        "Dependency": {
-          "AppLogic": 0,
-          "Config": 0,
-          "Infra": 0,
-          "Dependency": 1,
-          "Resource": 1,
-          "Data": 0
-        },
-        "Resource": {
-          "AppLogic": 0,
-          "Config": 0,
-          "Infra": 0,
-          "Dependency": 0,
-          "Resource": 1,
-          "Data": 0
-        },
-        "Data": {
-          "AppLogic": 0,
-          "Config": 0,
-          "Infra": 0,
-          "Dependency": 0,
-          "Resource": 0,
-          "Data": 1
-        }
-      },
-      "hard_confusions": [
-        {
-          "truth": "Dependency",
-          "predicted": "Resource",
-          "count": 1
-        },
-        {
-          "truth": "Config",
-          "predicted": "AppLogic",
-          "count": 1
-        }
-      ]
-    },
-    "confusion_table": "truth\\pred\tAppLogic\tConfig\tInfra\tDependency\tResource\tData\nAppLogic\t1\t0\t0\t0\t0\t0\nConfig\t1\t1\t0\t0\t0\t0\nInfra\t0\t0\t1\t0\t0\t0\nDependency\t0\t0\t0\t1\t1\t0\nResource\t0\t0\t0\t0\t1\t0\nData\t0\t0\t0\t0\t0\t1\naccuracy\t0.750"
+    "confusion_table": "truth\\pred\tAppLogic\tConfig\tInfra\tDependency\tResource\tData\nAppLogic\t0\t0\t0\t0\t0\t0\nConfig\t0\t0\t0\t0\t0\t0\nInfra\t0\t0\t0\t0\t0\t0\nDependency\t0\t0\t0\t1\t0\t0\nResource\t0\t0\t0\t0\t0\t0\nData\t0\t0\t0\t0\t0\t0\naccuracy\t1.000"
   },
-  "tuning": {
-    "best_weights": {
-      "w_T": 0.0,
-      "w_D": 0.0,
-      "w_P": 1.0
-    },
-    "train_metrics": {
-      "n": 6,
-      "top1": 1.0,
-      "top3": 1.0,
-      "top5": 1.0,
-      "mrr": 1.0,
-      "subgraph_recall": 1.0,
-      "hits_at_1": 6,
-      "hits_at_3": 6,
-      "hits_at_5": 6,
-      "recall_hits": 6,
-      "per_scenario": {
-        "S3": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        },
-        "S1": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        },
-        "S2": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        }
-      }
-    },
-    "test_metrics": {
-      "n": 6,
-      "top1": 1.0,
-      "top3": 1.0,
-      "top5": 1.0,
-      "mrr": 1.0,
-      "subgraph_recall": 1.0,
-      "hits_at_1": 6,
-      "hits_at_3": 6,
-      "hits_at_5": 6,
-      "recall_hits": 6,
-      "per_scenario": {
-        "S4": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        },
-        "S5": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        },
-        "S0": {
-          "n": 2,
-          "top1": 1.0,
-          "top3": 1.0,
-          "top5": 1.0,
-          "mrr": 1.0,
-          "subgraph_recall": 1.0,
-          "hits_at_1": 2,
-          "hits_at_3": 2,
-          "hits_at_5": 2,
-          "recall_hits": 2,
-          "per_scenario": {}
-        }
-      }
-    },
-    "grid_size": 19,
-    "verified_no_leakage": true
-  },
-  "calibration": {
+  "calibration_smoke": {
     "ece": 0.0,
-    "map_kind": "isotonic",
-    "bins": [
-      {
-        "lo": 0.9,
-        "hi": 1.0,
-        "mean_predicted": 1.0,
-        "empirical_accuracy": 1.0,
-        "count": 6
-      }
-    ],
-    "reliability_points": [
-      {
-        "predicted": 1.0,
-        "empirical": 1.0
-      }
-    ],
-    "mapping": [
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      },
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      },
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      },
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      },
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      },
-      {
-        "raw": 0.17999999979545458,
-        "calibrated": 1.0
-      }
-    ]
-  },
-  "reliability_diagram_ascii": "predicted\tempirical\n---------\t---------\n1.00 ####################\t1.00 ********************",
-  "isolation_d1": {
-    "n": 1,
-    "cluster_count_accuracy": 1.0,
-    "per_fault_top1": 1.0,
-    "per_fault_top3": 1.0,
-    "ari": 1.0,
-    "abstention_correct": null
-  },
-  "isolation_d3_abstention": {
-    "n": 1,
-    "cluster_count_accuracy": 1.0,
-    "per_fault_top1": 1.0,
-    "per_fault_top3": 1.0,
-    "ari": 1.0,
-    "abstention_correct": 1.0
+    "raw_confidence": 0.23999999974193562,
+    "calibrated_top_confidence": 1.0,
+    "reliability_diagram_ascii": "predicted\tempirical\n---------\t---------\n1.00 ####################\t1.00 ********************"
   },
   "remediation_plans": {
     "Dependency": {
@@ -714,7 +480,9 @@
             "p95_latency": 0.88,
             "error_rate": 0.4
           },
-          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.",
+          "cluster_id": null,
+          "flags": {}
         }
       },
       "candidate_node": "cart-redis"
@@ -723,11 +491,11 @@
       "fault_class": "AppLogic",
       "action": "code_fix_pr",
       "depth": "deep",
-      "summary": "Open proposed PR for cart-redis (never auto-merged)",
+      "summary": "Propose code-fix PR payload for cart-redis (never auto-merged)",
       "details": {
         "pr": {
           "title": "fix(cart-redis): proposed remediation from Causa RCA",
-          "body": "## Evidence\ncart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.\n\n- score: 0.930\n- confidence: 0.810\n- role: origin\n- signals: T=1.00 D=0.91 P=0.88\n\n## Proposed diff (illustrative)\n```diff\n--- a/services/cart-redis/handler.py\n+++ b/services/cart-redis/handler.py\n@@\n- # buggy path\n+ # guarded path with timeout + retry budget\n```\n\n**Status:** proposed only \u2014 never auto-merged.",
+          "body": "## Evidence\ncart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.\n\n- score: 0.930\n- confidence: 0.810\n- role: origin\n- signals: T=1.00 D=0.91 P=0.88\n\n## Proposed diff (payload only \u2014 never auto-merged)\n```diff\n--- a/services/cart-redis/handler.py\n+++ b/services/cart-redis/handler.py\n@@\n- # buggy path\n+ # guarded path with timeout + retry budget\n```\n\n**Status:** proposed PR payload only \u2014 never auto-merged.",
           "base": "main",
           "head": "causa/fix-cart-redis",
           "merged": false,
@@ -749,7 +517,9 @@
             "p95_latency": 0.88,
             "error_rate": 0.4
           },
-          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.",
+          "cluster_id": null,
+          "flags": {}
         }
       },
       "candidate_node": "cart-redis"
@@ -792,7 +562,9 @@
             "p95_latency": 0.88,
             "error_rate": 0.4
           },
-          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+          "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin.",
+          "cluster_id": null,
+          "flags": {}
         }
       },
       "candidate_node": "cart-redis"
@@ -865,12 +637,10 @@
   },
   "per_scenario_table": {
     "S0": {
-      "top1": 1.0,
-      "top3": 1.0,
-      "mrr": 1.0,
-      "subgraph_recall": 1.0,
-      "n": 2,
-      "note": "ok"
+      "top1": null,
+      "top3": null,
+      "mrr": null,
+      "note": "no runs"
     },
     "S1": {
       "top1": 1.0,
@@ -878,7 +648,7 @@
       "mrr": 1.0,
       "subgraph_recall": 1.0,
       "n": 1,
-      "note": "hard cell"
+      "note": "fixture smoke"
     },
     "S2": {
       "top1": null,
@@ -893,30 +663,17 @@
       "note": "no runs"
     },
     "S4": {
-      "top1": 1.0,
-      "top3": 1.0,
-      "mrr": 1.0,
-      "subgraph_recall": 1.0,
-      "n": 2,
-      "note": "hard cell"
+      "top1": null,
+      "top3": null,
+      "mrr": null,
+      "note": "no runs"
     },
     "S5": {
-      "top1": 1.0,
-      "top3": 1.0,
-      "mrr": 1.0,
-      "subgraph_recall": 1.0,
-      "n": 2,
-      "note": "ok"
+      "top1": null,
+      "top3": null,
+      "mrr": null,
+      "note": "no runs"
     }
   },
-  "cross_topology_argument": "T/D/P are computed from local graph structure and live deviations; the scorer memorizes nothing per-node. The only tunable parameters are three global weights (w_T, w_D, w_P) \u2014 a 3-dimensional surface with negligible overfit risk relative to learned node embeddings. In-app site split (deep chain / wide fan-out / leaf origin) is therefore a genuine within-app generalization check, not a restatement of train score.",
-  "split": {
-    "train_n": 6,
-    "test_n": 6,
-    "held_out_sites": [
-      "kafka",
-      "node-1"
-    ],
-    "verified_no_leakage": true
-  }
+  "cross_topology_argument": "T/D/P are computed from local graph structure and live deviations; the scorer memorizes nothing per-node. The only tunable parameters are three global weights (w_T, w_D, w_P) \u2014 a 3-dimensional surface with negligible overfit risk relative to learned node embeddings. In-app site split (deep chain / wide fan-out / leaf origin) is therefore a genuine within-app generalization check, not a restatement of train score."
 }

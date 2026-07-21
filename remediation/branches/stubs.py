@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts.c3_candidates import FaultClass, RootCauseCandidate
+from contracts import FaultClass, RootCauseCandidate
 
 
 def stub_action(fault_class: FaultClass, candidate: RootCauseCandidate) -> dict[str, Any]:

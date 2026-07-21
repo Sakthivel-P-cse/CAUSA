@@ -1,0 +1,67 @@
+{
+  "incident_id": "golden-001",
+  "fault_class": "Dependency",
+  "abstain_reason": null,
+  "candidates": [
+    {
+      "node_id": "cart-redis",
+      "node_kind": "dependency",
+      "score": 0.93,
+      "confidence": 0.81,
+      "role": "origin",
+      "signals": {"T": 1.0, "D": 0.91, "P": 0.88},
+      "dev_vector": {"saturation": 0.95, "p95_latency": 0.88, "error_rate": 0.4},
+      "explanation": "cart-redis deviated 3.0 s before its callers (T=1.0), influence flows outward to cart with no incoming anomaly (D=0.91), and outgoing edges degraded in order (P=0.88). Role: origin."
+    },
+    {
+      "node_id": "cart",
+      "node_kind": "service",
+      "score": 0.72,
+      "confidence": 0.55,
+      "role": "amplifier",
+      "signals": {"T": 0.75, "D": 0.62, "P": 0.7},
+      "dev_vector": {"p95_latency": 0.82, "error_rate": 0.55, "retry_rate": 0.7},
+      "explanation": "cart amplified the Redis fault toward checkout."
+    },
+    {
+      "node_id": "checkout",
+      "node_kind": "service",
+      "score": 0.48,
+      "confidence": 0.3,
+      "role": "victim",
+      "signals": {"T": 0.5, "D": 0.35, "P": 0.4},
+      "dev_vector": {"p95_latency": 0.71, "error_rate": 0.48},
+      "explanation": "checkout is a downstream victim."
+    },
+    {
+      "node_id": "frontend",
+      "node_kind": "service",
+      "score": 0.28,
+      "confidence": 0.15,
+      "role": "victim",
+      "signals": {"T": 0.25, "D": 0.2, "P": 0.15},
+      "dev_vector": {"p95_latency": 0.55, "error_rate": 0.3},
+      "explanation": "frontend is a leaf victim."
+    },
+    {
+      "node_id": "payment",
+      "node_kind": "service",
+      "score": 0.1,
+      "confidence": 0.05,
+      "role": "victim",
+      "signals": {"T": 0.5, "D": 0.1, "P": 0.0},
+      "dev_vector": {"p95_latency": 0.12},
+      "explanation": "payment largely unaffected."
+    },
+    {
+      "node_id": "node-1",
+      "node_kind": "infra",
+      "score": 0.08,
+      "confidence": 0.04,
+      "role": "victim",
+      "signals": {"T": 0.5, "D": 0.05, "P": 0.0},
+      "dev_vector": {"cpu": 0.18},
+      "explanation": "infra host not the origin."
+    }
+  ]
+}

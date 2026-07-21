@@ -1,68 +1,59 @@
-"""Load golden fixtures into contract types."""
+"""Load golden fixtures into contract types via adapters."""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 
-from contracts.c2_anomaly import AnomalyOutput, AnomalyThresholds, NodeAnomaly
-from contracts.c3_candidates import RankedResult
-from contracts.c5_ground_truth import DualInjectionGroundTruth, Incident
+from adapters.anomaly import bag_from_fixture_nodes
+from adapters.logs import messages_from_fixture_logs
+from contracts import AnomalyBag, DualInjectionGroundTruth, Incident, RankedResult
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "golden_incident"
+GOLDEN_INCIDENT_ID = "golden-001"
 
 
-def _parse_ts(value: str | None) -> datetime | None:
-    if value is None:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+def _load_json(path: Path) -> dict:
+    return json.loads(path.read_text())
 
 
 def load_subgraph(path: Path | None = None) -> dict:
     p = path or (FIXTURE_DIR / "subgraph.json")
-    return json.loads(p.read_text())
+    return _load_json(p)
 
 
-def load_anomaly(path: Path | None = None) -> AnomalyOutput:
+def load_anomaly(path: Path | None = None) -> AnomalyBag:
     p = path or (FIXTURE_DIR / "anomaly.json")
-    raw = json.loads(p.read_text())
-    thr = raw.get("thresholds") or {}
-    nodes = {
-        nid: NodeAnomaly(
-            node_id=nid,
-            anomaly_score=float(n["anomaly_score"]),
-            dev_vector=dict(n.get("dev_vector") or {}),
-            first_deviation=_parse_ts(n.get("first_deviation")),
-        )
-        for nid, n in (raw.get("nodes") or {}).items()
-    }
-    return AnomalyOutput(
-        incident_id=raw["incident_id"],
-        nodes=nodes,
-        thresholds=AnomalyThresholds(
-            theta_fire=float(thr.get("theta_fire", 0.5)),
-            k_persist=int(thr.get("k_persist", 3)),
-            theta_low=float(thr.get("theta_low", 0.2)),
-        ),
-    )
+    if not p.exists():
+        alt = FIXTURE_DIR / "anomaly_output.json"
+        p = alt if alt.exists() else p
+    return bag_from_fixture_nodes(_load_json(p))
 
 
 def load_ranked_result(path: Path | None = None) -> RankedResult:
-    p = path or (FIXTURE_DIR / "ranked_result.json")
-    return RankedResult.from_dict(json.loads(p.read_text()))
+    if path is not None:
+        return RankedResult.from_dict(_load_json(path))
+    flat = FIXTURE_DIR / "root_cause_candidate.json"
+    clustered = FIXTURE_DIR / "ranked_result.json"
+    if flat.exists():
+        return RankedResult.from_dict(_load_json(flat))
+    return RankedResult.from_dict(_load_json(clustered))
 
 
 def load_ground_truth(path: Path | None = None) -> Incident:
     p = path or (FIXTURE_DIR / "ground_truth.json")
-    return Incident.from_dict(json.loads(p.read_text()))
+    return Incident.from_dict(_load_json(p))
 
 
 def load_dual_ground_truth(path: Path | None = None) -> DualInjectionGroundTruth:
     p = path or (FIXTURE_DIR / "dual_ground_truth.json")
-    return DualInjectionGroundTruth.from_dict(json.loads(p.read_text()))
+    return DualInjectionGroundTruth.from_dict(_load_json(p))
 
 
 def load_logs(path: Path | None = None) -> dict[str, list[dict]]:
     p = path or (FIXTURE_DIR / "logs.json")
-    return json.loads(p.read_text())
+    return _load_json(p)
+
+
+def load_logs_by_node(path: Path | None = None) -> dict[str, list[str]]:
+    return messages_from_fixture_logs(load_logs(path))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts.c3_candidates import RootCauseCandidate
+from contracts import RootCauseCandidate
 
 
 def propose_rollback(candidate: RootCauseCandidate) -> dict[str, Any]:

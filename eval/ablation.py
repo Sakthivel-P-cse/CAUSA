@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from contracts.c4_scorer import EnabledSignals, Scorer, Weights
+from contracts import EnabledSignals, Scorer, Weights
 from eval.runner import EvalReport, EvalRunner
 
 

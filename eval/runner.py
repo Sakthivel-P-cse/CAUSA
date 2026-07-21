@@ -1,6 +1,7 @@
 """Eval runner: candidates vs GroundTruth → metrics.
 
-Works against fixtures before Dev B's scorer exists.
+Works against fixtures through the C4 Scorer port before Dev B is wired.
+Depends only on contracts + fixtures + baselines — never on graphs/scoring.
 """
 
 from __future__ import annotations
@@ -8,29 +9,30 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
-from contracts.c2_anomaly import AnomalyOutput
-from contracts.c3_candidates import RankedResult
-from contracts.c4_scorer import EnabledSignals, Scorer, Weights
-from contracts.c5_ground_truth import Incident
+from contracts import (
+    AnomalyBag,
+    EnabledSignals,
+    Incident,
+    RankedResult,
+    Scorer,
+    Weights,
+    normalize_enabled,
+    normalize_weights,
+)
 from eval.baselines import most_anomalous_rank, random_rank
 from eval.metrics import EvalMetrics, compute_metrics
-from fixtures import (
-    load_anomaly,
-    load_ground_truth,
-    load_ranked_result,
-    load_subgraph,
-)
+from fixtures import load_anomaly, load_ground_truth, load_ranked_result, load_subgraph
 
 
-RankProvider = Callable[[Incident, AnomalyOutput, dict], RankedResult]
+RankProvider = Callable[[Incident, AnomalyBag, dict], RankedResult]
 
 
 @dataclass
 class EvalCase:
     incident: Incident
-    anomaly: AnomalyOutput
+    anomaly: AnomalyBag
     subgraph: dict
     result: RankedResult
     method: str
@@ -47,7 +49,7 @@ class EvalReport:
 
 
 class EvalRunner:
-    def __init__(self, incidents: list[tuple[Incident, AnomalyOutput, dict]] | None = None):
+    def __init__(self, incidents: list[tuple[Incident, AnomalyBag, dict]] | None = None):
         self.incidents = incidents or []
 
     @classmethod
@@ -63,8 +65,10 @@ class EvalRunner:
 
         for incident, anomaly, subgraph in self.incidents:
             result = provider(incident, anomaly, subgraph)
-            ranked = result.ranked_node_ids(0)
-            subgraph_ids = incident.subgraph_node_ids or [n["id"] for n in subgraph.get("nodes", [])]
+            ranked = result.ranked_node_ids()
+            subgraph_ids = incident.subgraph_node_ids or [
+                n["id"] for n in subgraph.get("nodes", [])
+            ]
             scenario = incident.scenario.value if incident.scenario else None
             metric_cases.append((incident.true_root_node, ranked, subgraph_ids, scenario))
             cases_out.append(
@@ -80,26 +84,28 @@ class EvalRunner:
         return EvalReport(method=method, metrics=compute_metrics(metric_cases), cases=cases_out)
 
     def evaluate_random(self, seed: int = 0) -> EvalReport:
-        def provider(inc: Incident, anomaly: AnomalyOutput, subgraph: dict) -> RankedResult:
+        def provider(inc: Incident, anomaly: AnomalyBag, subgraph: dict) -> RankedResult:
             nodes = inc.subgraph_node_ids or [n["id"] for n in subgraph.get("nodes", [])]
             return random_rank(inc.incident_id, nodes, anomaly, seed=seed)
 
         return self.evaluate("Random", provider)
 
     def evaluate_most_anomalous(self) -> EvalReport:
-        def provider(inc: Incident, anomaly: AnomalyOutput, subgraph: dict) -> RankedResult:
+        def provider(inc: Incident, anomaly: AnomalyBag, subgraph: dict) -> RankedResult:
             nodes = inc.subgraph_node_ids or [n["id"] for n in subgraph.get("nodes", [])]
             return most_anomalous_rank(inc.incident_id, nodes, anomaly)
 
         return self.evaluate("MostAnomalous", provider)
 
     def evaluate_fixture_ranked(self) -> EvalReport:
-        """Use pre-authored RankedResult (golden fixture / Dev B dump)."""
         fixture_result = load_ranked_result()
 
-        def provider(inc: Incident, anomaly: AnomalyOutput, subgraph: dict) -> RankedResult:
-            if inc.incident_id == fixture_result.incident_id:
-                return fixture_result
+        def provider(inc: Incident, anomaly: AnomalyBag, subgraph: dict) -> RankedResult:
+            if inc.incident_id != fixture_result.incident_id:
+                raise ValueError(
+                    f"Fixture ranked refuse silent reuse: got {inc.incident_id!r}, "
+                    f"expected {fixture_result.incident_id!r}"
+                )
             return fixture_result
 
         return self.evaluate("FixtureFull", provider)
@@ -108,17 +114,20 @@ class EvalRunner:
         self,
         scorer: Scorer,
         method: str = "Full",
-        weights: Weights | None = None,
-        enabled_signals: EnabledSignals | None = None,
+        weights: Weights | dict[str, float] | None = None,
+        enabled_signals: EnabledSignals | Iterable[str] | None = None,
     ) -> EvalReport:
-        def provider(inc: Incident, anomaly: AnomalyOutput, subgraph: dict) -> RankedResult:
-            return scorer.score(subgraph, weights=weights, enabled_signals=enabled_signals)
+        w = normalize_weights(weights)
+        en = normalize_enabled(enabled_signals)
+
+        def provider(inc: Incident, anomaly: AnomalyBag, subgraph: dict) -> RankedResult:
+            return scorer.score(subgraph, weights=w, enabled_signals=en)
 
         return self.evaluate(method, provider)
 
 
 def run_golden_fixture() -> dict[str, Any]:
-    """CI entrypoint: baselines + fixture full ranking on golden incident."""
+    """CI entrypoint: fixture smoke gate on the golden incident only."""
     runner = EvalRunner.from_golden()
     reports = {
         "Random": runner.evaluate_random(seed=42),
@@ -127,7 +136,6 @@ def run_golden_fixture() -> dict[str, Any]:
     }
     out = {name: r.to_dict() for name, r in reports.items()}
 
-    # Integrity checks for CI gate
     full = reports["FixtureFull"].metrics
     ma = reports["MostAnomalous"].metrics
     assert full.n == 1, "golden must have exactly one incident"
@@ -143,7 +151,7 @@ def main() -> None:
     artifacts = Path(__file__).resolve().parents[1] / "artifacts"
     artifacts.mkdir(exist_ok=True)
     (artifacts / "golden_eval.json").write_text(json.dumps(result, indent=2) + "\n")
-    print("Wrote artifacts/golden_eval.json")
+    print("Wrote artifacts/golden_eval.json (fixture smoke)")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from contracts.c5_ground_truth import Incident
+from contracts import Incident
 
 
 @dataclass(frozen=True)

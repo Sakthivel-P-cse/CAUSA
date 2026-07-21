@@ -1,8 +1,8 @@
 truth\pred	AppLogic	Config	Infra	Dependency	Resource	Data
-AppLogic	1	0	0	0	0	0
-Config	1	1	0	0	0	0
-Infra	0	0	1	0	0	0
-Dependency	0	0	0	1	1	0
-Resource	0	0	0	0	1	0
-Data	0	0	0	0	0	1
-accuracy	0.750
+AppLogic	0	0	0	0	0	0
+Config	0	0	0	0	0	0
+Infra	0	0	0	0	0	0
+Dependency	0	0	0	1	0	0
+Resource	0	0	0	0	0	0
+Data	0	0	0	0	0	0
+accuracy	1.000
