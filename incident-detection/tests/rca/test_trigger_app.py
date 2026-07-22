@@ -32,7 +32,8 @@ def test_health_and_trigger_acceptance():
     try:
         status, body = _request(server, "GET", "/health")
         assert status == 200
-        assert body == {"status": "ok"}
+        assert body["status"] == "ok"
+        assert "incident_not_opened_via_ingest_total" in body
 
         payload = {
             "status": "firing",

@@ -28,10 +28,17 @@ from rca.types import KernelAnomaly
 
 from .arbitration import arbitrate
 from .fault_class import derive_fault_class
+from .fitted_weights import load_fitted_weights
 from .output import build_candidates, resolve_origins, stamp_confidence
 from .signals import compute_signals
 
-DEFAULT_WEIGHTS: dict[str, float] = {"T": 1.0 / 3.0, "D": 1.0 / 3.0, "P": 1.0 / 3.0}
+
+def _default_weight_dict() -> dict[str, float]:
+    w = load_fitted_weights()
+    return {"T": w.w_T, "D": w.w_D, "P": w.w_P}
+
+
+DEFAULT_WEIGHTS: dict[str, float] = _default_weight_dict()
 ALL_SIGNALS = frozenset({"T", "D", "P"})
 
 

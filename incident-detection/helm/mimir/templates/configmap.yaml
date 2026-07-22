@@ -67,6 +67,7 @@ data:
 
     ruler_storage:
       backend: s3
+      storage_prefix: ruler
       s3:
         bucket_name: {{ .Values.config.storage.bucket }}
 

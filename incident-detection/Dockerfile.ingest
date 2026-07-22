@@ -17,9 +17,11 @@ COPY graphs/ ./graphs/
 COPY isolation/ ./isolation/
 COPY rca/ ./rca/
 COPY scoring/ ./scoring/
-# testbed/ is listed in pyproject [tool.setuptools].packages (with chaos/*.yaml
-# package-data), so it must be present for `pip install` to build the dist —
-# even though the running trigger (CMD below) never imports it.
+COPY adapters/ ./adapters/
+COPY classify/ ./classify/
+COPY eval/ ./eval/
+COPY remediation/ ./remediation/
+COPY fixtures/ ./fixtures/
 COPY testbed/ ./testbed/
 
 RUN pip install --no-cache-dir ".[trigger]"

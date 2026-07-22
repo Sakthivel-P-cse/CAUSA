@@ -1,0 +1,93 @@
+[
+  {
+    "incident_id": "inc-live-test-1784723324",
+    "true_root_node": "gcp-demo-test-control-plane",
+    "fault_class": "Infra",
+    "inject_start": "2026-07-22T12:26:45.012548+00:00",
+    "inject_end": "2026-07-22T12:33:45.012548+00:00"
+  },
+  {
+    "incident_id": "inc-5b2a75f2c49d849f",
+    "true_root_node": "gcp-demo-test-control-plane",
+    "fault_class": "Infra",
+    "inject_start": "2026-07-22T12:34:45.047759+00:00",
+    "inject_end": "2026-07-22T12:41:45.047759+00:00"
+  },
+  {
+    "incident_id": "inc-0699647d7116cf35",
+    "true_root_node": "flagd",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-d929d8206b7d56e1",
+    "true_root_node": "product-reviews",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-f0910fa0fc6c30f9",
+    "true_root_node": "image-provider",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-bf08f51f25bb8ad8",
+    "true_root_node": "recommendation",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-d7146b9249b7dfd3",
+    "true_root_node": "flagd",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-e0dbdfd0dc1b4aa3",
+    "true_root_node": "recommendation",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-3200aa96084d1851",
+    "true_root_node": "fraud-detection",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-9c0b9f788c89a42b",
+    "true_root_node": "image-provider",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-5fda6f66a1db1b4b",
+    "true_root_node": "product-reviews",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-c5ef0acb202ef0f0",
+    "true_root_node": "ad",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  },
+  {
+    "incident_id": "inc-2976cc44691bafb7",
+    "true_root_node": "fraud-detection",
+    "fault_class": "Resource",
+    "inject_start": null,
+    "inject_end": null
+  }
+]

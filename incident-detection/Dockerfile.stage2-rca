@@ -15,6 +15,11 @@ COPY graphs/ ./graphs/
 COPY isolation/ ./isolation/
 COPY rca/ ./rca/
 COPY scoring/ ./scoring/
+COPY adapters/ ./adapters/
+COPY classify/ ./classify/
+COPY eval/ ./eval/
+COPY remediation/ ./remediation/
+COPY fixtures/ ./fixtures/
 COPY testbed/ ./testbed/
 
 RUN pip install --no-cache-dir ".[trigger]"

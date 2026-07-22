@@ -1,0 +1,1173 @@
+[
+  {
+    "id": "6c1cabb6-bb6e-4c4d-b53e-1673dda93b15",
+    "triggered_at": "2026-07-22T12:28:45.012548+00:00",
+    "alert_name": "ServiceHighErrorRate",
+    "alerted_service": "checkout",
+    "root_cause_service": "gcp-demo-test-control-plane",
+    "failure_type": "Infra",
+    "routing": null,
+    "incident_id": "inc-live-test-1784723324",
+    "root_cause_summary": "Top root-cause candidate: gcp-demo-test-control-plane. gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.",
+    "origin_candidates": [
+      {
+        "role": "origin",
+        "flags": {},
+        "score": 0.9203440039882371,
+        "node_id": "gcp-demo-test-control-plane",
+        "signals": {
+          "D": 0.7610320747222187,
+          "P": 0.9999999372424927,
+          "T": 1.0
+        },
+        "node_kind": "infra",
+        "cluster_id": "cluster-0",
+        "confidence": 0.44849585256231295,
+        "dev_vector": {
+          "cpu": 0.7187020609376942,
+          "saturation": 0.0
+        },
+        "explanation": "gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin."
+      },
+      {
+        "role": "amplifier",
+        "flags": {
+          "zero_outdegree_P": true
+        },
+        "score": 0.4718481509386109,
+        "node_id": "checkout",
+        "signals": {
+          "D": 0.41554445281583263,
+          "P": 0.0,
+          "T": 1.0
+        },
+        "node_kind": "service",
+        "cluster_id": "cluster-0",
+        "confidence": 0.20820908218082015,
+        "dev_vector": {
+          "saturation": 0.7329799808157081
+        },
+        "explanation": "checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier."
+      }
+    ],
+    "amplifier_nodes": [
+      "checkout"
+    ],
+    "blast_radius": [
+      "checkout"
+    ],
+    "anomaly_scores": {
+      "checkout": 0.7329799808157081,
+      "gcp-demo-test-control-plane": 0.7187020609376942
+    },
+    "confidence_score": 0.44849585256231295,
+    "evidence": [
+      {
+        "node": "gcp-demo-test-control-plane",
+        "score": 0.9203440039882371,
+        "signals": {
+          "D": 0.7610320747222187,
+          "P": 0.9999999372424927,
+          "T": 1.0
+        },
+        "dev_vector": {
+          "cpu": 0.7187020609376942,
+          "saturation": 0.0
+        },
+        "explanation": "gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin."
+      },
+      {
+        "node": "checkout",
+        "score": 0.4718481509386109,
+        "signals": {
+          "D": 0.41554445281583263,
+          "P": 0.0,
+          "T": 1.0
+        },
+        "dev_vector": {
+          "saturation": 0.7329799808157081
+        },
+        "explanation": "checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier."
+      },
+      {
+        "node": "accounting",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "accounting is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "ad",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "ad is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "alertmanager",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "alertmanager is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "cart",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "cart is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "causa-ingest",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "causa-ingest is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "coredns",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "coredns is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "currency",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "currency is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "email",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "email is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "etcd-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "etcd-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "flagd",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "flagd is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "fraud-detection",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "fraud-detection is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "frontend",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "frontend is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "frontend-proxy",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "frontend-proxy is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "image-provider",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "image-provider is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kafka",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kafka is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kindnet",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kindnet is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-apiserver-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-apiserver-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-controller-manager-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-controller-manager-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-proxy",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-proxy is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-scheduler-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-scheduler-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-state-metrics",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-state-metrics is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "llm",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "llm is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "load-generator",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "load-generator is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "local-path-provisioner",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "local-path-provisioner is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "loki",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "loki is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "mimir",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "mimir is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-loki",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-loki is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-mimir",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-mimir is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-tempo",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-tempo is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "node-exporter",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "node-exporter is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-agent",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-agent is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-collector",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-collector is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-lb",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-lb is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "payment",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "payment is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "postgres",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "postgres is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "postgresql",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "postgresql is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "product-catalog",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "product-catalog is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "product-reviews",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "product-reviews is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "prometheus",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "prometheus is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "quote",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "quote is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "recommendation",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "recommendation is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "shipping",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "shipping is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "stage2-rca",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "stage2-rca is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "tempo",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "tempo is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "valkey-cart",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "valkey-cart is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      }
+    ],
+    "timeline": [
+      {
+        "event": "first deviation",
+        "service": "checkout",
+        "timestamp": "2026-07-22T12:18:44+00:00"
+      },
+      {
+        "event": "first deviation",
+        "service": "gcp-demo-test-control-plane",
+        "timestamp": "2026-07-22T12:18:44+00:00"
+      }
+    ],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:28:45.858723+00:00"
+  },
+  {
+    "id": "79ed1823-fe06-402e-89da-6950ddd180df",
+    "triggered_at": "2026-07-22T12:27:44.851423+00:00",
+    "alert_name": "DeploymentReplicasUnavailable",
+    "alerted_service": "fraud-detection",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-2976cc44691bafb7",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:27:44.91549+00:00"
+  },
+  {
+    "id": "4293a9c0-51aa-4185-9a33-ae66c588f44b",
+    "triggered_at": "2026-07-22T12:25:29.350455+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "ad",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-c5ef0acb202ef0f0",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:25:29.380194+00:00"
+  },
+  {
+    "id": "42f66dc4-fce7-432e-8f42-693c53a28fb3",
+    "triggered_at": "2026-07-22T12:19:29.320285+00:00",
+    "alert_name": "DeploymentReplicasUnavailable",
+    "alerted_service": "product-reviews",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-5fda6f66a1db1b4b",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:19:29.453444+00:00"
+  },
+  {
+    "id": "cfcbd1e8-7014-455d-b5b4-c9f53d89e3b6",
+    "triggered_at": "2026-07-22T12:18:29.744792+00:00",
+    "alert_name": "DeploymentReplicasUnavailable",
+    "alerted_service": "image-provider",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-9c0b9f788c89a42b",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:18:29.833064+00:00"
+  },
+  {
+    "id": "c8076a25-7be6-4b6f-8a64-c7644f9faba8",
+    "triggered_at": "2026-07-22T12:17:59.554272+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "fraud-detection",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-3200aa96084d1851",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:17:59.747998+00:00"
+  },
+  {
+    "id": "6cfc8460-ee55-4307-8454-9ad065c271f1",
+    "triggered_at": "2026-07-22T12:17:29.65306+00:00",
+    "alert_name": "DeploymentReplicasUnavailable",
+    "alerted_service": "recommendation",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-e0dbdfd0dc1b4aa3",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:17:29.78188+00:00"
+  },
+  {
+    "id": "2a2d66b6-4af4-4ec1-9703-e39f8d02dfed",
+    "triggered_at": "2026-07-22T12:17:14.746073+00:00",
+    "alert_name": "DeploymentReplicasUnavailable",
+    "alerted_service": "flagd",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-d7146b9249b7dfd3",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:17:14.815052+00:00"
+  },
+  {
+    "id": "d6baf8c1-bc54-4a4f-8bfa-db42e087a129",
+    "triggered_at": "2026-07-22T12:16:55.51458+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "product-catalog",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-765982b7e5e6116d",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": "9a1ff47ccac8f213a5ce4f5305c9c4e4",
+    "created_at": "2026-07-22T12:16:55.600479+00:00"
+  },
+  {
+    "id": "718bb317-8b5f-4bc0-a53f-cff061aa0ec5",
+    "triggered_at": "2026-07-22T12:16:43.14451+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "checkout",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-06aee17f275497f0",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": "cd6588af6abd9c89f29c1fcff75eec7c",
+    "created_at": "2026-07-22T12:16:43.279723+00:00"
+  },
+  {
+    "id": "3c802a3c-b03b-4321-bd5d-f669709beb33",
+    "triggered_at": "2026-07-22T12:16:42.549108+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "accounting",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-ea1c4d92643c2497",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:42.637065+00:00"
+  },
+  {
+    "id": "1b933ab5-c7d4-4717-be25-8adb4c8b1e8d",
+    "triggered_at": "2026-07-22T12:16:41.846595+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "kafka",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-137830fb3a147c14",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:41.920049+00:00"
+  },
+  {
+    "id": "04dbc626-ef80-4aa6-b872-bc5c101f37b4",
+    "triggered_at": "2026-07-22T12:16:41.305355+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "valkey-cart",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-47aa5f328daec389",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:41.394987+00:00"
+  },
+  {
+    "id": "04e06bcb-6661-49ae-8897-488403d08305",
+    "triggered_at": "2026-07-22T12:16:41.049832+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "postgresql",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-bfdf0681acc38875",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:41.131191+00:00"
+  },
+  {
+    "id": "87bc1c16-ebda-46fd-9206-bb5b7b9a908b",
+    "triggered_at": "2026-07-22T12:16:29.845106+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "recommendation",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-bf08f51f25bb8ad8",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:29.933304+00:00"
+  },
+  {
+    "id": "15033f1f-7544-4c39-9ab4-2f1001038cbf",
+    "triggered_at": "2026-07-22T12:16:26.760088+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "frontend-proxy",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-5f74917d3eca9333",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:26.861331+00:00"
+  },
+  {
+    "id": "bab85d30-67b9-485f-9dbc-a515e14f08fd",
+    "triggered_at": "2026-07-22T12:16:26.052507+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "ad",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-770ce01b17dc5eab",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:26.474529+00:00"
+  },
+  {
+    "id": "41bd766f-2bb5-42e7-9f1e-066c7706d7b0",
+    "triggered_at": "2026-07-22T12:16:26.045933+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "currency",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-953363c2dd5c9554",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:26.474278+00:00"
+  },
+  {
+    "id": "05d74c8d-9fd7-4f46-85c5-818104106c66",
+    "triggered_at": "2026-07-22T12:16:11.058024+00:00",
+    "alert_name": "ContainerMemoryNearLimit",
+    "alerted_service": "llm",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-a7aa73e62d5ab15e",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:16:11.202159+00:00"
+  },
+  {
+    "id": "2f54ccc4-7cf9-4222-878c-f99a3460db8a",
+    "triggered_at": "2026-07-22T12:16:05.755282+00:00",
+    "alert_name": "ServiceHighErrorRate",
+    "alerted_service": "unknown_service:checkout",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-c99c26c39bdc13ea",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": "cd6588af6abd9c89f29c1fcff75eec7c",
+    "created_at": "2026-07-22T12:16:05.889939+00:00"
+  },
+  {
+    "id": "553072b9-f66c-4d32-bf37-c843ce060e68",
+    "triggered_at": "2026-07-22T12:15:52.445758+00:00",
+    "alert_name": "ServiceHighErrorRate",
+    "alerted_service": "unknown_service:envoy",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-0952c3a11e006f48",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": "3390d8605f3dbdb8dad5333ec93bf956",
+    "created_at": "2026-07-22T12:15:52.517993+00:00"
+  },
+  {
+    "id": "e178d994-8b4e-46e1-806b-49dc23fd6f5a",
+    "triggered_at": "2026-07-22T12:15:51.946169+00:00",
+    "alert_name": "ServiceHighErrorRate",
+    "alerted_service": "unknown_service:/nodejs/bin/node",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-358a78fd46499784",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": "3390d8605f3dbdb8dad5333ec93bf956",
+    "created_at": "2026-07-22T12:15:52.046399+00:00"
+  },
+  {
+    "id": "32b71650-374b-4310-9445-13918b194b9f",
+    "triggered_at": "2026-07-22T12:15:44.45095+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "image-provider",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-f0910fa0fc6c30f9",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:15:44.667339+00:00"
+  },
+  {
+    "id": "7895cfd0-44ca-4ac6-9082-5d77cae120a8",
+    "triggered_at": "2026-07-22T12:15:30.744138+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "flagd",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-0699647d7116cf35",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:15:31.068237+00:00"
+  },
+  {
+    "id": "bcc81cb1-3324-4bab-8079-d6b1e5d408c7",
+    "triggered_at": "2026-07-22T12:15:30.653606+00:00",
+    "alert_name": "PodCrashLooping",
+    "alerted_service": "product-reviews",
+    "root_cause_service": null,
+    "failure_type": null,
+    "routing": null,
+    "incident_id": "inc-d929d8206b7d56e1",
+    "root_cause_summary": "RCA abstained: missing_anomaly_baselines",
+    "origin_candidates": [],
+    "amplifier_nodes": [],
+    "blast_radius": [],
+    "anomaly_scores": {},
+    "confidence_score": 0,
+    "evidence": [],
+    "timeline": [],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:15:31.068009+00:00"
+  }
+]

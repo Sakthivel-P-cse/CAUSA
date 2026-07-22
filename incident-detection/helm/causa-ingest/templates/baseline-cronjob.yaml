@@ -1,0 +1,53 @@
+{{- if .Values.baselineCron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "causa-ingest.fullname" . }}-baseline-refresh
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "causa-ingest.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.baselineCron.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: baseline-refresh
+            app.kubernetes.io/part-of: causa
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: capture-baseline
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "testbed.harness.capture_baseline"]
+              args:
+                - "--namespace"
+                - {{ .Values.baselineCron.appNamespace | default .Values.env.CAUSA_APP_NAMESPACE | quote }}
+                - "--window-minutes"
+                - {{ .Values.baselineCron.windowMinutes | quote }}
+                - "--out"
+                - "/tmp/baselines.json"
+                - "--write-db"
+                - "--prometheus-url"
+                - {{ .Values.baselineCron.prometheusUrl | default .Values.env.PROMETHEUS_URL | quote }}
+              env:
+                - name: PGHOST
+                  value: {{ .Values.env.PGHOST | quote }}
+                - name: PGPORT
+                  value: {{ .Values.env.PGPORT | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.env.PGDATABASE | quote }}
+                - name: PGUSER
+                  value: {{ .Values.env.PGUSER | quote }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "causa-ingest.fullname" . }}-secret{{ end }}
+                      key: PGPASSWORD
+{{- end }}

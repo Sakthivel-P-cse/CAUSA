@@ -1,0 +1,6 @@
+apiVersion: v2
+name: causa-dashboard
+description: Dev C accuracy dashboard (causa_eval joins)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

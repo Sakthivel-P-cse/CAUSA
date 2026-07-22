@@ -1,0 +1,123 @@
+{
+  "incident_id": "inc-live-test-1784723324",
+  "n_proposals": 2,
+  "proposals": [
+    {
+      "index": 0,
+      "node": "gcp-demo-test-control-plane",
+      "fault_class": "Infra",
+      "action": "scale_restart_cordon",
+      "depth": "stub",
+      "summary": "STUB: scale/restart/cordon for infra target gcp-demo-test-control-plane",
+      "implemented": false
+    },
+    {
+      "index": 1,
+      "node": "checkout",
+      "fault_class": "AppLogic",
+      "action": "code_fix_pr",
+      "depth": "deep",
+      "summary": "Propose code-fix PR payload for checkout (never auto-merged)",
+      "implemented": null
+    }
+  ],
+  "approval_tests": {
+    "approve_first": {
+      "ok": true,
+      "decision": "approve",
+      "index": 0,
+      "accepted_action": "scale_restart_cordon",
+      "accepted_node": "gcp-demo-test-control-plane",
+      "cli_transcript": "\n============================================================\nCandidate #0: gcp-demo-test-control-plane  score=0.920  conf=0.448\nRole: origin  Kind: infra\nExplanation: gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.\n\nProposed remediation (stub): scale_restart_cordon\n  STUB: scale/restart/cordon for infra target gcp-demo-test-control-plane\n",
+      "canary_after_approve": {
+        "applied": true,
+        "rolled_back": false,
+        "final_traffic_pct": 100.0,
+        "reason": "Canary completed; SLOs healthy",
+        "snapshots": [
+          {
+            "step": 0,
+            "traffic_pct": 10.0,
+            "error_rate": 0.01,
+            "latency_p99_ms": 120.0,
+            "breached": false
+          },
+          {
+            "step": 1,
+            "traffic_pct": 25.0,
+            "error_rate": 0.01,
+            "latency_p99_ms": 120.0,
+            "breached": false
+          },
+          {
+            "step": 2,
+            "traffic_pct": 50.0,
+            "error_rate": 0.01,
+            "latency_p99_ms": 120.0,
+            "breached": false
+          },
+          {
+            "step": 3,
+            "traffic_pct": 100.0,
+            "error_rate": 0.01,
+            "latency_p99_ms": 120.0,
+            "breached": false
+          }
+        ]
+      }
+    },
+    "reject_then_approve_second": {
+      "ok": true,
+      "decision": "approve",
+      "index": 1,
+      "accepted_action": "code_fix_pr",
+      "accepted_node": "checkout",
+      "cli_transcript": "\n============================================================\nCandidate #0: gcp-demo-test-control-plane  score=0.920  conf=0.448\nRole: origin  Kind: infra\nExplanation: gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.\n\nProposed remediation (stub): scale_restart_cordon\n  STUB: scale/restart/cordon for infra target gcp-demo-test-control-plane\nRejected; trying next candidate.\n\n============================================================\nCandidate #1: checkout  score=0.472  conf=0.208\nRole: amplifier  Kind: service\nExplanation: checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier.\n\nProposed remediation (deep): code_fix_pr\n  Propose code-fix PR payload for checkout (never auto-merged)\n  PR title: fix(checkout): proposed remediation from Causa RCA\n  merged=False draft=True\n"
+    },
+    "reject_all": {
+      "ok": true,
+      "decision": "reject",
+      "plan_is_none": true,
+      "cli_transcript": "\n============================================================\nCandidate #0: gcp-demo-test-control-plane  score=0.920  conf=0.448\nRole: origin  Kind: infra\nExplanation: gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.\n\nProposed remediation (stub): scale_restart_cordon\n  STUB: scale/restart/cordon for infra target gcp-demo-test-control-plane\nRejected; trying next candidate.\n\n============================================================\nCandidate #1: checkout  score=0.472  conf=0.208\nRole: amplifier  Kind: service\nExplanation: checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier.\n\nProposed remediation (deep): code_fix_pr\n  Propose code-fix PR payload for checkout (never auto-merged)\n  PR title: fix(checkout): proposed remediation from Causa RCA\n  merged=False draft=True\nRejected; trying next candidate.\n"
+    },
+    "quit": {
+      "ok": true,
+      "decision": "quit",
+      "cli_transcript": "\n============================================================\nCandidate #0: gcp-demo-test-control-plane  score=0.920  conf=0.448\nRole: origin  Kind: infra\nExplanation: gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.\n\nProposed remediation (stub): scale_restart_cordon\n  STUB: scale/restart/cordon for infra target gcp-demo-test-control-plane\n"
+    },
+    "approve_then_canary_breach": {
+      "ok": true,
+      "canary": {
+        "applied": false,
+        "rolled_back": true,
+        "final_traffic_pct": 0.0,
+        "reason": "SLO breach at 50.0% traffic (err=0.200, p99=900.0ms); auto-rollback",
+        "snapshots": [
+          {
+            "step": 0,
+            "traffic_pct": 10.0,
+            "error_rate": 0.02,
+            "latency_p99_ms": 150.0,
+            "breached": false
+          },
+          {
+            "step": 1,
+            "traffic_pct": 25.0,
+            "error_rate": 0.02,
+            "latency_p99_ms": 150.0,
+            "breached": false
+          },
+          {
+            "step": 2,
+            "traffic_pct": 50.0,
+            "error_rate": 0.2,
+            "latency_p99_ms": 900.0,
+            "breached": true
+          }
+        ]
+      }
+    }
+  },
+  "how_to_accept_interactively": "cd incident-detection && PYTHONPATH=. python -m remediation.cli  # then type: approve | reject | quit at the prompt (uses golden fixture by default; live path uses ApprovalCLI the same way)",
+  "note": "Accepting a proposal gates a SimulatedCanary only \u2014 it does not apply kubectl/git. Infra plans remain stubs (implemented=false)."
+}

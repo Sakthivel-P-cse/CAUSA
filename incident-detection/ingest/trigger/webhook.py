@@ -64,11 +64,18 @@ class Alert:
         return f"inc-{self.alert_name}-{svc}-{ts}"
 
 
+def _node_from_labels(labels: dict[str, str]) -> str | None:
+    if labels.get("node"):
+        return labels["node"]
+    instance = labels.get("instance")
+    if not instance:
+        return None
+    return instance.rsplit(":", 1)[0] if ":" in instance else instance
+
+
 def parse_alerts(payload: dict[str, Any]) -> list[Alert]:
     """Extract every alert from an Alertmanager webhook body."""
     out: list[Alert] = []
-    # `alerts` may be absent, explicitly null ({"alerts": null}), or a non-list;
-    # coerce so a malformed webhook yields [] instead of raising.
     alerts = payload.get("alerts")
     if not isinstance(alerts, list):
         return out
@@ -81,7 +88,7 @@ def parse_alerts(payload: dict[str, Any]) -> list[Alert]:
                 alert_name=labels.get("alertname", "unknown"),
                 service=extract_service_from_labels(labels),
                 namespace=labels.get("namespace"),
-                node=labels.get("node"),
+                node=_node_from_labels(labels),
                 severity=labels.get("severity"),
                 status=str(raw.get("status") or payload.get("status") or "firing"),
                 starts_at=_parse_iso(raw.get("startsAt")),

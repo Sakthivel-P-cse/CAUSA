@@ -32,7 +32,7 @@ def test_every_fixture_is_evaluable():
 def test_baseline_every_scored_scenario_names_a_true_root():
     """Pins the baseline so a scoring change shows up as a diff, not a vibe."""
     results = _by_id(run_all())
-    for sid in ("S0", "S1", "S2", "S5", "D1", "D2"):
+    for sid in ("S0", "S1", "S2", "S3", "S4", "S5", "D1", "D2"):
         assert results[sid].top1, f"{sid} regressed off top-1"
     assert results["D3"].abstained and results["D3"].abstention_ok
 

@@ -1,0 +1,693 @@
+[
+  {
+    "id": "6c1cabb6-bb6e-4c4d-b53e-1673dda93b15",
+    "triggered_at": "2026-07-22T12:28:45.012548+00:00",
+    "alert_name": "ServiceHighErrorRate",
+    "alerted_service": "checkout",
+    "root_cause_service": "gcp-demo-test-control-plane",
+    "failure_type": "Infra",
+    "routing": null,
+    "incident_id": "inc-live-test-1784723324",
+    "root_cause_summary": "Top root-cause candidate: gcp-demo-test-control-plane. gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin.",
+    "origin_candidates": [
+      {
+        "role": "origin",
+        "flags": {},
+        "score": 0.9203440039882371,
+        "node_id": "gcp-demo-test-control-plane",
+        "signals": {
+          "D": 0.7610320747222187,
+          "P": 0.9999999372424927,
+          "T": 1.0
+        },
+        "node_kind": "infra",
+        "cluster_id": "cluster-0",
+        "confidence": 0.44849585256231295,
+        "dev_vector": {
+          "cpu": 0.7187020609376942,
+          "saturation": 0.0
+        },
+        "explanation": "gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin."
+      },
+      {
+        "role": "amplifier",
+        "flags": {
+          "zero_outdegree_P": true
+        },
+        "score": 0.4718481509386109,
+        "node_id": "checkout",
+        "signals": {
+          "D": 0.41554445281583263,
+          "P": 0.0,
+          "T": 1.0
+        },
+        "node_kind": "service",
+        "cluster_id": "cluster-0",
+        "confidence": 0.20820908218082015,
+        "dev_vector": {
+          "saturation": 0.7329799808157081
+        },
+        "explanation": "checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier."
+      }
+    ],
+    "amplifier_nodes": [
+      "checkout"
+    ],
+    "blast_radius": [
+      "checkout"
+    ],
+    "anomaly_scores": {
+      "checkout": 0.7329799808157081,
+      "gcp-demo-test-control-plane": 0.7187020609376942
+    },
+    "confidence_score": 0.44849585256231295,
+    "evidence": [
+      {
+        "node": "gcp-demo-test-control-plane",
+        "score": 0.9203440039882371,
+        "signals": {
+          "D": 0.7610320747222187,
+          "P": 0.9999999372424927,
+          "T": 1.0
+        },
+        "dev_vector": {
+          "cpu": 0.7187020609376942,
+          "saturation": 0.0
+        },
+        "explanation": "gcp-demo-test-control-plane deviated 0.00s before its influence targets (T=1.00), influence flows outward to 46 node(s) with no incoming influence edges (D=0.76), 1/46 outgoing edges consistent in order (P=1.00). Role: origin."
+      },
+      {
+        "node": "checkout",
+        "score": 0.4718481509386109,
+        "signals": {
+          "D": 0.41554445281583263,
+          "P": 0.0,
+          "T": 1.0
+        },
+        "dev_vector": {
+          "saturation": 0.7329799808157081
+        },
+        "explanation": "checkout first deviation at t=0.00s (T=1.00), out-influence=0.00, in-influence=0.72 (D=0.42), no outgoing influence edges (P=0.00 flagged). Role: amplifier."
+      },
+      {
+        "node": "accounting",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "accounting is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "ad",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "ad is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "alertmanager",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "alertmanager is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "cart",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "cart is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "causa-ingest",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "causa-ingest is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "coredns",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "coredns is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "currency",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "currency is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "email",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "email is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "etcd-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "etcd-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "flagd",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "flagd is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "fraud-detection",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "fraud-detection is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "frontend",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "frontend is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "frontend-proxy",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "frontend-proxy is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "image-provider",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "image-provider is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kafka",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kafka is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kindnet",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kindnet is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-apiserver-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-apiserver-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-controller-manager-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-controller-manager-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-proxy",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-proxy is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-scheduler-gcp-demo-test-control",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-scheduler-gcp-demo-test-control is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "kube-state-metrics",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "kube-state-metrics is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "llm",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "llm is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "load-generator",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "load-generator is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "local-path-provisioner",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "local-path-provisioner is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "loki",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "loki is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "mimir",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "mimir is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-loki",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-loki is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-mimir",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-mimir is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "minio-tempo",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "minio-tempo is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "node-exporter",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "node-exporter is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-agent",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-agent is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-collector",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-collector is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "otel-lb",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "otel-lb is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "payment",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "payment is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "postgres",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "postgres is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "postgresql",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "postgresql is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "product-catalog",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "product-catalog is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "product-reviews",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "product-reviews is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "prometheus",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "prometheus is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "quote",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "quote is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "recommendation",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "recommendation is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "shipping",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "shipping is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "stage2-rca",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "stage2-rca is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "tempo",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "tempo is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      },
+      {
+        "node": "valkey-cart",
+        "score": 0.26363906831652784,
+        "signals": {
+          "D": 0.2909172049495835,
+          "P": 0.0,
+          "T": 0.5
+        },
+        "dev_vector": {
+          "anomaly": 0.0
+        },
+        "explanation": "valkey-cart is a slow-burn / no-deviation node (T=0.50 neutral), out-influence=0.00, in-influence=0.72 (D=0.29), no outgoing influence edges (P=0.00 flagged). Role: victim."
+      }
+    ],
+    "timeline": [
+      {
+        "event": "first deviation",
+        "service": "checkout",
+        "timestamp": "2026-07-22T12:18:44+00:00"
+      },
+      {
+        "event": "first deviation",
+        "service": "gcp-demo-test-control-plane",
+        "timestamp": "2026-07-22T12:18:44+00:00"
+      }
+    ],
+    "trace_id": null,
+    "created_at": "2026-07-22T12:28:45.858723+00:00"
+  }
+]

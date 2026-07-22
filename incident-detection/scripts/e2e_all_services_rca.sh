@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# ============================================================
+# e2e_all_services_rca.sh — trigger→Stage-2→Postgres LOOP SMOKE
+#
+# Scales services to zero to fire DeploymentReplicasUnavailable.
+# This is NOT an RCA accuracy gate (availability faults often do not
+# cross θ_fire). Use chaos catalog + eval.live_runner for accuracy.
+# ============================================================
 set -euo pipefail
 
 CTX=""

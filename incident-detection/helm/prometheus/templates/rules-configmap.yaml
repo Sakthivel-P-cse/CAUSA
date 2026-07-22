@@ -26,15 +26,19 @@ data:
           # The ``server`` label identifies the service receiving the requests.
           - alert: ServiceHighErrorRate
             expr: |
-              (
-                sum by (server) (rate(traces_service_graph_request_failed_total[5m]))
-                /
-                sum by (server) (rate(traces_service_graph_request_total[5m]))
-              ) > 0.05
+              label_replace(
+                (
+                  sum by (server) (rate(traces_service_graph_request_failed_total[5m]))
+                  /
+                  sum by (server) (rate(traces_service_graph_request_total[5m]))
+                ) > 0.05,
+                "service", "$1", "server", "(.*)"
+              )
             for: 2m
             labels:
               severity: critical
               layer: service
+              namespace: {{ .Values.appNamespace | default "otel-demo" | quote }}
             annotations:
               summary: "High error rate on {{ "{{" }} $labels.server {{ "}}" }}"
               description: >
@@ -45,15 +49,19 @@ data:
           # Stage 2 failure type: Cascading failure, Resource exhaustion, Traffic overload
           - alert: ServiceHighLatency
             expr: |
-              histogram_quantile(0.99,
-                sum by (server, le) (
-                  rate(traces_service_graph_request_server_seconds_bucket[5m])
-                )
-              ) > 2.0
+              label_replace(
+                histogram_quantile(0.99,
+                  sum by (server, le) (
+                    rate(traces_service_graph_request_server_seconds_bucket[5m])
+                  )
+                ) > 2.0,
+                "service", "$1", "server", "(.*)"
+              )
             for: 2m
             labels:
               severity: warning
               layer: service
+              namespace: {{ .Values.appNamespace | default "otel-demo" | quote }}
             annotations:
               summary: "High p99 latency on {{ "{{" }} $labels.server {{ "}}" }}"
               description: >
@@ -136,11 +144,14 @@ data:
           # Node has < 10% memory available for 2 minutes
           - alert: NodeMemoryPressure
             expr: |
-              (
-                node_memory_MemAvailable_bytes
-                /
-                node_memory_MemTotal_bytes
-              ) < 0.10
+              label_replace(
+                (
+                  node_memory_MemAvailable_bytes
+                  /
+                  node_memory_MemTotal_bytes
+                ) < 0.10,
+                "node", "$1", "instance", "^([^:]+).*"
+              )
             for: 2m
             labels:
               severity: critical
@@ -155,11 +166,14 @@ data:
           # Node CPU usage > 90% for 5 minutes
           - alert: NodeCPUSaturation
             expr: |
-              (
-                1 - avg by(instance)(
-                  rate(node_cpu_seconds_total{mode="idle"}[5m])
-                )
-              ) > 0.90
+              label_replace(
+                (
+                  1 - avg by(instance)(
+                    rate(node_cpu_seconds_total{mode="idle"}[5m])
+                  )
+                ) > 0.90,
+                "node", "$1", "instance", "^([^:]+).*"
+              )
             for: 5m
             labels:
               severity: warning

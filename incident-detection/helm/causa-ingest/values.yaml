@@ -38,3 +38,10 @@ env:
   CAUSA_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
 
 existingSecret: ""   # set in prod to avoid a plain-text password in values
+
+baselineCron:
+  enabled: true
+  schedule: "0 */6 * * *"
+  windowMinutes: "30"
+  appNamespace: "otel-demo"
+  prometheusUrl: "http://prometheus.prometheus.svc.cluster.local:9090"

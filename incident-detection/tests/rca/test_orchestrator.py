@@ -103,3 +103,40 @@ def test_orchestrator_loads_exact_window_scores_and_persists():
     assert reader.calls[0]["lookback_minutes"] == 10
     assert reader.calls[0]["preferred_trace_id"] == "trace-1"
     assert reader.closed
+    assert result.fault_class is not None or result.candidates
+
+
+def test_orchestrator_empty_baselines_loud_abstain():
+    state = IncidentState(
+        incident_id="inc-empty-bl",
+        alert_name="ServiceHighErrorRate",
+        alerted_service="checkout",
+        namespace="otel-demo",
+        node=None,
+        severity="critical",
+        window_start=NOW,
+        window_end=NOW + timedelta(minutes=11),
+        trace_id=None,
+        telemetry_refs={},
+        status="open",
+        triggered_at=NOW + timedelta(minutes=10),
+        resolved_at=None,
+    )
+    store = _Store(state, {})
+    reader = _Reader(
+        IncidentTelemetry(
+            incident_id=state.incident_id,
+            alerted_service="checkout",
+            window_start=state.window_start,
+            window_end=state.window_end,
+        )
+    )
+    from rca.orchestrator import MISSING_BASELINES_REASON
+
+    result = RCAOrchestrator(store, reader_factory=lambda: reader).process(
+        "inc-empty-bl"
+    )
+    assert result.abstain_reason == MISSING_BASELINES_REASON
+    assert result.candidates == []
+    assert store.saved
+    assert not reader.calls

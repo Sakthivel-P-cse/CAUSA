@@ -1,0 +1,14 @@
+{
+  "model": "z-ai/glm-5.2",
+  "base_url": "https://integrate.api.nvidia.com/v1",
+  "ok": true,
+  "error": null,
+  "content": "```json\n{\n  \"fault_class\": \"Infra\",\n  \"confidence\": 0.92,\n  \"rationale\": \"The control-plane node is identified as the origin of the fault with a high score (0.92). It deviated before its influence targets (T=1.0) and influence flows outward to 46 nodes with no incoming edges (D=0.76), confirming it as the root cause. High CPU utilization (0.72) on the control-plane indicates an infrastructure-level resource bottleneck.\",\n  \"remediation\": \"Investigate and mitigate CPU saturation on the gcp-demo-test-control-plane node. Consider scaling up the control-plane resources, optimizing workloads consuming excessive CPU, or migrating affected services to a healthier node to restore system stability.\"\n}\n```",
+  "parsed": {
+    "fault_class": "Infra",
+    "confidence": 0.92,
+    "rationale": "The control-plane node is identified as the origin of the fault with a high score (0.92). It deviated before its influence targets (T=1.0) and influence flows outward to 46 nodes with no incoming edges (D=0.76), confirming it as the root cause. High CPU utilization (0.72) on the control-plane indicates an infrastructure-level resource bottleneck.",
+    "remediation": "Investigate and mitigate CPU saturation on the gcp-demo-test-control-plane node. Consider scaling up the control-plane resources, optimizing workloads consuming excessive CPU, or migrating affected services to a healthier node to restore system stability."
+  },
+  "latency_note": "chat completed in ~179s (slow but ok)"
+}

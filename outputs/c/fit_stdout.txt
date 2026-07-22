@@ -1,0 +1,2 @@
+fit_from_live n=13 best_weights={'w_T': 0.0, 'w_D': 0.0, 'w_P': 1.0} best_top1=1.0 ece=0.0 note=best_weights from live re-rank grid on stored T/D/P signals; apply to scoring defaults (normalize_weights / Scorer weights)
+wrote /home/bhuvi/PROJECTS/causa/outputs/c/fit_result.json

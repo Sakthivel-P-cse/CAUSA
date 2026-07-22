@@ -71,20 +71,9 @@ echo ""
 
 if [[ "${STAGE2_PROFILE}" == "real" ]]; then
   echo "──────────────────────────────────────────────────────"
-  echo "[1/3] Building Docker image: causa/stage2-rca:latest"
+  echo "[1/3] Building Docker images (ingest + stage2-rca)"
   echo "──────────────────────────────────────────────────────"
-  docker build --no-cache \
-    -f "${ROOT_DIR}/Dockerfile.stage2-rca" \
-    -t causa/stage2-rca:latest \
-    "${ROOT_DIR}"
-  echo "✓ causa/stage2-rca:latest built"
-  echo ""
-
-  echo "──────────────────────────────────────────────────────"
-  echo "[2/3] Loading image into kind cluster '${KIND_CLUSTER}'"
-  echo "──────────────────────────────────────────────────────"
-  kind load docker-image causa/stage2-rca:latest --name "${KIND_CLUSTER}"
-  echo "✓ Image loaded"
+  "${SCRIPT_DIR}/build_images.sh" --kind-cluster "${KIND_CLUSTER}"
   echo ""
 else
   echo "Using explicit development mock; image build and load skipped."
@@ -106,21 +95,43 @@ else
   CHART_DIR="${ROOT_DIR}/helm/stage2-mock"
 fi
 
-echo "──────────────────────────────────────────────────────"
-echo "[3/3] Deploying Stage-2 ${STAGE2_PROFILE}"
-echo "──────────────────────────────────────────────────────"
-helm upgrade --install stage2-rca "${CHART_DIR}" \
-  --kube-context "${CONTEXT}" \
-  --namespace stage2-rca \
-  --create-namespace \
-  -f "${CHART_DIR}/values.yaml" \
-  -f "${CHART_DIR}/values-${ENV}.yaml" \
-  --wait \
-  --timeout 3m
+if [[ "${STAGE2_PROFILE}" == "real" ]]; then
+  echo "──────────────────────────────────────────────────────"
+  echo "[3/4] Deploying Stage-2 ${STAGE2_PROFILE} + causa-ingest"
+  echo "──────────────────────────────────────────────────────"
+  helm upgrade --install stage2-rca "${CHART_DIR}" \
+    --kube-context "${CONTEXT}" \
+    --namespace stage2-rca \
+    --create-namespace \
+    -f "${CHART_DIR}/values.yaml" \
+    -f "${CHART_DIR}/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+  helm upgrade --install causa-ingest "${ROOT_DIR}/helm/causa-ingest" \
+    --kube-context "${CONTEXT}" \
+    --namespace causa-ingest \
+    --create-namespace \
+    -f "${ROOT_DIR}/helm/causa-ingest/values.yaml" \
+    -f "${ROOT_DIR}/helm/causa-ingest/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+else
+  echo "──────────────────────────────────────────────────────"
+  echo "[3/3] Deploying Stage-2 ${STAGE2_PROFILE}"
+  echo "──────────────────────────────────────────────────────"
+  helm upgrade --install stage2-rca "${CHART_DIR}" \
+    --kube-context "${CONTEXT}" \
+    --namespace stage2-rca \
+    --create-namespace \
+    -f "${CHART_DIR}/values.yaml" \
+    -f "${CHART_DIR}/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+fi
 
 echo ""
 echo "========================================================"
-echo "  Stage-2 ${STAGE2_PROFILE} deployed successfully"
+echo "  Stage-2 ${STAGE2_PROFILE} (+ ingest if real) deployed"
 echo "========================================================"
 echo "  kubectl --context ${CONTEXT} -n stage2-rca \\"
 echo "    port-forward svc/stage2-rca 8081:8080"

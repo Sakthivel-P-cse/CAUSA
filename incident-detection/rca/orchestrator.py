@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from collections import defaultdict
 from datetime import timedelta
 from typing import Callable, Mapping
@@ -11,9 +13,15 @@ from contracts import AnomalyOutput, Baseline, IncidentTelemetry, RankedResult, 
 from graphs import build_incident_subgraph, build_influence_graph
 from ingest.reader import TelemetryReader
 from isolation import isolate
+from scoring.fault_class import derive_fault_class
 
 from .adapter import adapt_incident
 from .store import IncidentState, RCAStore
+
+logger = logging.getLogger(__name__)
+
+MISSING_BASELINES_REASON = "missing_anomaly_baselines"
+_missing_baselines_total = 0
 
 
 def _default_reader_factory() -> TelemetryReader:
@@ -108,8 +116,33 @@ class RCAOrchestrator:
         self.thresholds = thresholds or Thresholds()
 
     def process(self, incident_id: str) -> RankedResult:
+        global _missing_baselines_total
         state = self.store.load_incident(incident_id)
         baselines = self.store.load_baselines()
+        if not baselines:
+            _missing_baselines_total += 1
+            logger.error(
+                "anomaly_baseline empty for incident %s — refusing quiet abstain "
+                "(missing_baselines_total=%d)",
+                incident_id,
+                _missing_baselines_total,
+            )
+            result = RankedResult(
+                candidates=[],
+                incident_id=incident_id,
+                abstain_reason=MISSING_BASELINES_REASON,
+            )
+            telemetry = IncidentTelemetry(
+                incident_id=incident_id,
+                alerted_service=state.alerted_service or "unknown",
+                window_start=state.window_start,
+                window_end=state.window_end,
+            )
+            self.store.insert_report(
+                state, telemetry, [], result, self.thresholds
+            )
+            return result
+
         telemetry = self._load_telemetry(state)
         anomalies = anomalies_from_telemetry(telemetry, baselines, self.thresholds)
         kernel_input = adapt_incident(
@@ -150,7 +183,20 @@ class RCAOrchestrator:
                     for candidate in ranked.candidates
                 ]
                 candidates.sort(key=lambda candidate: (-candidate.score, candidate.node_id))
-                result = RankedResult(candidates=candidates, incident_id=incident_id)
+                fault_class = None
+                if candidates:
+                    top_id = candidates[0].node_id
+                    for ranked in isolated.ranked_by_cluster.values():
+                        if any(c.node_id == top_id for c in ranked.candidates):
+                            fault_class = ranked.fault_class
+                            break
+                    if fault_class is None:
+                        fault_class = derive_fault_class(candidates, influence)
+                result = RankedResult(
+                    candidates=candidates,
+                    incident_id=incident_id,
+                    fault_class=fault_class,
+                )
 
         self.store.insert_report(
             state, telemetry, anomalies, result, self.thresholds
@@ -163,10 +209,9 @@ class RCAOrchestrator:
         if state.window_end <= state.window_start:
             raise ValueError(f"incident {state.incident_id} has an invalid analysis window")
 
+        namespace = state.namespace or os.getenv("CAUSA_APP_NAMESPACE") or None
         reader = self.reader_factory()
         try:
-            # Dev A stores [around-lookback, around+1m]. Reconstruct that exact
-            # window rather than querying relative to the Stage-2 wall clock.
             around = state.window_end - timedelta(minutes=1)
             lookback = int(
                 (state.window_end - state.window_start - timedelta(minutes=1))
@@ -178,7 +223,7 @@ class RCAOrchestrator:
                 alerted_service=state.alerted_service or "unknown",
                 around=around,
                 lookback_minutes=max(0, lookback),
-                namespace=state.namespace,
+                namespace=namespace,
                 preferred_trace_id=state.trace_id,
             )
         finally:

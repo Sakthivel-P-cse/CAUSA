@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 _MAX_BODY = int(os.getenv("TRIGGER_MAX_BODY_BYTES", str(1024 * 1024)))
 _AUTH_TOKEN = os.getenv("TRIGGER_AUTH_TOKEN") or None
 
+incident_not_opened_via_ingest_total = 0
+rca_process_failures_total = 0
+
 
 class Dispatcher:
     """Bounded background execution; a successful submit means accepted."""
@@ -72,11 +75,21 @@ class Dispatcher:
         return True
 
     def _run(self) -> None:
+        global incident_not_opened_via_ingest_total, rca_process_failures_total
         while True:
             incident_id = self._q.get()
             try:
                 self.orchestrator.process(incident_id)
+            except LookupError:
+                incident_not_opened_via_ingest_total += 1
+                logger.error(
+                    "incident_not_opened_via_ingest incident_id=%s "
+                    "(count=%d) — Alertmanager must POST causa-ingest, not stage2",
+                    incident_id,
+                    incident_not_opened_via_ingest_total,
+                )
             except Exception:
+                rca_process_failures_total += 1
                 logger.exception("RCA failed for incident %s", incident_id)
             finally:
                 with self._submit_lock:
@@ -100,7 +113,26 @@ class TriggerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") in ("", "/health", "/healthz"):
-            self._send(200, {"status": "ok"})
+            self._send(
+                200,
+                {
+                    "status": "ok",
+                    "incident_not_opened_via_ingest_total": incident_not_opened_via_ingest_total,
+                    "rca_process_failures_total": rca_process_failures_total,
+                },
+            )
+        elif self.path.rstrip("/") == "/metrics":
+            body = (
+                f"# TYPE incident_not_opened_via_ingest_total counter\n"
+                f"incident_not_opened_via_ingest_total {incident_not_opened_via_ingest_total}\n"
+                f"# TYPE rca_process_failures_total counter\n"
+                f"rca_process_failures_total {rca_process_failures_total}\n"
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._send(404, {"error": "not found"})
 

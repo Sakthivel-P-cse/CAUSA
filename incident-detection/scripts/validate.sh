@@ -470,6 +470,77 @@ else
   fail "Stage 2 RCA engine /health did not respond (not deployed yet?)"
 fi
 echo ""
+
+echo "[14+] AM webhook → ingest, images, baselines, ingest health, node PromQL..."
+AM_CFG=$(k -n alertmanager get configmap -o name 2>/dev/null | head -1 || true)
+AM_WEBHOOK=""
+if [[ -n "${AM_CFG}" ]]; then
+  AM_WEBHOOK=$(k -n alertmanager get "${AM_CFG}" -o yaml 2>/dev/null | grep -o 'http[^ ]*causa-ingest[^ ]*' | head -1 || true)
+fi
+if [[ -z "${AM_WEBHOOK}" ]]; then
+  AM_WEBHOOK=$(k -n alertmanager get secret -o name 2>/dev/null | head -1 || true)
+  # Fall back: check alertmanager values via pod args / mounted file
+  AM_POD=$(k -n alertmanager get pod -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
+    k -n alertmanager get pod -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -n "${AM_POD}" ]]; then
+    AM_WEBHOOK=$(k -n alertmanager exec "${AM_POD}" -- \
+      sh -c 'grep -rho "causa-ingest[^ ]*" /etc/alertmanager 2>/dev/null | head -1' 2>/dev/null || true)
+  fi
+fi
+if echo "${AM_WEBHOOK}" | grep -q 'causa-ingest'; then
+  ok "Alertmanager webhook targets causa-ingest"
+else
+  fail "Alertmanager webhook does not target causa-ingest (got: ${AM_WEBHOOK:-empty})"
+fi
+
+S2_IMG=$(k -n stage2-rca get deploy stage2-rca -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+ING_IMG=$(k -n causa-ingest get deploy causa-ingest -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+if echo "${S2_IMG}" | grep -q 'causa/stage2-rca' && ! echo "${S2_IMG}" | grep -qi 'traceops'; then
+  ok "stage2 image is causa/stage2-rca (${S2_IMG})"
+else
+  fail "stage2 image unexpected: ${S2_IMG:-missing}"
+fi
+if echo "${ING_IMG}" | grep -q 'causa/ingest' && ! echo "${ING_IMG}" | grep -qi 'traceops'; then
+  ok "ingest image is causa/ingest (${ING_IMG})"
+else
+  fail "ingest image unexpected: ${ING_IMG:-missing}"
+fi
+
+BL=$(k -n postgres exec deployment/postgres -- \
+  psql -U causa -d causa -tAc "SELECT COUNT(*) FROM anomaly_baseline;" 2>/dev/null | tr -d '[:space:]' || echo "0")
+if [[ "${BL}" =~ ^[0-9]+$ ]] && [[ "${BL}" -gt 0 ]]; then
+  ok "anomaly_baseline has ${BL} row(s)"
+else
+  fail "anomaly_baseline empty — capture_baseline --write-db required"
+fi
+
+pid=$(port_forward_bg causa-ingest causa-ingest 8082 8080)
+cleanup_pids+=("${pid}")
+sleep 2
+if curl --connect-timeout 2 --max-time 5 -sf http://localhost:8082/health &>/dev/null; then
+  ok "causa-ingest /health → 200 OK"
+else
+  fail "causa-ingest /health did not respond"
+fi
+
+NODE_Q=$(curl --connect-timeout 2 --max-time 5 -sf \
+  'http://localhost:9090/api/v1/query?query=node_cpu_seconds_total' 2>/dev/null || true)
+if [[ -n "${NODE_Q}" ]] && echo "${NODE_Q}" | grep -q '"status":"success"' \
+  && ! echo "${NODE_Q}" | grep -q '"result":\[\]'; then
+  ok "node PromQL non-empty (node_cpu_seconds_total)"
+else
+  fail "node PromQL empty — node-exporter / scrape broken"
+fi
+
+UQ=$(k -n postgres exec deployment/postgres -- \
+  psql -U causa -d causa -tAc \
+  "SELECT COUNT(*) FROM pg_indexes WHERE indexname='uq_rca_incident_id';" 2>/dev/null | tr -d '[:space:]' || echo "0")
+if [[ "${UQ}" == "1" ]]; then
+  ok "uq_rca_incident_id index present"
+else
+  fail "uq_rca_incident_id missing — schema-migrate required"
+fi
+echo ""
 fi
 
 # ── Result summary ─────────────────────────────────────────
@@ -480,7 +551,7 @@ echo "  Passed: ${PASS}"
 echo "  Failed: ${FAIL}"
 echo ""
 if [[ "${FAIL}" -eq 0 ]]; then
-  echo "  ALL CHECKS PASSED — Dev A+B stack and Stage 2 RCA ready"
+  echo "  ALL CHECKS PASSED — Dev A+B+C stack ready"
   exit 0
 else
   echo "  SOME CHECKS FAILED — Review output above"

@@ -51,6 +51,8 @@ FIXTURES: tuple[tuple[str, str, str], ...] = (
     ("S0", "fixtures.incident_s0", "load_incident_s0"),
     ("S1", "fixtures.incident_s1", "load_incident_s1"),
     ("S2", "fixtures.incident_s2", "load_incident_s2"),
+    ("S3", "fixtures.incident_s3", "load_incident_s3"),
+    ("S4", "fixtures.incident_s4", "load_incident_s4"),
     ("S5", "fixtures.incident_s5", "load_incident_s5"),
     ("D1", "fixtures.incident_d1", "load_incident_d1"),
     ("D2", "fixtures.incident_d2", "load_incident_d2"),
@@ -58,7 +60,7 @@ FIXTURES: tuple[tuple[str, str, str], ...] = (
 )
 
 """Chaos scenarios with no kernel fixture at all."""
-CATALOGUED_WITHOUT_FIXTURE: tuple[str, ...] = ("S3", "S4")
+CATALOGUED_WITHOUT_FIXTURE: tuple[str, ...] = ()
 
 SIGNALS = ("T", "D", "P")
 
@@ -311,13 +313,17 @@ def print_report(results: list[ScenarioResult]) -> None:
           f"abstention={s['abstention']:.2f}  "
           f"fault_class={s['fault_class']:.2f} "
           f"(coverage {s['fault_class_coverage']:.2f})")
-    print(
+    scope = (
         "\nSCOPE: these are KERNEL fixtures — abstract graphs exercising one "
         "mechanism each.\nExcept S2 they do NOT model the chaos scenario whose "
-        f"ID they share ({'--check-catalog' } shows the divergence), so these "
-        "numbers say\nnothing about accuracy on real incidents. "
-        f"{', '.join(CATALOGUED_WITHOUT_FIXTURE)} have no fixture at all."
+        f"ID they share ({'--check-catalog'} shows the divergence), so these "
+        "numbers say\nnothing about accuracy on real incidents."
     )
+    if CATALOGUED_WITHOUT_FIXTURE:
+        scope += (
+            f" {', '.join(CATALOGUED_WITHOUT_FIXTURE)} have no fixture at all."
+        )
+    print(scope)
 
 
 def print_sweep(rows: list[tuple[str, dict[str, float]]]) -> None:

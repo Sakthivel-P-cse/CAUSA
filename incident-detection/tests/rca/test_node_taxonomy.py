@@ -158,8 +158,8 @@ def test_dependency_requires_being_called_not_merely_silent():
 
 
 ALL_FIXTURES = [
-    "incident_s0", "incident_s1", "incident_s5",
-    "incident_d1", "incident_d2", "incident_d3",
+    "incident_s0", "incident_s1", "incident_s2", "incident_s3", "incident_s4",
+    "incident_s5", "incident_d1", "incident_d2", "incident_d3",
 ]
 
 

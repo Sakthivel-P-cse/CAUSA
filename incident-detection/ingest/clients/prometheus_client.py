@@ -42,6 +42,10 @@ def _series_points(values: list[list[Any]]) -> list[list[float]]:
     return out
 
 
+class NodeSeriesUnavailable(RuntimeError):
+    """Both node-label and internal_ip PromQL paths returned empty series."""
+
+
 class PrometheusClient:
     """Thin wrapper around the Prometheus HTTP query API."""
 
@@ -445,20 +449,36 @@ class PrometheusClient:
         results = self._range_safe(
             expr.format(sel=f'node="{self._esc(node)}"', by="node"), start, end, step=step
         )
+        label_empty = not results
         if not results:
             _, node_to_ip = self._node_ip_maps()
             ip = node_to_ip.get(node)
             if ip is None:
-                logger.warning(
+                logger.error(
                     "No internal_ip for node %r; infra series unavailable "
-                    "(kube_node_info missing or node-exporter unrelabeled)", node
+                    "(kube_node_info missing or node-exporter unrelabeled)",
+                    node,
                 )
-                return []
+                raise NodeSeriesUnavailable(
+                    f"node series empty for {node!r}: no node label match and "
+                    f"no kube_node_info.internal_ip"
+                )
             sel = f'instance=~"{self._esc_re(ip)}(:[0-9]+)?"'
             results = self._range_safe(
                 expr.format(sel=sel, by="instance"), start, end, step=step
             )
-        return _series_points(results[0]["values"]) if results else []
+        if not results:
+            logger.error(
+                "Node PromQL empty for %r after label and IP paths "
+                "(label_empty=%s)",
+                node,
+                label_empty,
+            )
+            raise NodeSeriesUnavailable(
+                f"node series empty for {node!r}: label and internal_ip paths "
+                f"both returned no samples"
+            )
+        return _series_points(results[0]["values"])
 
     def get_node_cpu_pct_series(
         self, node: str, start: datetime, end: datetime, step: str = "1m"

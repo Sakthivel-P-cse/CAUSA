@@ -64,6 +64,9 @@ spec:
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
                       CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
                   END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'causa_eval') THEN
+                      CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
+                  END IF;
               END
               $$;
 
@@ -76,4 +79,8 @@ spec:
 
               GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
               GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
+
+              GRANT USAGE ON SCHEMA groundtruth TO causa_eval;
+              GRANT SELECT ON groundtruth.ground_truth TO causa_eval;
+              GRANT SELECT ON rca_reports, incidents, anomaly_baseline TO causa_eval;
               SQL

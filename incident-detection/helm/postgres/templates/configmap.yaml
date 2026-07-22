@@ -143,6 +143,7 @@ data:
         trace_id        TEXT,
         telemetry_refs  JSONB,
         status          TEXT        NOT NULL DEFAULT 'open',   -- open | resolved
+        snapshot_status TEXT,                                  -- ok | failed | NULL
         triggered_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         resolved_at     TIMESTAMPTZ
     );

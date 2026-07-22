@@ -74,6 +74,7 @@ class IncidentStore:
         window_end: datetime,
         trace_id: str | None,
         telemetry_refs: dict[str, Any] | None = None,
+        snapshot_status: str | None = None,
     ) -> None:
         """Insert (or no-op on re-fire) an open incident row."""
         with self._connect() as conn:
@@ -81,14 +82,16 @@ class IncidentStore:
                 """
                 INSERT INTO incidents (
                     incident_id, alert_name, alerted_service, namespace, node,
-                    severity, window_start, window_end, trace_id, telemetry_refs, status
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'open')
+                    severity, window_start, window_end, trace_id, telemetry_refs,
+                    status, snapshot_status
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'open',%s)
                 ON CONFLICT (incident_id) DO NOTHING
                 """,
                 (
                     incident_id, alert_name, alerted_service, namespace, node,
                     severity, window_start, window_end, trace_id,
                     json.dumps(telemetry_refs or {}),
+                    snapshot_status,
                 ),
             )
         logger.info("Opened incident %s (%s / %s)", incident_id, alert_name, alerted_service)

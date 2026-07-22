@@ -147,6 +147,8 @@ config:
       #   regex: "go_gc_.*|go_memstats_.*"
       #   action: drop
 
+appNamespace: otel-demo
+
 rules:
   core:
     enabled: true

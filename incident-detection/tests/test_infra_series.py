@@ -111,8 +111,10 @@ def test_node_series_absolute_window_and_step():
 
 
 @respx.mock
-def test_missing_node_ip_returns_empty_not_synthesized():
-    """No kube_node_info row → [] rather than a faked series that poisons baselines."""
+def test_missing_node_ip_raises_not_synthesized():
+    """No kube_node_info row → NodeSeriesUnavailable (not a faked empty-as-healthy)."""
+    from ingest.clients.prometheus_client import NodeSeriesUnavailable
+
     respx.get("http://prom.local/api/v1/query").mock(
         return_value=httpx.Response(
             200, json={"status": "success", "data": {"result": []}}
@@ -125,6 +127,10 @@ def test_missing_node_ip_returns_empty_not_synthesized():
     )
     c = PrometheusClient("http://prom.local")
     try:
-        assert c.get_node_cpu_pct_series("ghost-node", START, END, "1m") == []
+        try:
+            c.get_node_cpu_pct_series("ghost-node", START, END, "1m")
+            raise AssertionError("expected NodeSeriesUnavailable")
+        except NodeSeriesUnavailable:
+            pass
     finally:
         c.close()

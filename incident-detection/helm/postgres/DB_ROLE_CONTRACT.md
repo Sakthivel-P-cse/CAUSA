@@ -40,7 +40,11 @@ profile is a normal Helm upgrade and cannot leave both implementations selecting
 ## Existing clusters
 
 `init.sql` still runs **once, on an empty data volume**. On every chart install or
-upgrade, the `postgres-rca-engine-grants` hook waits for Postgres and idempotently
-creates the role if needed, revokes ground-truth access, and applies only the engine's
-required table grants. The hook fails the Helm operation if required tables are
-missing instead of silently deploying an over-privileged or unusable engine.
+upgrade:
+
+1. `postgres-schema-migrate` (hook-weight 1) applies idempotent DDL — tables,
+   indexes (`uq_rca_incident_id`), `stage2_outbox`, roles — so upgraded PVCs get
+   schema that post-dates the original init.
+2. `postgres-rca-engine-grants` (hook-weight 5) creates roles if needed, revokes
+   ground-truth access from `rca_engine`, and grants `rca_engine` + `causa_eval`.
+   The grants hook fails the Helm operation if required tables are missing.

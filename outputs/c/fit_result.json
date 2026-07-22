@@ -1,0 +1,57 @@
+{
+  "n": 13,
+  "min_rows": 3,
+  "best_weights": {
+    "w_T": 0.0,
+    "w_D": 0.0,
+    "w_P": 1.0
+  },
+  "best_top1": 1.0,
+  "grid_size": 91,
+  "note": "best_weights from live re-rank grid on stored T/D/P signals; apply to scoring defaults (normalize_weights / Scorer weights)",
+  "ece": {
+    "ece": 0.0,
+    "map_kind": "isotonic",
+    "n": 2,
+    "bins": [
+      {
+        "lo": 0.9,
+        "hi": 1.0,
+        "mean_predicted": 1.0,
+        "empirical_accuracy": 1.0,
+        "count": 2
+      }
+    ],
+    "note": "isotonic fit_calibration on reconstructed RankedResult"
+  },
+  "equal_top1": 1.0,
+  "calibration": {
+    "ece": 0.0,
+    "map_kind": "isotonic",
+    "bins": [
+      {
+        "lo": 0.9,
+        "hi": 1.0,
+        "mean_predicted": 1.0,
+        "empirical_accuracy": 1.0,
+        "count": 2
+      }
+    ],
+    "reliability_points": [
+      {
+        "predicted": 1.0,
+        "empirical": 1.0
+      }
+    ],
+    "mapping": [
+      {
+        "raw": 0.3858372104031473,
+        "calibrated": 1.0
+      },
+      {
+        "raw": 0.44849585256231295,
+        "calibrated": 1.0
+      }
+    ]
+  }
+}

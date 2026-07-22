@@ -59,26 +59,16 @@ fi
 echo "✓ Cluster reachable"
 echo ""
 
-# ── Step 1: Rebuild stage2-rca image ─────────────────────
+# ── Step 1–2: Rebuild + load ingest and stage2 images ─────
 echo "──────────────────────────────────────────────────────"
-echo "[1/4] Building stage2-rca Docker image"
+echo "[1/3] Building + loading causa/ingest and causa/stage2-rca"
 echo "──────────────────────────────────────────────────────"
-cd "${ROOT_DIR}/.."    # causa project root (Dockerfile.stage2-rca lives here)
-docker build -f Dockerfile.stage2-rca -t causa/stage2-rca:latest .
-echo "✓ Image built: causa/stage2-rca:latest"
-echo ""
-
-# ── Step 2: Load image into kind ──────────────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[2/4] Loading image into kind cluster '${KIND_CLUSTER}'"
-echo "──────────────────────────────────────────────────────"
-kind load docker-image causa/stage2-rca:latest --name "${KIND_CLUSTER}"
-echo "✓ Image loaded into kind"
+"${SCRIPT_DIR}/build_images.sh" --kind-cluster "${KIND_CLUSTER}"
 echo ""
 
 # ── Step 3: Reload Prometheus alert rules via helm upgrade ─
 echo "──────────────────────────────────────────────────────"
-echo "[3/4] Upgrading Prometheus helm release (reload alert rules)"
+echo "[2/3] Upgrading Prometheus helm release (reload alert rules)"
 echo "──────────────────────────────────────────────────────"
 helm upgrade --install prometheus "${HELM_DIR}/prometheus" \
   --kube-context "${CONTEXT}" \
@@ -93,7 +83,7 @@ echo ""
 
 # ── Step 4: Restart stage2-rca to pick up the new image ───
 echo "──────────────────────────────────────────────────────"
-echo "[4/4] Rolling restart of stage2-rca deployment"
+echo "[3/3] Rolling restart of stage2-rca + causa-ingest"
 echo "──────────────────────────────────────────────────────"
 kubectl --context "${CONTEXT}" \
   -n stage2-rca \
@@ -102,6 +92,15 @@ kubectl --context "${CONTEXT}" \
   -n stage2-rca \
   rollout status deployment/stage2-rca --timeout=120s
 echo "✓ stage2-rca restarted"
+if kubectl --context "${CONTEXT}" -n causa-ingest get deployment causa-ingest &>/dev/null; then
+  kubectl --context "${CONTEXT}" \
+    -n causa-ingest \
+    rollout restart deployment/causa-ingest
+  kubectl --context "${CONTEXT}" \
+    -n causa-ingest \
+    rollout status deployment/causa-ingest --timeout=120s
+  echo "✓ causa-ingest restarted"
+fi
 echo ""
 
 # ── Verification ───────────────────────────────────────────

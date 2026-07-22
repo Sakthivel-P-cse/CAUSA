@@ -9,12 +9,15 @@ healthy-window statistics.
 Usage:
     python -m testbed.harness.capture_baseline \
         --namespace otel-demo --window-minutes 30 --out baselines/otel-demo.json
+    python -m testbed.harness.capture_baseline \
+        --namespace otel-demo --window-minutes 30 --out baselines/otel-demo.json --write-db
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -69,6 +72,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--prometheus-url", default=None)
     p.add_argument("--tempo-url", default=None)
     p.add_argument("--loki-url", default=None)
+    p.add_argument(
+        "--write-db",
+        action="store_true",
+        help="also upsert into anomaly_baseline (requires PG* / CAUSA_PG_DSN)",
+    )
+    p.add_argument("--dsn", default=None, help="Postgres DSN for --write-db")
     args = p.parse_args(argv)
 
     kwargs = {}
@@ -112,6 +121,13 @@ def main(argv: list[str] | None = None) -> int:
 
     save_baselines(baselines, args.out)
     logger.info("Wrote %d baselines → %s", len(baselines), args.out)
+
+    if args.write_db:
+        from ingest.trigger.state import IncidentStore, dsn_from_env
+
+        dsn = args.dsn or os.getenv("CAUSA_PG_DSN") or dsn_from_env()
+        IncidentStore(dsn=dsn).upsert_baselines(baselines)
+        logger.info("Upserted %d baselines into anomaly_baseline", len(baselines))
     return 0
 
 

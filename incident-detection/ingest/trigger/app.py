@@ -58,6 +58,12 @@ _FORWARD_RETRIES = int(os.getenv("STAGE2_FORWARD_RETRIES", "3"))
 _FORWARD_TIMEOUT = float(os.getenv("STAGE2_FORWARD_TIMEOUT", "5.0"))
 _OUTBOX_INTERVAL = float(os.getenv("STAGE2_OUTBOX_INTERVAL", "30"))
 
+ingest_snapshot_failed_total = 0
+ingest_queue_full_total = 0
+ingest_outbox_enqueued_total = 0
+ingest_outbox_sent_total = 0
+ingest_outbox_lost_total = 0
+
 
 def _default_reader_factory() -> TelemetryReader:
     return TelemetryReader.from_defaults(
@@ -99,18 +105,12 @@ class Dispatcher:
             ).start()
 
     def submit(self, alerts: list[Alert], payload: dict) -> bool:
-        """Enqueue for background processing without blocking the webhook thread.
-
-        Returns False if the queue is saturated so the caller can answer 503 and
-        let Alertmanager re-deliver — `put_nowait` raises `queue.Full`, which
-        (unguarded) would escape do_POST as a 500 and neither ACK nor retry the
-        alert (audit L3). We never stall the request thread, and never silently
-        drop the incident.
-        """
+        global ingest_queue_full_total
         try:
             self._q.put_nowait((alerts, payload))
             return True
         except queue.Full:
+            ingest_queue_full_total += 1
             logger.warning(
                 "Trigger queue saturated (maxsize=%d) — 503 for Alertmanager retry.",
                 self._q.maxsize,
@@ -128,26 +128,34 @@ class Dispatcher:
                 self._q.task_done()
 
     def _process(self, alerts: list[Alert], payload: dict) -> None:
+        opened_ok = False
         for alert in alerts:
             try:
                 if alert.is_resolved:
                     self.store.resolve_incident(
                         alert.incident_id, alert.ends_at or datetime.now(timezone.utc)
                     )
+                    opened_ok = True
                 else:
-                    self._open(alert)
-            except Exception:  # one bad alert must not sink the batch or the forward
+                    if self._open(alert):
+                        opened_ok = True
+            except Exception:
                 logger.exception("Failed handling alert %s", alert.alert_name)
-        self._forward_with_retry(payload)
+        if opened_ok:
+            self._forward_with_retry(payload)
+        else:
+            logger.error(
+                "Skipping Stage-2 forward — no successful snapshot/open in batch"
+            )
 
-    def _open(self, alert: Alert) -> None:
+    def _open(self, alert: Alert) -> bool:
+        global ingest_snapshot_failed_total
         around = alert.starts_at or datetime.now(timezone.utc)
-        # Persist the ACTUAL analysis window (matches the reader's snapshot
-        # bounds) — never a zero-width window.
         window_start = around - timedelta(minutes=_LOOKBACK_MIN)
         window_end = around + timedelta(minutes=1)
         trace_id = None
         refs: dict = {}
+        snapshot_status = "ok"
         try:
             reader = self.reader_factory()
             telem = reader.read_incident_window(
@@ -155,28 +163,52 @@ class Dispatcher:
                 alerted_service=alert.service or "unknown",
                 around=around,
                 lookback_minutes=_LOOKBACK_MIN,
-                namespace=_NAMESPACE,
+                namespace=alert.namespace or _NAMESPACE,
             )
             trace_id = telem.trace_id
             refs = telem.to_summary()
             reader.close()
         except Exception as exc:
-            logger.warning("Window snapshot failed for %s: %s", alert.incident_id, exc)
+            ingest_snapshot_failed_total += 1
+            snapshot_status = "failed"
+            logger.error(
+                "Window snapshot failed for %s: %s (snapshot_failed_total=%d)",
+                alert.incident_id,
+                exc,
+                ingest_snapshot_failed_total,
+            )
+            self.store.open_incident(
+                incident_id=alert.incident_id,
+                alert_name=alert.alert_name,
+                alerted_service=alert.service,
+                namespace=alert.namespace or _NAMESPACE,
+                node=alert.node,
+                severity=alert.severity,
+                window_start=window_start,
+                window_end=window_end,
+                trace_id=None,
+                telemetry_refs={},
+                snapshot_status=snapshot_status,
+            )
+            return False
 
         self.store.open_incident(
             incident_id=alert.incident_id,
             alert_name=alert.alert_name,
             alerted_service=alert.service,
-            namespace=alert.namespace,
+            namespace=alert.namespace or _NAMESPACE,
             node=alert.node,
             severity=alert.severity,
             window_start=window_start,
             window_end=window_end,
             trace_id=trace_id,
             telemetry_refs=refs,
+            snapshot_status=snapshot_status,
         )
+        return True
 
     def _forward_with_retry(self, payload: dict) -> None:
+        global ingest_outbox_enqueued_total, ingest_outbox_lost_total
         if not self.forward_url:
             return
         import httpx
@@ -195,13 +227,15 @@ class Dispatcher:
                 )
                 if attempt < _FORWARD_RETRIES:
                     time.sleep(min(2 ** attempt, 8))
-        # Exhausted inline retries → buffer durably so the outage can't drop it.
         try:
             self.store.enqueue_outbox(payload, last_error=last_error)
+            ingest_outbox_enqueued_total += 1
         except Exception:
+            ingest_outbox_lost_total += 1
             logger.exception("Failed to buffer Stage-2 forward to outbox — LOST")
 
     def _drain_outbox_loop(self) -> None:
+        global ingest_outbox_sent_total
         import httpx
 
         while True:
@@ -218,6 +252,7 @@ class Dispatcher:
                     )
                     resp.raise_for_status()
                     self.store.mark_outbox_sent(row["id"])
+                    ingest_outbox_sent_total += 1
                     logger.info("Drained outbox row %s to Stage-2", row["id"])
                 except Exception as exc:
                     self.store.bump_outbox_attempt(row["id"], str(exc))
@@ -245,7 +280,35 @@ class TriggerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.rstrip("/") in ("/health", "/healthz", ""):
-            self._send(200, {"status": "ok"})
+            self._send(
+                200,
+                {
+                    "status": "ok",
+                    "ingest_snapshot_failed_total": ingest_snapshot_failed_total,
+                    "ingest_queue_full_total": ingest_queue_full_total,
+                    "ingest_outbox_enqueued_total": ingest_outbox_enqueued_total,
+                    "ingest_outbox_sent_total": ingest_outbox_sent_total,
+                    "ingest_outbox_lost_total": ingest_outbox_lost_total,
+                },
+            )
+        elif self.path.rstrip("/") == "/metrics":
+            body = (
+                f"# TYPE ingest_snapshot_failed_total counter\n"
+                f"ingest_snapshot_failed_total {ingest_snapshot_failed_total}\n"
+                f"# TYPE ingest_queue_full_total counter\n"
+                f"ingest_queue_full_total {ingest_queue_full_total}\n"
+                f"# TYPE ingest_outbox_enqueued_total counter\n"
+                f"ingest_outbox_enqueued_total {ingest_outbox_enqueued_total}\n"
+                f"# TYPE ingest_outbox_sent_total counter\n"
+                f"ingest_outbox_sent_total {ingest_outbox_sent_total}\n"
+                f"# TYPE ingest_outbox_lost_total counter\n"
+                f"ingest_outbox_lost_total {ingest_outbox_lost_total}\n"
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._send(404, {"error": "not found"})
 

@@ -24,10 +24,16 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # --- Dev A+B (producers) — imported here only to construct real kernel output ---
+from fixtures.incident_d1 import load_incident_d1
 from fixtures.incident_s0 import load_incident_s0
 from fixtures.incident_s1 import load_incident_s1
+from fixtures.incident_s2 import load_incident_s2
+from fixtures.incident_s3 import load_incident_s3
+from fixtures.incident_s4 import load_incident_s4
+from fixtures.incident_s5 import load_incident_s5
 from graphs.incident_subgraph import build_incident_subgraph
 from graphs.influence_graph import build_influence_graph
+from isolation.pipeline import isolate
 from scoring.scorer import score
 
 # --- The seam ---
@@ -37,16 +43,20 @@ from adapters.isolation import IsolationView
 # --- Dev C (consumers) — must reach A/B only via contracts + adapters ---
 from classify.classifier import classify_candidate
 from remediation.router import RemediationRouter
+from eval.isolation_metrics import evaluate_isolation
 from eval.metrics import compute_metrics, subgraph_recall
 from eval.runner import EvalRunner
 from contracts import (
     ABSTENTION_FLAG,
+    DualInjectionGroundTruth,
     FaultClass,
     NodeKind,
     RankedResult,
     Role,
     RootCauseCandidate,
+    ScenarioId,
     SignalScores,
+    Weights,
 )
 
 
@@ -60,6 +70,25 @@ def _kernel_rank(loader):
     ig = build_influence_graph(sub)
     result = score(sub, ig=ig, incident_id=gt.incident_id)
     return result, gt
+
+
+def _full_pipeline(loader):
+    """Kernel → classify → remediate; returns (result, gt, pred, plan)."""
+    result, gt = _kernel_rank(loader)
+    top = result.candidates[0]
+    pred = classify_candidate(top)
+    plan = RemediationRouter().route(pred.fault_class, top, result)
+    return result, gt, pred, plan
+
+
+SCENARIO_LOADERS = [
+    ("S0", load_incident_s0),
+    ("S1", load_incident_s1),
+    ("S2", load_incident_s2),
+    ("S3", load_incident_s3),
+    ("S4", load_incident_s4),
+    ("S5", load_incident_s5),
+]
 
 
 # --------------------------------------------------------------------------- #
@@ -233,3 +262,91 @@ def test_dev_c_lane_has_no_direct_ab_imports(pkg):
         "Dev C must reach A/B only through contracts/ + adapters/. "
         f"Direct imports found: {violations}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# 9. Scenario corpus: real kernel top-1 + C3 contract on every offline path   #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("label,loader", SCENARIO_LOADERS)
+def test_kernel_top1_and_c3_on_scenario_corpus(label, loader):
+    result, gt = _kernel_rank(loader)
+    ranked = result.ranked_node_ids()
+    assert subgraph_recall(gt.true_root_node, ranked), (
+        f"{label}: expected {gt.true_root_node!r} in ranked list, got {ranked}"
+    )
+    assert ranked[0] == gt.true_root_node, f"{label}: top-1 mismatch"
+    roundtrip = RankedResult.from_dict(result.to_dict())
+    assert roundtrip.ranked_node_ids() == ranked
+
+
+# --------------------------------------------------------------------------- #
+# 10. S1 infra-origin flows through classify → remediation (stub branch)       #
+# --------------------------------------------------------------------------- #
+def test_kernel_result_flows_into_remediation_s1_infra():
+    result, gt, pred, plan = _full_pipeline(load_incident_s1)
+    assert gt.true_root_node == "node-b"
+    assert pred.fault_class == FaultClass.INFRA
+    assert plan.depth == "stub"
+    assert plan.action == "scale_restart_cordon"
+    assert plan.candidate.node_id == "node-b"
+
+
+# --------------------------------------------------------------------------- #
+# 11. Real B isolation → IsolationView → Dev C eval metrics                    #
+# --------------------------------------------------------------------------- #
+def test_b_isolation_maps_to_isolation_view_and_eval_metrics():
+    topology, traces, anomaly, gt = load_incident_s0()
+    sub = build_incident_subgraph(topology, traces, anomaly)
+    iso = isolate(sub)
+    view = IsolationView.from_isolation_result(iso, incident_id=gt.incident_id)
+    assert not view.abstained
+    assert view.cluster_count == gt.expected_cluster_count
+    dual = DualInjectionGroundTruth(
+        incident_id=gt.incident_id,
+        true_root_nodes=[gt.true_root_node],
+        fault_classes=[FaultClass(gt.fault_class)],
+        node_to_fault={gt.true_root_node: 0},
+        inject_start=gt.inject_start,
+        inject_end=gt.inject_end,
+        scenario=ScenarioId.S0,
+    )
+    metrics = evaluate_isolation([(dual, view)])
+    assert metrics.cluster_count_accuracy == 1.0
+
+
+def test_b_isolation_d1_multi_fault_through_view():
+    topology, traces, anomaly, gt = load_incident_d1()
+    sub = build_incident_subgraph(topology, traces, anomaly)
+    iso = isolate(sub)
+    view = IsolationView.from_isolation_result(iso, incident_id=gt.incident_id)
+    assert view.cluster_count == gt.expected_cluster_count == 2
+    assert len(view.ranked_lists()) == 2
+
+
+# --------------------------------------------------------------------------- #
+# 12. ABScorer accepts C4 weight overrides without breaking the seam             #
+# --------------------------------------------------------------------------- #
+def test_abscorer_respects_c4_weight_overrides():
+    custom = Weights(w_T=0.8, w_D=0.1, w_P=0.1)
+    result = ABScorer().score(
+        {"incident_id": "golden-0001"},
+        weights=custom,
+    )
+    assert isinstance(result, RankedResult)
+    assert result.candidates
+    top = result.candidates[0]
+    pred = classify_candidate(top)
+    plan = RemediationRouter().route(pred.fault_class, top, result)
+    assert plan.candidate is top
+
+
+# --------------------------------------------------------------------------- #
+# 13. S2 retry-storm: kernel ranks root first; classify needs logs for Dep.   #
+#     (known gap: SERVICE-typed roots default to AppLogic without log hints)  #
+# --------------------------------------------------------------------------- #
+def test_s2_retry_storm_kernel_ranks_root_and_pipeline_consumes():
+    result, gt, pred, plan = _full_pipeline(load_incident_s2)
+    assert result.candidates[0].node_id == gt.true_root_node == "product-catalog"
+    assert pred.fault_class in set(FaultClass)
+    assert plan.depth in {"deep", "stub"}
+    assert plan.candidate.node_id == "product-catalog"
