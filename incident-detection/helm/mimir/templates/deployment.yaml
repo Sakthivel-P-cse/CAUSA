@@ -32,6 +32,7 @@ spec:
         - name: mimir
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: {{ .Values.config.dataDir }}
           args:
             - -target=all
             - -config.file=/etc/mimir/mimir.yaml

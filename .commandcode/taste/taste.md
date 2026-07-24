@@ -1,0 +1,16 @@
+- Prefers comprehensive, exhaustive technical analysis that covers every file, module, class, function, and configuration — not high-level summaries. Confidence: 0.9
+- Wants explanations of both *what* code does AND *why* it was designed that way (design rationale, trade-offs, assumptions). Confidence: 0.9
+- Prefers structured, systematic responses organized by detailed sub-topics (e.g., numbered lists covering architecture, workflow, algorithms, data flow, configuration, error handling, performance, trade-offs). Confidence: 0.8
+- Values complete traceability of data flow across components — how data is transformed at each step and how modules communicate. Confidence: 0.8
+- Cares about algorithms, statistical methods, graph algorithms, and mathematical formulas behind the implementation. Confidence: 0.8
+- Expects explicit coverage of error handling, edge cases, fallback mechanisms, and validation logic when analyzing a system. Confidence: 0.9
+- Wants configuration parameters, thresholds, and tunable settings documented in a structured format (e.g., tables) when reviewing a system. Confidence: 0.8
+- Values discussion of performance considerations, computational complexity, and optimizations in architectural analysis. Confidence: 0.8
+- Wants explicit treatment of assumptions, limitations, and design trade-offs made in the implementation. Confidence: 0.9
+- Expects analysis to trace execution flow across files/modules and describe inter-module communication. Confidence: 0.8
+- Values understanding of how a component relates to adjacent stages in a pipeline (predecessors and successors). Confidence: 0.8
+- Expects the agent to remember/preserve project context across sessions; values continuity of understanding even when work happens on different machines or in separate sessions. Confidence: 0.8
+- Prefers the agent to proactively analyze the current project state (infer what was done before from code artifacts) and provide actionable next-step recommendations without requiring explicit step-by-step instructions. Confidence: 0.7
+- Prefers the agent to handle boilerplate setup actions (e.g., creating config files, copying templates) directly rather than just describing the steps, so the user can focus on providing sensitive/unique values. Also prefers to edit sensitive files themselves using terminal-based editors (e.g., nano) rather than having the agent modify file contents directly. Confidence: 0.7
+- Wants clear, upfront documentation of prerequisites, requirements, readiness criteria, and the exact commands to be executed before any deployment, setup, or execution steps begin — prefers to review the full plan (both "what is needed" and "what will be run") before proceeding. Confidence: 0.9
+- After reviewing a deployment/setup plan, prefers to give a single terse go-ahead (e.g., "run them") and expects the agent to autonomously execute the entire multi-step procedure — including detecting failures, diagnosing root causes, and applying fixes — without requesting intermediate confirmation for each sub-step or troubleshooting decision. Confidence: 0.8

@@ -184,7 +184,7 @@ spec:
               CREATE INDEX IF NOT EXISTS idx_remediation_events_plan
                   ON remediation_events (plan_id);
 
-              DO $$
+              DO $$$$
               BEGIN
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
                       CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
@@ -193,5 +193,5 @@ spec:
                       CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
                   END IF;
               END
-              $$;
+              $$$$;
               SQL

@@ -59,7 +59,7 @@ spec:
                 --username={{ .Values.auth.username | quote }} \
                 --dbname={{ .Values.auth.database | quote }} \
                 --set=ON_ERROR_STOP=1 <<'SQL'
-              DO $$
+              DO $$$$
               BEGIN
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
                       CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
@@ -68,7 +68,7 @@ spec:
                       CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
                   END IF;
               END
-              $$;
+              $$$$;
 
               REVOKE ALL ON SCHEMA groundtruth FROM PUBLIC;
               REVOKE ALL ON ALL TABLES IN SCHEMA groundtruth FROM PUBLIC;

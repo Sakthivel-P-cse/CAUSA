@@ -1,2 +1,0 @@
-live_eval n=13 scored=13 top1=0.154 top3=0.154 mrr=0.154 failure_type_null_rate=0.846 failure_type_match=1.000
-wrote /home/bhuvi/PROJECTS/causa/outputs/c/live_eval.json
