@@ -21,6 +21,27 @@ from contracts import (
 logger = logging.getLogger(__name__)
 
 
+def operator_root_cause_summary(
+    *,
+    top_node: str | None,
+    alert_name: str | None,
+    alerted_service: str | None,
+    role: Role | None,
+    abstain_reason: str | None,
+) -> str:
+    """Short operator-facing summary; candidate.explanation stays technical."""
+    if top_node is None:
+        return f"RCA abstained: {abstain_reason or 'no candidates'}"
+    alert = alert_name or "the alert"
+    role_label = (role.value if role is not None else "origin").replace("_", " ")
+    if alerted_service:
+        return (
+            f"{top_node} is the top {role_label} candidate for {alert} "
+            f"on {alerted_service}"
+        )
+    return f"{top_node} is the top {role_label} candidate for {alert}"
+
+
 def _libpq_kv(key: str, value: str) -> str:
     escaped = str(value).replace("\\", "\\\\").replace("'", "\\'")
     return f"{key}='{escaped}'"
@@ -177,10 +198,12 @@ class RCAStore:
             if output.first_deviation is not None
         ]
         timeline.sort(key=lambda event: (event["timestamp"], event["service"]))
-        summary = (
-            f"Top root-cause candidate: {top.node_id}. {top.explanation}"
-            if top is not None
-            else f"RCA abstained: {result.abstain_reason or 'no candidates'}"
+        summary = operator_root_cause_summary(
+            top_node=top.node_id if top is not None else None,
+            alert_name=incident.alert_name,
+            alerted_service=incident.alerted_service,
+            role=top.role if top is not None else None,
+            abstain_reason=result.abstain_reason,
         )
 
         with self._connect() as conn:

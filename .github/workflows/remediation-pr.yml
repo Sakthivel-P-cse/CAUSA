@@ -1,0 +1,52 @@
+name: Remediation PR CI
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "remediation-sandbox/**"
+      - "incident-detection/remediation/**"
+  push:
+    branches: ["causa/fix-*"]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax-check sandbox + remediation modules
+        run: |
+          python -m compileall remediation-sandbox incident-detection/remediation -q
+      - name: Rules-only propose smoke
+        working-directory: incident-detection
+        env:
+          CAUSA_NIM_ENABLED: "0"
+          PYTHONPATH: "."
+        run: |
+          python - <<'PY'
+          from remediation.service import propose_for_report, apply_plan_v1
+          report = {
+            "incident_id": "ci-smoke",
+            "alert_name": "HighErrorRate",
+            "alerted_service": "checkout",
+            "root_cause_service": "checkout",
+            "origin_candidates": [{
+              "node_id": "checkout",
+              "node_kind": "service",
+              "score": 1.0,
+              "confidence": 0.9,
+              "role": "origin",
+              "signals": {"T": 1, "D": 1, "P": 1},
+              "dev_vector": {"error_rate": 0.7},
+              "explanation": "exception panic",
+            }],
+          }
+          out = propose_for_report(report)
+          assert out["ok"], out
+          applied = apply_plan_v1(out["plan"], breach=False)
+          assert applied.get("attempted"), applied
+          print("ok", out["plan"]["fault_class"], applied.get("mode"))
+          PY

@@ -190,7 +190,9 @@ class Dispatcher:
                 telemetry_refs={},
                 snapshot_status=snapshot_status,
             )
-            return False
+            # Still open + forward Stage-2 even when the telemetry snapshot fails;
+            # otherwise AppLogic/error-rate alerts never become RCA incidents.
+            return True
 
         self.store.open_incident(
             incident_id=alert.incident_id,

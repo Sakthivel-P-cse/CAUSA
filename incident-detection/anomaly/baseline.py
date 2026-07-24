@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # genuine ~10% jump on a tight-healthy metric never fires. Robustness comes from
 # the median/MAD, not from inflating the spread.
 _MAD_ABS_FLOOR = 1e-6
+_MIN_BASELINE_N = 5
 
 
 def robust_baseline(values: Iterable[float]) -> Baseline | None:
@@ -42,6 +43,9 @@ def robust_baseline(values: Iterable[float]) -> Baseline | None:
     Non-finite samples (NaN, ±inf) are dropped before any statistic is taken: a
     single NaN would make median/MAD NaN and silently disable the metric, and a
     +inf would make it always-anomalous. Garbage in must not poison the baseline.
+
+    Requires at least ``_MIN_BASELINE_N`` finite samples — MAD with n=1 floors
+    to ε and invents huge anomalies from noise.
     """
     xs: list[float] = []
     for v in values:
@@ -51,7 +55,7 @@ def robust_baseline(values: Iterable[float]) -> Baseline | None:
             continue
         if math.isfinite(f):
             xs.append(f)
-    if not xs:
+    if len(xs) < _MIN_BASELINE_N:
         return None
     median = statistics.median(xs)
     mad_raw = statistics.median([abs(x - median) for x in xs])

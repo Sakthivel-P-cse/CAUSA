@@ -11,11 +11,37 @@ from contracts import (
     SignalScores,
 )
 from graphs.influence_graph import InfluenceGraph
+from ingest.service_scope import is_system_infra_host
 from rca.types import KernelAnomaly
 
+from .fitted_weights import apply_calibration_map, load_calibration_map
 from .signals import NodeSignals, SignalResult
 
 EPS = 1e-9
+_SYSTEM_INFRA_SCORE_SCALE = 0.01
+
+
+def demote_system_infra_hosts(
+    candidates: list[RootCauseCandidate],
+) -> list[RootCauseCandidate]:
+    """Crush Kind/k8s control-plane hosts so they cannot win app-service RCA."""
+    if not candidates:
+        return candidates
+    changed = False
+    for candidate in candidates:
+        if not is_system_infra_host(candidate.node_id):
+            continue
+        if candidate.node_kind not in (NodeKind.INFRA, NodeKind.SERVICE):
+            # INFRA is expected; still demote any matching host id.
+            pass
+        candidate.score *= _SYSTEM_INFRA_SCORE_SCALE
+        candidate.flags["demoted_system_infra"] = True
+        changed = True
+    if not changed:
+        return candidates
+    ranked = sorted(candidates, key=lambda c: (-c.score, c.node_id))
+    stamp_confidence(ranked)
+    return ranked
 
 
 def _fmt(x: float) -> str:
@@ -155,10 +181,14 @@ def resolve_origins(candidates: list[RootCauseCandidate]) -> None:
 
 
 def stamp_confidence(candidates: list[RootCauseCandidate]) -> None:
-    """Raw confidence from spec §5 (isotonic/ECE calibration is Dev C).
+    """Margin confidence from spec §5, optionally isotonic-mapped from fit artifact.
 
     Top: ``S(top) * (S(top) - S(second)) / (S(top) + ε)``, exactly per spec.
     Others: the same local-margin formula, then clamped by a running minimum.
+
+    When ``load_calibration_map()`` returns a non-degenerate mapping (≥10 points,
+    non-constant), each raw value is passed through that map before the monotone
+    clamp. Missing/unsafe artifacts leave raw confidence unchanged.
 
     The clamp enforces the invariant the raw formula violates: confidence must
     be non-increasing with rank. Without it a mid-list candidate sitting above
@@ -170,13 +200,15 @@ def stamp_confidence(candidates: list[RootCauseCandidate]) -> None:
 
     Callers MUST pass ``candidates`` already sorted by descending score.
     """
+    mapping = load_calibration_map()
     n = len(candidates)
     ceiling = float("inf")
     for i, c in enumerate(candidates):
         next_score = candidates[i + 1].score if i + 1 < n else 0.0
         margin = max(0.0, c.score - next_score)
         raw = c.score * margin / (c.score + EPS)
-        c.confidence = min(raw, ceiling)
+        conf = apply_calibration_map(raw, mapping) if mapping else raw
+        c.confidence = min(conf, ceiling)
         ceiling = c.confidence
 
 

@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  color-scheme: dark;
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --sidebar-width: 224px;
+  --topbar-height: 58px;
+  --control-height: 34px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --focus: #78a9ff;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg-0: #f5f6f8;
+  --bg-1: #ffffff;
+  --bg-2: #eef0f4;
+  --panel: #ffffff;
+  --panel-2: #f3f4f7;
+  --line: #c8ccd4;
+  --line-soft: #dfe2e8;
+  --text: #20222a;
+  --muted: #555b68;
+  --muted-2: #666d7a;
+  --accent: #5b44d6;
+  --accent-2: #3b63cf;
+  --info: #1769aa;
+  --danger: #b42335;
+  --warn: #8b5b00;
+  --good: #16784a;
+  --shadow-1: 0 4px 14px rgb(20 25 35 / 8%);
+  --shadow-2: 0 10px 30px rgb(20 25 35 / 12%);
+}
+
+:root[data-density='compact'] {
+  --control-height: 28px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+

@@ -75,12 +75,22 @@ class RemediationRouter:
             FaultClass.INFRA: "scale_restart_cordon",
             FaultClass.RESOURCE: "scale_up",
             FaultClass.DATA: "alert_only",
-        }[fault_class]
+        }.get(fault_class, "alert_only")
+        if fault_class == FaultClass.INFRA:
+            details["runbook"] = (
+                f"Cordon/drain or restart workloads on infra node {candidate.node_id}; "
+                "verify node-exporter CPU/memory before re-admit."
+            )
+        elif fault_class == FaultClass.RESOURCE:
+            details["runbook"] = (
+                f"Scale up or raise memory/CPU limits for {candidate.node_id} "
+                "(allowlisted namespaces only)."
+            )
         return RemediationPlan(
             fault_class=fault_class,
             action=action,
             depth="stub",
-            summary=details["summary"],
+            summary=details.get("summary") or f"Stub remediation for {fault_class.value}",
             details=details,
             candidate=candidate,
         )

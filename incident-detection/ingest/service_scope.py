@@ -48,6 +48,7 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"alertmanager|"
     r"coredns(?:$|-.*)|"
     r"etcd(?:$|-.*)|"
+    r"envoy(?:$|-.*)|"  # bare OTel graph peer; use frontend-proxy / app names instead
     r"grafana|"
     r"kindnet(?:$|-.*)|"
     r"kube(?:$|-.*)|"
@@ -78,6 +79,16 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
 _REPLICASET_POD_RE = re.compile(r"^(?P<base>.+)-[a-f0-9]{8,10}-[a-z0-9]{5}$", re.IGNORECASE)
 _STATEFULSET_POD_RE = re.compile(r"^(?P<base>.+)-\d+$")
 _DAEMONSET_POD_RE = re.compile(r"^(?P<base>.+)-[a-z0-9]{5}$", re.IGNORECASE)
+_UNKNOWN_SERVICE_PREFIX_RE = re.compile(r"^unknown_service:(?P<rest>.+)$", re.IGNORECASE)
+_SYSTEM_INFRA_HOST_RE = re.compile(
+    r"(?:^|-)(?:control-plane|master)$",
+    re.IGNORECASE,
+)
+_SYSTEM_INFRA_HOST_NAMES = frozenset({
+    "kind-control-plane",
+    "minikube",
+    "docker-desktop",
+})
 
 
 @lru_cache(maxsize=1)
@@ -105,6 +116,43 @@ def _excluded_services_re() -> re.Pattern[str] | None:
         return re.compile(_DEFAULT_EXCLUDED_SERVICES_RE, re.IGNORECASE)
 
 
+def normalize_service_name(service: str | None) -> str | None:
+    """
+    Clean Alertmanager / Prom service-graph labels into a usable service id.
+
+    - `unknown_service:checkout` → `checkout`
+    - path-like junk (`/nodejs/bin/node`) → `unknown`
+    - bare `unknown_service` → `unknown`
+    """
+    if not service:
+        return None
+    value = service.strip()
+    if not value:
+        return None
+    match = _UNKNOWN_SERVICE_PREFIX_RE.match(value)
+    if match:
+        value = match.group("rest").strip()
+    if not value:
+        return None
+    if value.lower() in {"unknown_service", "unknown", "none", "n/a"}:
+        return "unknown"
+    if value.startswith("/") or "/" in value:
+        return "unknown"
+    return value
+
+
+def is_system_infra_host(name: str | None) -> bool:
+    """True for Kind/k8s control-plane style hosts that must not win app RCA."""
+    if not name:
+        return False
+    value = name.strip()
+    if not value:
+        return False
+    if value.lower() in _SYSTEM_INFRA_HOST_NAMES:
+        return True
+    return bool(_SYSTEM_INFRA_HOST_RE.search(value))
+
+
 def _service_name_label_keys() -> list[str]:
     keys_env = os.getenv(
         "CAUSA_SERVICE_NAME_LABEL_KEYS",
@@ -129,20 +177,24 @@ def excluded_services_pattern() -> str:
 
 def extract_service_from_labels(labels: dict[str, str]) -> str | None:
     """Best-effort service extraction from Alertmanager / stream labels."""
+    raw: str | None = None
     for key in _service_name_label_keys():
         if val := labels.get(key):
-            return val
+            raw = val
+            break
 
-    # Fallbacks if none of the above match
-    if server := labels.get("server"):
-        return server
-    if pod := labels.get("pod"):
-        parts = pod.rsplit("-", 2)
-        return parts[0] if len(parts) >= 3 else pod
-    if inst := labels.get("instance"):
-        return inst
-    return labels.get("namespace")
+    if raw is None:
+        if server := labels.get("server"):
+            raw = server
+        elif pod := labels.get("pod"):
+            parts = pod.rsplit("-", 2)
+            raw = parts[0] if len(parts) >= 3 else pod
+        elif inst := labels.get("instance"):
+            raw = inst
+        else:
+            raw = labels.get("namespace")
 
+    return normalize_service_name(raw)
 
 def infer_service_name_from_pod(pod_name: str | None) -> str | None:
     """Infer a stable service/controller name from a Kubernetes pod name."""

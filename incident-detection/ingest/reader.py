@@ -26,6 +26,7 @@ from .adapters import TelemetryAdapter
 from .clients.loki_client import LokiClient
 from .clients.prometheus_client import PrometheusClient
 from .clients.tempo_client import TempoClient
+from .service_scope import is_system_infra_host
 from .topology import build_topology, stamp_service_edges
 
 logger = logging.getLogger(__name__)
@@ -206,6 +207,10 @@ class TelemetryReader:
             for host in sorted(
                 {n.name for n in telemetry.infra_nodes if n.kind == "node" and n.name}
             ):
+                # Kind/k8s control-plane hosts co-locate every pod and inject
+                # noisy CPU/mem — skip scoring them so they cannot win app RCA.
+                if is_system_infra_host(host):
+                    continue
                 for metric in _INFRA_METRICS:
                     point = adapter.metric_point(host, metric, window, kind="infra")
                     if point is not None:

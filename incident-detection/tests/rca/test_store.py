@@ -116,8 +116,14 @@ def test_store_uses_only_engine_tables_and_writes_report():
     assert "insert into rca_reports" in sql
     insert_params = connection.executed[-1][1]
     assert insert_params[3] == "checkout"
+    assert insert_params[6] == (
+        "checkout is the top origin candidate for ServiceHighErrorRate on checkout"
+    )
     assert json.loads(insert_params[7])[0]["node_id"] == "checkout"
     assert insert_params[13] == 0.8
+    # Technical T/D/P explanation must remain on the candidate, not the summary.
+    assert "T=" not in insert_params[6]
+    assert "deviated first" in json.loads(insert_params[7])[0]["explanation"]
 
 
 def test_default_dsn_enforces_restricted_role(monkeypatch):

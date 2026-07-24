@@ -326,6 +326,7 @@ def isolate(
     theta_low: float = THETA_LOW,
     weights: dict[str, float] | None = None,
     enabled_signals: Iterable[str] | None = None,
+    alerted_service: str | None = None,
 ) -> IsolationResult:
     """`weights` / `enabled_signals` pass straight through to `score`, so an
     ablation or sweep can run the real production path rather than bypassing
@@ -374,6 +375,7 @@ def isolate(
             ig=cluster_ig,
             anomaly=anomaly,
             horizon=shared_horizon,
+            alerted_service=alerted_service,
         )
         # Stamp cluster_id
         for c in result.candidates:

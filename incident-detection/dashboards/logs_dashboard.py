@@ -28,8 +28,8 @@ LOKI_URL = "http://localhost:3100"
 DASHBOARD_PORT = 5001
 REFRESH_SECONDS = 10
 
-# Promtail uses job=kubernetes-pods for all pod logs
-LOKI_QUERY = '{job=~"kubernetes-pods.*"}'
+# OTel → Loki uses service/job labels (not necessarily kubernetes-pods)
+LOKI_QUERY = '{job=~".+"}'
 
 # ─── HTML template ────────────────────────────────────────────────────────────
 HTML_TEMPLATE = """<!DOCTYPE html>

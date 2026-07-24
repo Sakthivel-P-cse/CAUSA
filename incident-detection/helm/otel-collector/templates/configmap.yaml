@@ -54,6 +54,9 @@ data:
           - action: insert
             key: deployment.environment
             value: {{ .Release.Namespace }}
+          - action: upsert
+            key: service.name
+            from_attribute: k8s.deployment.name
 
       # ── Tail sampling (gateway-only) ───────────────────────────────
       # Decides which whole traces to keep AFTER all spans arrive.

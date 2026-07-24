@@ -1,0 +1,17 @@
+replicaCount: 1
+image:
+  repository: causa/dashboard
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 8090
+env:
+  PROMETHEUS_URL: http://prometheus.prometheus.svc.cluster.local:9090
+  LOKI_URL: http://loki.loki.svc.cluster.local:3100
+  TEMPO_URL: http://tempo.tempo.svc.cluster.local:3200
+  PGHOST: postgres.postgres.svc.cluster.local
+  PGPORT: "5432"
+  PGDATABASE: causa
+  PGUSER: rca_engine
+resources: {}

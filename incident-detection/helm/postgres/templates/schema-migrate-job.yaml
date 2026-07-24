@@ -154,6 +154,36 @@ spec:
               CREATE INDEX IF NOT EXISTS idx_stage2_outbox_pending
                   ON stage2_outbox (id) WHERE sent_at IS NULL;
 
+              CREATE TABLE IF NOT EXISTS remediation_plans (
+                  id              TEXT PRIMARY KEY,
+                  incident_id     TEXT NOT NULL,
+                  report_id       TEXT,
+                  candidate_node  TEXT,
+                  fault_class     TEXT,
+                  action          TEXT,
+                  depth           TEXT,
+                  summary         TEXT,
+                  details         JSONB,
+                  status          TEXT NOT NULL DEFAULT 'proposed',
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  decided_at      TIMESTAMPTZ,
+                  decided_by      TEXT,
+                  apply_result    JSONB
+              );
+              CREATE INDEX IF NOT EXISTS idx_remediation_plans_status
+                  ON remediation_plans (status);
+              CREATE INDEX IF NOT EXISTS idx_remediation_plans_incident
+                  ON remediation_plans (incident_id);
+              CREATE TABLE IF NOT EXISTS remediation_events (
+                  id          TEXT PRIMARY KEY,
+                  plan_id     TEXT NOT NULL,
+                  event_type  TEXT NOT NULL,
+                  payload     JSONB,
+                  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+              CREATE INDEX IF NOT EXISTS idx_remediation_events_plan
+                  ON remediation_events (plan_id);
+
               DO $$
               BEGIN
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN

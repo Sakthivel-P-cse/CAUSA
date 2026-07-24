@@ -1,15 +1,12 @@
 """Structural fault-class floor for the top candidate.
 
-`RankedResult.fault_class` was never assigned anywhere in the RCA path, so it
-defaulted to None and `store.insert_report` wrote NULL into `rca_reports
-.failure_type` on every report — a column with a dedicated index and a
-documented enum constraint.
+This module assigns only classes the scoring kernel can justify from graph
+structure and dominant metrics. Full classification (AppLogic / Config / Data /
+Timing / …) lives in ``classify.classifier.FaultClassifier`` and optional NIM
+merge in remediation — not here.
 
-Full classification is Dev C's target (see `contracts.ground_truth.FaultClass`),
-and this module deliberately does NOT try to be that classifier. It assigns only
-the classes the kernel can already justify from structure it computed itself,
-and returns None everywhere else rather than guessing. A NULL that means "not
-classified" is honest; a wrong label that looks authoritative is not.
+``RankedResult.fault_class`` and Postgres ``rca_reports.failure_type`` store
+``FaultClass`` string values (see ``contracts.ground_truth.FaultClass``).
 
 Assigned here:
   Infra      — the top candidate is a HOST (something runs on it).
@@ -17,13 +14,10 @@ Assigned here:
   Resource   — the top candidate's dominant deviating metric is a resource one
                (cpu / saturation) rather than a RED symptom.
 
-Everything else (AppLogic vs Config vs Data) needs evidence the kernel does not
-currently gather — log content, config/deploy history, schema and query shape —
-so it stays None until Dev C's classifier lands.
-
-The layer rules come first because node kind is structural evidence about WHAT
-failed, while the dominant metric only says HOW it presented; a saturated host
-is an Infra fault, not a Resource one, which is what the S1/S5 ground truth says.
+Everything else stays None rather than guessing. Layer rules come first because
+node kind is structural evidence about WHAT failed, while the dominant metric
+only says HOW it presented; a saturated host is an Infra fault, not a Resource
+one, which is what the S1/S5 ground truth says.
 """
 
 from __future__ import annotations

@@ -66,8 +66,22 @@ class ClassificationResult:
 def classify_candidate(
     candidate: RootCauseCandidate,
     log_messages: Sequence[str] | None = None,
+    *,
+    alert_name: str | None = None,
+    rca_failure_type: str | None = None,
 ) -> ClassificationResult:
+    if rca_failure_type:
+        for fc in CLASSIFICATION_TARGETS:
+            if fc.value.lower() == str(rca_failure_type).lower():
+                return ClassificationResult(
+                    fault_class=fc,
+                    scores={k.value: (2.0 if k == fc else 0.0) for k in CLASSIFICATION_TARGETS},
+                    rationale=f"class={fc.value} from rca.failure_type",
+                )
+
     logs = list(log_messages or [])
+    if alert_name:
+        logs = [str(alert_name), *logs]
     combined: dict[FaultClass, float] = {fc: 0.0 for fc in CLASSIFICATION_TARGETS}
     for part in (
         _score_from_logs(logs),
@@ -76,6 +90,15 @@ def classify_candidate(
     ):
         for fc, v in part.items():
             combined[fc] += v
+
+    # When RCA left failure_type NULL, lean on alert naming for AppLogic/Config/Resource.
+    alert = str(alert_name or "").lower()
+    if "crashloop" in alert or "oom" in alert:
+        combined[FaultClass.RESOURCE] += 1.2
+    if "flag" in alert or "config" in alert:
+        combined[FaultClass.CONFIG] += 1.0
+    if "error" in alert or "exception" in alert or "fail" in alert:
+        combined[FaultClass.APP_LOGIC] += 0.6
 
     best = max(
         CLASSIFICATION_TARGETS,
@@ -108,6 +131,17 @@ class FaultClassifier:
     def __init__(self, logs_by_node: dict[str, list[str]] | None = None):
         self.logs_by_node = logs_by_node or {}
 
-    def classify(self, candidate: RootCauseCandidate) -> ClassificationResult:
+    def classify(
+        self,
+        candidate: RootCauseCandidate,
+        *,
+        alert_name: str | None = None,
+        rca_failure_type: str | None = None,
+    ) -> ClassificationResult:
         msgs = self.logs_by_node.get(candidate.node_id, [])
-        return classify_candidate(candidate, msgs)
+        return classify_candidate(
+            candidate,
+            msgs,
+            alert_name=alert_name,
+            rca_failure_type=rca_failure_type,
+        )

@@ -65,6 +65,7 @@ def build_incident_subgraph(
     *,
     theta_fire: float = THETA_FIRE,
     theta_low: float = THETA_LOW,
+    force_include: set[str] | None = None,
 ) -> IncidentSubgraph:
     """Include a node if ANY inclusion rule fires (spec §1.1)."""
     scores = anomaly.anomaly_score
@@ -120,6 +121,11 @@ def build_incident_subgraph(
     # Always keep seeds from fire/trace/resource.
     included |= seeds
 
+    # Always keep the alerted service (and any other forced nodes) so Stage-2
+    # can still rank when metrics are thin and Kind control-plane is demoted.
+    forced = {nid for nid in (force_include or set()) if nid and nid in by_id}
+    included |= forced
+
     nodes = {nid: by_id[nid] for nid in included if nid in by_id}
     edges = [
         e
@@ -136,6 +142,7 @@ def build_incident_subgraph(
         if scores.get(nid, 0.0) > theta_fire
         or resource.get(nid, False)
         or nid in trace_participants
+        or nid in forced
     }
 
     return IncidentSubgraph(

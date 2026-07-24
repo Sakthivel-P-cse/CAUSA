@@ -1,0 +1,75 @@
+
+> causa-dashboard@1.0.0 dev
+> vite --host 0.0.0.0 --port 5174 --strictPort
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+  VITE v5.4.21  ready in 137 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: http://10.10.13.220:5174/
+  ➜  Network: http://172.26.0.1:5174/
+  ➜  Network: http://172.20.0.1:5174/
+9:24:54 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+9:24:58 AM [vite] hmr update /src/pages/Overview.jsx, /src/components/watchdog/InsightCard.jsx, /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+9:24:58 AM [vite] hmr invalidate /src/components/watchdog/InsightCard.jsx Could not Fast Refresh ("incidentPriority" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+9:24:58 AM [vite] hmr update /src/pages/Overview.jsx
+9:25:01 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+9:25:04 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+9:25:08 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+9:25:10 AM [vite] hmr update /src/components/watchdog/RcaStory.jsx
+9:25:13 AM [vite] hmr update /src/components/watchdog/RcaStory.jsx
+9:25:14 AM [vite] hmr update /src/styles/theme.css
+9:25:32 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+10:28:33 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:28:34 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+10:28:42 AM [vite] hmr update /src/pages/Overview.jsx
+10:30:45 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:30:47 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:30:47 AM [vite] hmr update /src/pages/Overview.jsx
+10:30:47 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:30:53 AM [vite] hmr update /src/pages/Overview.jsx
+10:30:53 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+10:31:48 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:31:50 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+10:31:50 AM [vite] hmr update /src/pages/Overview.jsx
+10:51:50 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:51:50 AM [vite] hmr update /src/components/watchdog/RcaStory.jsx
+10:51:59 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx, /src/components/watchdog/RcaStory.jsx
+10:52:29 AM [vite] hmr update /src/components/watchdog/ConfidenceBadge.jsx
+10:52:29 AM [vite] hmr invalidate /src/components/watchdog/ConfidenceBadge.jsx Could not Fast Refresh ("confidenceBand" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:52:29 AM [vite] page reload src/components/watchdog/ConfidenceBadge.jsx
+10:52:29 AM [vite] hmr update /src/pages/IncidentInvestigation.jsx
+10:52:41 AM [vite] hmr update /src/components/watchdog/InsightCard.jsx
+10:53:08 AM [vite] hmr update /src/components/watchdog/IncidentTable.jsx
+10:53:15 AM [vite] hmr update /src/pages/Overview.jsx
+10:53:36 AM [vite] hmr update /src/styles/theme.css
+10:53:43 AM [vite] hmr update /src/pages/IncidentInbox.jsx
+10:53:47 AM [vite] hmr update /src/pages/RemediationQueue.jsx
+10:53:50 AM [vite] hmr update /src/pages/RemediationReview.jsx
+10:53:51 AM [vite] hmr update /src/pages/RemediationReview.jsx
+10:53:51 AM [vite] hmr update /src/context/DashboardContext.jsx
+10:53:51 AM [vite] hmr invalidate /src/context/DashboardContext.jsx Could not Fast Refresh ("useDashboard" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:53:51 AM [vite] page reload src/context/DashboardContext.jsx
+10:53:51 AM [vite] hmr update /src/context/DashboardContext.jsx
+10:53:51 AM [vite] hmr invalidate /src/context/DashboardContext.jsx Could not Fast Refresh ("useDashboard" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+10:53:51 AM [vite] page reload src/context/DashboardContext.jsx
+10:54:17 AM [vite] hmr update /src/components/Common.jsx
+10:54:36 AM [vite] hmr update /src/pages/Metrics.jsx
+10:54:37 AM [vite] hmr update /src/pages/Metrics.jsx
+10:54:42 AM [vite] hmr update /src/pages/Logs.jsx
+10:54:43 AM [vite] hmr update /src/pages/Logs.jsx
+10:54:43 AM [vite] hmr update /src/pages/Traces.jsx
+10:54:44 AM [vite] hmr update /src/pages/Traces.jsx
+10:54:50 AM [vite] hmr update /src/pages/Metrics.jsx
+10:54:50 AM [vite] hmr update /src/App.jsx
+10:54:52 AM [vite] hmr update /src/App.jsx
+10:55:03 AM [vite] hmr update /src/styles/theme.css
+10:55:03 AM [vite] hmr update /src/pages/Metrics.jsx
+10:55:04 AM [vite] hmr update /src/components/watchdog/HealthSummary.jsx
+11:00:06 AM [vite] hmr update /src/styles/theme.css
+11:00:06 AM [vite] hmr update /src/pages/IncidentInbox.jsx
+11:00:32 AM [vite] hmr update /src/pages/IncidentInbox.jsx
+11:00:53 AM [vite] hmr update /src/context/DashboardContext.jsx
+11:00:53 AM [vite] hmr invalidate /src/context/DashboardContext.jsx Could not Fast Refresh ("useDashboard" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+11:00:53 AM [vite] page reload src/context/DashboardContext.jsx

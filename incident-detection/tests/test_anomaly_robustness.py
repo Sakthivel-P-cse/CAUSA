@@ -32,11 +32,18 @@ def test_mad_floor_does_not_halve_sensitivity():
 
 
 def test_robust_baseline_drops_nan_and_inf():
-    b = robust_baseline([100.0, float("nan"), 101.0, float("inf"), 99.0])
+    b = robust_baseline(
+        [100.0, float("nan"), 101.0, float("inf"), 99.0, 100.5, 98.5]
+    )
     assert b is not None
     assert math.isfinite(b.median) and math.isfinite(b.mad)
-    assert b.n == 3                          # the two non-finite samples dropped
+    assert b.n == 5
     assert robust_baseline([float("nan"), float("inf")]) is None
+
+
+def test_robust_baseline_rejects_too_few_samples():
+    assert robust_baseline([100.0, 101.0, 99.0, 100.5]) is None
+    assert robust_baseline([100.0] * 5) is not None
 
 
 def test_first_deviation_is_time_adjacent():

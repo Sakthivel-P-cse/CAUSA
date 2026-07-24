@@ -29,7 +29,7 @@ from rca.types import KernelAnomaly
 from .arbitration import arbitrate
 from .fault_class import derive_fault_class
 from .fitted_weights import load_fitted_weights
-from .output import build_candidates, resolve_origins, stamp_confidence
+from .output import build_candidates, demote_system_infra_hosts, resolve_origins, stamp_confidence
 from .signals import compute_signals
 
 
@@ -38,7 +38,13 @@ def _default_weight_dict() -> dict[str, float]:
     return {"T": w.w_T, "D": w.w_D, "P": w.w_P}
 
 
-DEFAULT_WEIGHTS: dict[str, float] = _default_weight_dict()
+def default_weights() -> dict[str, float]:
+    """Call-time defaults from fit artifact (equal thirds when missing/rejected)."""
+    return _default_weight_dict()
+
+
+# Boot snapshot for importers; ``score()`` always reloads via ``default_weights()``.
+DEFAULT_WEIGHTS: dict[str, float] = {"T": 1.0 / 3.0, "D": 1.0 / 3.0, "P": 1.0 / 3.0}
 ALL_SIGNALS = frozenset({"T", "D", "P"})
 
 
@@ -54,6 +60,7 @@ def score(
     incident_id: str = "",
     seed_ids: set[str] | None = None,
     horizon: float | None = None,
+    alerted_service: str | None = None,
 ) -> RankedResult:
     """Deterministic RCA scoring over an incident subgraph (C4).
 
@@ -91,7 +98,7 @@ def score(
     repeatedly with varying weights / signal subsets for ablation sweeps.
     No tuning logic lives here.
     """
-    weights = dict(weights or DEFAULT_WEIGHTS)
+    weights = dict(weights if weights is not None else _default_weight_dict())
     enabled = set(enabled_signals) if enabled_signals is not None else set(ALL_SIGNALS)
     enabled &= set(ALL_SIGNALS)
 
@@ -122,11 +129,19 @@ def score(
         raw_scores[nid] = s
 
     candidates = build_candidates(signals, raw_scores, anomaly, ig)
+    candidates = demote_system_infra_hosts(candidates)
 
     if run_arbitration:
-        candidates = arbitrate(candidates, ig, anomaly, top_c=top_c)
+        candidates = arbitrate(
+            candidates,
+            ig,
+            anomaly,
+            top_c=top_c,
+            alerted_service=alerted_service,
+        )
         # Re-stamp confidence after possible score swaps / reordering.
         stamp_confidence(candidates)
+        candidates = demote_system_infra_hosts(candidates)
 
     # ORIGIN is a claim about the incident, so it can only be settled once the
     # ranking is final — including any arbitration reorder above.
@@ -136,7 +151,7 @@ def score(
         candidates=candidates,
         incident_id=incident_id,
         # Structural floor only — None when the kernel can't justify a class.
-        # Full classification is Dev C's; see scoring.fault_class.
+        # Full classification: classify.classifier / remediation NIM merge.
         fault_class=derive_fault_class(candidates, ig),
     )
 

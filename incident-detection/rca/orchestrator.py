@@ -14,6 +14,7 @@ from graphs import build_incident_subgraph, build_influence_graph
 from ingest.reader import TelemetryReader
 from isolation import isolate
 from scoring.fault_class import derive_fault_class
+from scoring.output import demote_system_infra_hosts, resolve_origins, stamp_confidence
 
 from .adapter import adapt_incident
 from .store import IncidentState, RCAStore
@@ -154,6 +155,11 @@ class RCAOrchestrator:
             kernel_input.anomaly,
             theta_fire=self.thresholds.theta_fire,
             theta_low=self.thresholds.theta_low,
+            force_include=(
+                {state.alerted_service}
+                if state.alerted_service and state.alerted_service != "unknown"
+                else None
+            ),
         )
 
         if not subgraph.nodes:
@@ -169,6 +175,7 @@ class RCAOrchestrator:
                 ig=influence,
                 anomaly=kernel_input.anomaly,
                 theta_low=self.thresholds.theta_low,
+                alerted_service=state.alerted_service,
             )
             if isolated.abstain_reason:
                 result = RankedResult(
@@ -183,6 +190,9 @@ class RCAOrchestrator:
                     for candidate in ranked.candidates
                 ]
                 candidates.sort(key=lambda candidate: (-candidate.score, candidate.node_id))
+                candidates = demote_system_infra_hosts(candidates)
+                resolve_origins(candidates)
+                stamp_confidence(candidates)
                 fault_class = None
                 if candidates:
                     top_id = candidates[0].node_id
