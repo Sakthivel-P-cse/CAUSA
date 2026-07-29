@@ -13,20 +13,66 @@ jobs:
     defaults:
       run:
         working-directory: incident-detection
+    # Real Postgres so the infra-handoff blockers are proven, not skipped. The
+    # `ON CONFLICT (incident_id) WHERE incident_id IS NOT NULL` clause infers a
+    # partial unique index and is invisible to the fake-cursor unit tests — it
+    # can only be validated by a server that actually parses it.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: causa_ci
+          POSTGRES_PASSWORD: causa_ci
+          POSTGRES_DB: causa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U causa_ci -d causa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Helm is needed early: the schema below is rendered from the postgres
+      # chart so CI loads the same DDL the cluster does.
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
       - name: Install package + deps
         run: |
-          pip install -e ".[dev]"
+          pip install -e ".[dev,trigger]"
           pip install -r requirements-devc.txt
           pip install pip-audit
+      - name: Load Causa schema into CI Postgres
+        working-directory: ${{ github.workspace }}
+        env:
+          PGPASSWORD: causa_ci
+        run: |
+          ./scripts/render-schema.sh \
+            | psql -h 127.0.0.1 -p 5432 -U causa_ci -d causa_test -v ON_ERROR_STOP=1 -f -
       - name: Python dependency audit
         run: pip-audit
       - name: Full Python test suite
+        # CAUSA_TEST_PG_DSN un-skips the infra-handoff blockers: the ON CONFLICT
+        # partial-index clause is exercised against a server that parses it.
+        env:
+          CAUSA_TEST_PG_DSN: postgresql://causa_ci:causa_ci@127.0.0.1:5432/causa_test
         run: PYTHONPATH=. pytest -q tests
+      - name: Assert the Postgres blocker actually ran (not silently skipped)
+        env:
+          CAUSA_TEST_PG_DSN: postgresql://causa_ci:causa_ci@127.0.0.1:5432/causa_test
+        run: |
+          PYTHONPATH=. pytest -q \
+            tests/test_infra_handoff.py::test_on_conflict_clause_parses_and_is_idempotent \
+            -o addopts= --no-header -rN \
+            | tee /tmp/pg_blocker.txt
+          grep -q "1 passed" /tmp/pg_blocker.txt || {
+            echo "::error::ON CONFLICT blocker test did not run — it must not be skipped in CI"
+            exit 1
+          }
       - name: Dev C lane + golden smoke
         run: |
           PYTHONPATH=. python -m eval.runner
@@ -41,10 +87,6 @@ jobs:
           PYTHONPATH=. pytest -q tests/test_nim_client.py tests/test_remediation_service.py
       - name: Fixture-smoke artifacts
         run: PYTHONPATH=. python -m eval.report
-      - name: Prometheus Phase-2 rule packs
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.14.4
       - name: Check Phase-2 rule packs
         env:
           REQUIRE_PROMTOOL: "1"
@@ -52,8 +94,16 @@ jobs:
       - name: Helm lint
         working-directory: ${{ github.workspace }}
         run: |
+          # Announce skips. A directory under helm/ without a Chart.yaml used to
+          # pass silently, so a malformed chart and a non-chart were
+          # indistinguishable from a green run.
           for chart in incident-detection/helm/* dashboard/helm/*; do
-            if [ -f "$chart/Chart.yaml" ]; then helm lint "$chart"; fi
+            [ -d "$chart" ] || continue
+            if [ -f "$chart/Chart.yaml" ]; then
+              helm lint "$chart"
+            else
+              echo "::notice::skipping $chart (no Chart.yaml — raw manifests)"
+            fi
           done
       - name: Live eval unit tests (mocked PG)
         run: PYTHONPATH=. pytest -q tests/test_live_eval.py

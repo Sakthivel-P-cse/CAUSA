@@ -7,11 +7,16 @@ if ! kubectl --context "${CONTEXT}" get crd constrainttemplates.templates.gateke
   kubectl --context "${CONTEXT}" apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/v3.17.1/deploy/gatekeeper.yaml
   kubectl --context "${CONTEXT}" -n gatekeeper-system rollout status deploy/gatekeeper-controller-manager --timeout=180s || true
 fi
-# Split apply: template first, wait for CRD, then constraint
+# Split apply: template first, wait for CRD, then constraint.
+#
+# NOTE: an earlier awk-based split lived here. It passed TMP as an *awk*
+# variable (`TMP="$TMP"`) while reading it via ENVIRON["TMP"], which is only
+# populated from the real environment — so ENVIRON["TMP"] was empty and awk
+# wrote its halves to ./.t and ./.c in the caller's working directory. Both got
+# committed to the repo root. The python split below already did the real work,
+# so the awk pass was pure side effect and is gone.
 TMP="$(mktemp)"
-awk 'BEGIN{p=1} /^---$/{if(p==1){p=2; next}} {if(p==1) print > ENVIRON["TMP"]".t"; else print > ENVIRON["TMP"]".c"}' TMP="$TMP" \
-  "${ROOT}/incident-detection/helm/gatekeeper-remediation/constraint.yaml" || true
-# simpler split with csplit/python
+trap 'rm -f "${TMP}" "${TMP}.t" "${TMP}.c"' EXIT
 python3 - <<PY
 from pathlib import Path
 text = Path("${ROOT}/incident-detection/helm/gatekeeper-remediation/constraint.yaml").read_text()
@@ -28,5 +33,4 @@ for i in $(seq 1 60); do
   sleep 2
 done
 kubectl --context "${CONTEXT}" apply -f "${TMP}.c"
-rm -f "${TMP}.t" "${TMP}.c"
 echo "Gatekeeper remediation constraints applied"

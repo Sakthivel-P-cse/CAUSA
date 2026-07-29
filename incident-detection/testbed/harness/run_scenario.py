@@ -388,6 +388,7 @@ def run_scenario(
         out_dir=out_dir,
         write_db=write_db,
         topology_id=f"{current_context}:{namespace}",
+        injected=injected,
     )
     return incidents
 
@@ -399,6 +400,7 @@ def _persist(
     out_dir: Path | None,
     write_db: bool,
     topology_id: str,
+    injected: bool = True,
 ) -> None:
     for inc in incidents:
         record = asdict(inc)
@@ -415,12 +417,21 @@ def _persist(
 
         if write_db:
             from ingest.trigger.state import IncidentStore
+            # Never claim confirmation the run did not obtain. Under
+            # --allow-unverified the fault may never have been admitted, and a
+            # row labelled "confirmed" is worse than an unlabelled one: it makes
+            # a phantom indistinguishable from a real incident at eval time.
             IncidentStore().write_ground_truth(
                 inc,
                 topology_id=topology_id,
                 labeler=f"chaos-harness:{scenario.id}",
-                verified_at=_now(),
-                label_notes="Chaos Mesh AllInjected status confirmed",
+                verified_at=_now() if injected else None,
+                label_notes=(
+                    "Chaos Mesh AllInjected status confirmed"
+                    if injected
+                    else "UNVERIFIED: recorded via --allow-unverified; "
+                         "AllInjected never observed"
+                ),
             )
             logger.info("Wrote ground truth → Postgres groundtruth.ground_truth (%s)",
                         inc.incident_id)

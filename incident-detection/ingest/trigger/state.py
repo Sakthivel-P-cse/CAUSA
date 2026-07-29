@@ -131,10 +131,15 @@ class IncidentStore:
         *,
         topology_id: str,
         labeler: str,
-        verified_at: datetime,
+        verified_at: datetime | None,
         label_notes: str | None = None,
     ) -> None:
-        """Persist a chaos run's known root into the role-isolated schema."""
+        """Persist a chaos run's known root into the role-isolated schema.
+
+        ``verified_at`` is None when the run never confirmed the injection
+        (``--allow-unverified``); the column is nullable so eval can filter on
+        it rather than trusting every row equally.
+        """
         with self._connect() as conn:
             conn.execute(
                 """

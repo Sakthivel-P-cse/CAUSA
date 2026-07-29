@@ -249,6 +249,25 @@ if [[ "${ENV}" == "prod" ]]; then
   fi
   echo "  ✓ stage2-rca-secret exists"
 
+  # Alertmanager's bearer token for the causa-ingest /trigger webhook. Without
+  # this the deploy dies at step 14/17 — after thirteen successful installs and
+  # a 5m --wait timeout — and the failure mode is silent: the whole observability
+  # stack is up but no alert ever reaches Stage 2. Its TRIGGER_AUTH_TOKEN value
+  # must match the one in causa-ingest-secret, or every webhook gets a 401.
+  if ! kubectl -n alertmanager get secret alertmanager-webhook-auth &>/dev/null; then
+    echo ""
+    echo "ERROR: Production secret 'alertmanager-webhook-auth' not found in namespace 'alertmanager'."
+    echo "  It carries the bearer token Alertmanager presents to causa-ingest /trigger."
+    echo "  Use the SAME value as causa-ingest-secret's TRIGGER_AUTH_TOKEN:"
+    echo ""
+    echo "    kubectl create namespace alertmanager --dry-run=client -o yaml | kubectl apply -f -"
+    echo "    kubectl -n alertmanager create secret generic alertmanager-webhook-auth \\"
+    echo "      --from-literal=TRIGGER_AUTH_TOKEN='<SAME_AS_CAUSA_INGEST_TRIGGER_AUTH_TOKEN>'"
+    echo ""
+    exit 1
+  fi
+  echo "  ✓ alertmanager-webhook-auth exists"
+
   # Verify the storage class exists on this cluster
   if ! kubectl get storageclass "${STORAGE_CLASS}" &>/dev/null; then
     echo ""

@@ -56,23 +56,32 @@ def snapshot_service(service: str, *, window: str = "5m") -> SLOSnapshot:
     now = datetime.now(timezone.utc).isoformat()
     svc = service.replace('"', "")
     try:
+        # `or vector(0)` on the numerator: a service with traffic but ZERO errors
+        # matches no series, so bare sum() yields an empty vector and the whole
+        # division collapses to empty — indistinguishable from "no data". That
+        # made error_rate None instead of 0.0, and evaluate_gates skips a None
+        # gate, so the error-rate check silently never ran on a healthy service.
         err_q = (
-            f'sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
-            f'status_code="STATUS_CODE_ERROR"}}[{window}])) '
+            f'(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
+            f'status_code="STATUS_CODE_ERROR"}}[{window}])) or vector(0)) '
             f'/ clamp_min(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}"}}[{window}])), 1e-9)'
         )
         lat_q = (
             f'histogram_quantile(0.99, sum by (le) (rate('
             f'traces_span_metrics_duration_milliseconds_bucket{{service_name="{svc}"}}[{window}])))'
         )
+        # Same guard, and here it matters more: a service that is failing EVERY
+        # request matches no non-error series, so without `or vector(0)` the
+        # success rate reads None and its gate is skipped at exactly the moment
+        # it should fail closed.
         ok_q = (
-            f'sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
-            f'status_code!="STATUS_CODE_ERROR"}}[{window}])) '
+            f'(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
+            f'status_code!="STATUS_CODE_ERROR"}}[{window}])) or vector(0)) '
             f'/ clamp_min(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}"}}[{window}])), 1e-9)'
         )
         fallback_err = (
-            f'sum(rate(http_server_request_duration_seconds_count{{service="{svc}",'
-            f'http_response_status_code=~"5.."}}[{window}])) '
+            f'(sum(rate(http_server_request_duration_seconds_count{{service="{svc}",'
+            f'http_response_status_code=~"5.."}}[{window}])) or vector(0)) '
             f'/ clamp_min(sum(rate(http_server_request_duration_seconds_count{{service="{svc}"}}[{window}])), 1e-9)'
         )
         error_rate = _scalar(_instant(err_q))
