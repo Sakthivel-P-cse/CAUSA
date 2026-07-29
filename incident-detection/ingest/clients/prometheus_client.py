@@ -63,6 +63,11 @@ class PrometheusClient:
     def close(self) -> None:
         self._http.close()
 
+    def check_available(self) -> None:
+        """Raise if Prometheus is unreachable (port-forward down, wrong URL, etc.)."""
+        resp = self._http.get(f"{self._base}/-/ready", timeout=5.0)
+        resp.raise_for_status()
+
     # ── Low-level helpers ─────────────────────────────────────────────
 
     def _instant(self, query: str, at: datetime | None = None) -> list[dict[str, Any]]:

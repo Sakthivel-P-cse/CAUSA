@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ID_ROOT="${ROOT}/incident-detection"
 CONTEXT="${CONTEXT:-kind-gcp-demo-test}"
 KIND_CLUSTER="${KIND_CLUSTER:-gcp-demo-test}"
-DEMO_NS="${DEMO_NS:-otel-demo}"
+DEMO_NS="${DEMO_NS:-${CAUSA_APP_NAMESPACE:-otel-demo}}"
 VALUES="${ID_ROOT}/testbed/otel-demo/values.yaml"
 
 log() { printf '==> %s\n' "$*"; }
@@ -62,14 +62,15 @@ install_demo() {
   helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts >/dev/null 2>&1 || true
   helm repo update open-telemetry >/dev/null
 
-  # Prior live kubectl patches (duplicate env / memory request>limit) break
-  # helm strategic-merge upgrades. Reinstall from a clean namespace.
-  if helm status otel-demo --kube-context "${CONTEXT}" -n "${DEMO_NS}" &>/dev/null; then
+  # Namespace deletion is destructive and must be explicitly requested.
+  if [[ "${RECREATE_DEMO_NAMESPACE:-0}" == "1" ]] \
+    && helm status otel-demo --kube-context "${CONTEXT}" -n "${DEMO_NS}" &>/dev/null; then
     log "Uninstalling existing otel-demo (clean reinstall)"
     helm uninstall otel-demo --kube-context "${CONTEXT}" -n "${DEMO_NS}" --wait --timeout 5m || true
+    kubectl --context "${CONTEXT}" delete namespace "${DEMO_NS}" --wait=true --timeout=5m
   fi
-  kubectl --context "${CONTEXT}" delete namespace "${DEMO_NS}" --ignore-not-found --wait=true --timeout=5m || true
-  kubectl --context "${CONTEXT}" create namespace "${DEMO_NS}"
+  kubectl --context "${CONTEXT}" create namespace "${DEMO_NS}" \
+    --dry-run=client -o yaml | kubectl --context "${CONTEXT}" apply -f -
 
   log "Installing otel-demo ${chart_version} in ${DEMO_NS}"
   # --wait races flagd Service creation on this chart; install then wait for pods.

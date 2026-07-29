@@ -18,7 +18,7 @@ from rca.types import KernelAnomaly
 
 EPS = 1e-9
 ALPHA = 0.5
-H_DEFAULT = 60.0  # seconds
+H_DEFAULT = 60.0  # seconds; used only when the basis has no timed spread
 # Neutral pseudo-evidence mass smoothing D's ratio (see compute_D). In
 # anomaly-score units, where one node contributes at most 1.0.
 D_PRIOR = 1.0
@@ -336,7 +336,9 @@ def compute_signals(
     t0 = _subgraph_t0(anomaly, basis)
     if horizon is None:
         max_delta = _max_subgraph_delta(anomaly, basis)
-        horizon = min(max_delta, H) if max_delta > 0 else H
+        # Do not cap observed spread by H — that collapses T for multi-minute
+        # incidents (rca-improvement.md Layer 4). H is fallback only.
+        horizon = max_delta if max_delta > 0 else H
     # Avoid degenerate horizon of 0.
     if horizon <= 0:
         horizon = H

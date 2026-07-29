@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from testbed.harness import run_scenario as rs
 from testbed.harness.catalog import get
 
@@ -91,6 +93,30 @@ def test_incident_ids_do_not_collide():
     a = rs._build_incidents(get("S1"), now, now, None)[0].incident_id
     b = rs._build_incidents(get("S1"), now, now, None)[0].incident_id
     assert a != b
+
+
+def test_single_fault_can_use_real_pipeline_incident_id():
+    now = datetime.now(timezone.utc)
+    incident = rs._build_incidents(
+        get("S1"),
+        now,
+        now,
+        None,
+        incident_id_override="inc-from-alertmanager",
+    )[0]
+    assert incident.incident_id == "inc-from-alertmanager"
+
+
+def test_incident_id_override_rejects_dual_fault_scenario():
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValueError, match="single-fault"):
+        rs._build_incidents(
+            get("D1"),
+            now,
+            now,
+            None,
+            incident_id_override="ambiguous",
+        )
 
 
 def test_dry_run_returns_without_persisting(tmp_path):

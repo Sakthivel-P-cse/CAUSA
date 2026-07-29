@@ -15,6 +15,10 @@ persistence:
   storageClassName: "standard"   # Override: STORAGE_CLASS=<name> ./scripts/deploy.sh prod
   size: 2Gi
 
+auth:
+  existingSecret: alertmanager-webhook-auth
+  triggerToken: ""
+
 # In prod, alert faster and persist notification state
 config:
   repeatInterval: 1h

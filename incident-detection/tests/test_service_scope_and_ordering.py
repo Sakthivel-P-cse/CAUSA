@@ -9,10 +9,19 @@ from datetime import datetime, timezone
 from contracts import OrderingSource, TraceSpan
 from ingest.ordering import enrich_spans_with_dag
 from ingest.service_scope import (
+    _excluded_services_re,
+    _monitored_services_re,
     extract_service_from_labels,
     is_monitored_service,
     normalize_service_name,
 )
+from runtime.profile import load_profile
+
+
+def setup_function():
+    load_profile.cache_clear()
+    _monitored_services_re.cache_clear()
+    _excluded_services_re.cache_clear()
 
 
 def test_scope_excludes_the_real_load_generator():
@@ -26,6 +35,27 @@ def test_scope_keeps_the_cart_cache_in_scope():
     assert is_monitored_service("redis-cart")
     assert is_monitored_service("checkout")
 
+
+def test_scope_excludes_minio_platform_service():
+    assert not is_monitored_service("minio")
+    assert not is_monitored_service("minio-loki")
+
+
+def test_monitored_alert_drops_platform_and_slo_layers():
+    from ingest.service_scope import is_monitored_alert
+
+    assert not is_monitored_alert(
+        {"alertname": "MinioBackendDown", "service": "minio", "layer": "platform"},
+        "minio",
+    )
+    assert not is_monitored_alert(
+        {"alertname": "SLOAvailabilityFastBurn", "service": "cart", "layer": "slo"},
+        "cart",
+    )
+    assert is_monitored_alert(
+        {"alertname": "ServiceHighErrorRate", "service": "cart", "layer": "service"},
+        "cart",
+    )
 
 def test_normalize_unknown_service_prefix():
     assert normalize_service_name("unknown_service:checkout") == "checkout"

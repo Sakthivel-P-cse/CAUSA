@@ -144,6 +144,32 @@ def test_cluster_origins_are_comparable_after_isolation():
     assert all(abs(c.signals.T - 1.0) < 1e-9 for c in tops)
 
 
+def test_long_spread_discriminates_mid_and_late_T():
+    """Observed multi-minute spreads must not be capped by H_DEFAULT.
+
+    Under the old ``min(max_delta, 60)`` rule, a node at +61s and one at +315s
+    both collapsed to T≈0. With uncapped horizon, the mid node keeps positive T.
+    """
+    ig = InfluenceGraph(
+        nodes={n: Node(n, NodeKind.SERVICE, n) for n in ("early", "mid", "late")},
+        edges=[
+            Edge("early", "mid", CallType.SYNC, degraded=True),
+            Edge("mid", "late", CallType.SYNC, degraded=True),
+        ],
+    )
+    anomaly = KernelAnomaly(
+        anomaly_score={"early": 0.95, "mid": 0.8, "late": 0.7},
+        first_deviation_time={"early": 0.0, "mid": 61.0, "late": 315.0},
+        resource_deviation={},
+    )
+    signals = compute_signals(ig, anomaly)
+    assert signals.horizon == pytest.approx(315.0)
+    assert signals.by_node["early"].T == pytest.approx(1.0)
+    assert signals.by_node["mid"].T > 0.5
+    assert signals.by_node["late"].T == pytest.approx(0.0, abs=1e-9)
+    assert signals.by_node["mid"].T > signals.by_node["late"].T
+
+
 # ── cycles ────────────────────────────────────────────────────────────
 
 

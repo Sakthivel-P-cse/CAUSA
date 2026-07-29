@@ -54,6 +54,12 @@
 .ui-popover { position: relative; }
 .ui-popover__panel { position: absolute; z-index: 50; top: calc(100% + 6px); right: 0; min-width: 210px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow-2); }
 .user-menu { display: grid; gap: 2px; }.user-menu .ui-button { justify-content: flex-start; width: 100%; }.user-menu__label { padding: 7px 9px; color: var(--muted); font-size: 11px; }
+.auth-form, .remediation-confirm { display: grid; gap: 14px; }
+.auth-form p, .remediation-confirm p { margin: 0; color: var(--muted); line-height: 1.5; }
+.ui-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.remediation-confirm:has(input:invalid) .confirmation-submit { opacity: .55; pointer-events: none; }
+.ui-success { margin: 10px 0; padding: 10px 12px; color: var(--good); background: color-mix(in srgb, var(--good) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--good) 45%, var(--line)); border-radius: var(--r-sm); }
+.explorer-stat small { display: block; margin-top: 5px; color: var(--muted-2); font-size: 10px; }
 
 .ui-skeleton { display: block; min-height: 16px; border-radius: 4px; background: linear-gradient(90deg, var(--panel-2), var(--line-soft), var(--panel-2)); background-size: 200% 100%; animation: skeleton 1.4s ease infinite; }
 @keyframes skeleton { to { background-position: -200% 0; } }
@@ -87,4 +93,3 @@
   .ui-overlay { padding: 0; }.ui-overlay__panel--drawer { border-radius: 0; }
   .ui-page-header { flex-direction: column; }.ui-page-header__actions { width: 100%; }
 }
-

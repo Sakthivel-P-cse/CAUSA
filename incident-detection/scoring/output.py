@@ -11,39 +11,12 @@ from contracts import (
     SignalScores,
 )
 from graphs.influence_graph import InfluenceGraph
-from ingest.service_scope import is_system_infra_host
 from rca.types import KernelAnomaly
 
 from .fitted_weights import apply_calibration_map, load_calibration_map
 from .signals import NodeSignals, SignalResult
 
 EPS = 1e-9
-_SYSTEM_INFRA_SCORE_SCALE = 0.01
-
-
-def demote_system_infra_hosts(
-    candidates: list[RootCauseCandidate],
-) -> list[RootCauseCandidate]:
-    """Crush Kind/k8s control-plane hosts so they cannot win app-service RCA."""
-    if not candidates:
-        return candidates
-    changed = False
-    for candidate in candidates:
-        if not is_system_infra_host(candidate.node_id):
-            continue
-        if candidate.node_kind not in (NodeKind.INFRA, NodeKind.SERVICE):
-            # INFRA is expected; still demote any matching host id.
-            pass
-        candidate.score *= _SYSTEM_INFRA_SCORE_SCALE
-        candidate.flags["demoted_system_infra"] = True
-        changed = True
-    if not changed:
-        return candidates
-    ranked = sorted(candidates, key=lambda c: (-c.score, c.node_id))
-    stamp_confidence(ranked)
-    return ranked
-
-
 def _fmt(x: float) -> str:
     return f"{x:.2f}"
 

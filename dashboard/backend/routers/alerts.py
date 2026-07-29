@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
+from dashboard.backend.app_scope import is_app_scope_incident
 from dashboard.backend.dependencies import get_store
 from dashboard.backend.db import DashboardStore
 
@@ -49,7 +50,9 @@ def list_alerts(
 ) -> list[dict[str, Any]]:
     joined = store.list_incidents_joined()
     open_items = [
-        i for i in joined if str(i.get("incident_status") or "") != "resolved"
+        i
+        for i in joined
+        if str(i.get("incident_status") or "") != "resolved" and is_app_scope_incident(i)
     ][:limit]
     return [
         {

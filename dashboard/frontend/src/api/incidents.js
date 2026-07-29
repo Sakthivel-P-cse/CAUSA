@@ -2,6 +2,42 @@ export function isAbstainedSummary(summary) {
   return String(summary || '').toLowerCase().startsWith('rca abstained')
 }
 
+export function parseAbstainReason(summary) {
+  if (!isAbstainedSummary(summary)) return null
+  return String(summary).replace(/^RCA abstained:\s*/i, '').trim() || null
+}
+
+const ABSTAIN_REASON_LABELS = {
+  'MULTI-INCIDENT — ambiguous':
+    'Multiple services deviated at once — cannot isolate a single origin.',
+  missing_anomaly_baselines:
+    'Anomaly baselines are missing — capture baselines before RCA can score origins.',
+  'no anomalous candidates':
+    'No anomalous services were found in the incident scope.',
+}
+
+export function formatAbstainReason(reason) {
+  const raw = String(reason || '').trim()
+  if (!raw) return 'Insufficient evidence to rank a root cause.'
+  return ABSTAIN_REASON_LABELS[raw] || raw
+}
+
+export function abstainContext(report = {}) {
+  const scope =
+    report.incident_scope?.nodes
+    || report.blast_radius
+    || Object.keys(report.anomaly_scores || {})
+  const anomalies = report.anomaly_scores || {}
+  const hot = Object.entries(anomalies)
+    .filter(([, score]) => Number(score) >= 0.7)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .map(([node]) => node)
+  return {
+    scopeCount: Array.isArray(scope) ? scope.length : 0,
+    hotServices: hot,
+  }
+}
+
 export function formatFailureType(item = {}) {
   if (item.failure_type) return item.failure_type
   if (isAbstainedSummary(item.root_cause_summary)) return 'Abstained'
@@ -33,15 +69,20 @@ export function normalizeListItem(raw = {}) {
     has_rca: Boolean(raw.has_rca),
     window_start: raw.window_start,
     window_end: raw.window_end,
+    acked_at: raw.acked_at || null,
+    acked_by: raw.acked_by || null,
+    lifecycle: raw.lifecycle || (raw.resolved_at ? 'resolved' : raw.acked_at ? 'investigating' : 'active'),
+    routing: raw.routing || null,
   }
 }
 
 export function normalizeReport(raw = {}) {
   const base = normalizeListItem(raw)
   const anomaly = raw.anomaly_scores || {}
-  const anomalyList = Array.isArray(raw.anomaly_score_list)
+  const anomalyList = (Array.isArray(raw.anomaly_score_list)
     ? raw.anomaly_score_list
     : Object.entries(anomaly).map(([node, score]) => ({ node, score }))
+  ).sort((a, b) => Number(b.score) - Number(a.score))
 
   return {
     ...base,
@@ -58,7 +99,32 @@ export function normalizeReport(raw = {}) {
     remediation: raw.remediation || null,
     feedback: raw.feedback || null,
     references: raw.references || {},
+    inference_evidence: raw.inference_evidence || null,
+    incident_scope: raw.incident_scope || null,
   }
+}
+
+export function rankedAnomalyScores(report = {}) {
+  return [...(report.anomaly_score_list || [])].sort(
+    (a, b) => Number(b.score) - Number(a.score),
+  )
+}
+
+export function sortedTimeline(report = {}) {
+  return [...(report.timeline || [])].sort((a, b) => {
+    const ta = Date.parse(a.timestamp || '') || 0
+    const tb = Date.parse(b.timestamp || '') || 0
+    return ta - tb || String(a.service || '').localeCompare(String(b.service || ''))
+  })
+}
+
+export function buildAbstainEvidence(report = {}) {
+  const anomalies = rankedAnomalyScores(report)
+  const timeline = sortedTimeline(report)
+  const scope = report.blast_radius?.length
+    ? report.blast_radius
+    : report.incident_scope?.nodes || anomalies.map(row => row.node)
+  return { anomalies, timeline, scope }
 }
 
 export function normalizeIncidentPage(payload) {

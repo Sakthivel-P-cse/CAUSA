@@ -40,6 +40,7 @@ export default function FacetPanel({ facets = {}, filters = {}, onChange, onClea
         <button type="button" className="link-button" onClick={onClear}>Clear</button>
       </div>
       <FacetGroup name="severity" label="Severity" values={facets.severity} selected={filters.severity} onToggle={onChange} />
+      <FacetGroup name="lifecycle" label="Lifecycle" values={facets.lifecycle} selected={filters.lifecycle} onToggle={onChange} />
       <FacetGroup name="failure_type" label="Failure type" values={facets.failure_type} selected={filters.failure_type} onToggle={onChange} />
       <FacetGroup name="status" label="Status" values={facets.status} selected={filters.status} onToggle={onChange} />
       <FacetGroup

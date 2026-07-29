@@ -8,13 +8,8 @@ metadata:
 data:
   alertmanager.yml: |
     global:
-      # How long an alert is considered resolved after it stops firing
       resolve_timeout: 5m
 
-    # ── Routing tree ─────────────────────────────────────────────
-    # All alerts go to the Stage 2 RCA webhook by default.
-    # The RCA engine uses the alert labels (service, namespace,
-    # alertname, severity) to decide where to start its investigation.
     route:
       receiver: stage2-rca-webhook
       group_by: ['alertname', 'service', 'namespace']
@@ -22,15 +17,25 @@ data:
       group_interval:  {{ .Values.config.groupInterval }}
       repeat_interval: {{ .Values.config.repeatInterval }}
 
-      # Critical alerts go immediately without grouping delay
       routes:
-        - match:
-            severity: critical
+        - matchers:
+            - route="page"
+          receiver: stage2-rca-webhook
+          group_wait: 0s
+          continue: false
+
+        - matchers:
+            - severity="critical"
           receiver: stage2-rca-webhook
           group_wait: 0s
           continue: true
 
-    # ── Receivers ────────────────────────────────────────────────
+        - matchers:
+            - route="ticket"
+          receiver: stage2-rca-webhook
+          group_wait: 30s
+          continue: false
+
     receivers:
       - name: stage2-rca-webhook
         webhook_configs:
@@ -38,18 +43,30 @@ data:
             send_resolved: true
             http_config:
               follow_redirects: true
+              authorization:
+                type: Bearer
+                credentials_file: /etc/alertmanager/secrets/trigger-token
 
-    # ── Inhibition rules ─────────────────────────────────────────
-    # Suppress child-service alerts when a node-level alert is
-    # already firing — avoids flooding Stage 2 with duplicate incidents.
     inhibit_rules:
       - source_match:
           alertname: NodeMemoryPressure
         target_match_re:
-          alertname: ServiceHighErrorRate|ServiceHighLatency|ContainerMemoryNearLimit
+          alertname: ServiceHighErrorRate|ServiceHighErrorRateHTTP|ServiceHighLatency|ContainerMemoryNearLimit|SLOAvailabilityFastBurn|SLOAvailabilitySlowBurn|SLOLatencyFastBurn|SLOLatencySlowBurn
         equal: ['node']
+
       - source_match:
           alertname: NodeCPUSaturation
         target_match_re:
-          alertname: ServiceHighLatency|ServiceTrafficSpike
+          alertname: ServiceHighLatency|ServiceTrafficSpike|SLOLatencyFastBurn|SLOLatencySlowBurn
         equal: ['node']
+
+      - source_match:
+          alertname: SLOAvailabilityFastBurn
+        target_match_re:
+          alertname: ServiceHighErrorRate|ServiceHighErrorRateHTTP
+        equal: ['service']
+
+      - source_match:
+          alertname: OtelGatewayDown
+        target_match_re:
+          layer: service|slo|dependency

@@ -104,3 +104,11 @@ def test_stamp_confidence_uses_calibration_when_safe(tmp_path, monkeypatch):
     stamp_confidence(cands)
     assert cands[0].confidence >= cands[1].confidence
     assert cands[0].confidence > 0.0
+
+
+def test_missing_fit_result_uses_neutral_weights(monkeypatch):
+    monkeypatch.delenv("RCA_WEIGHTS_ARTIFACT", raising=False)
+    w = load_fitted_weights()
+    assert abs(w.w_T - (1 / 3)) < 1e-9
+    assert abs(w.w_D - (1 / 3)) < 1e-9
+    assert abs(w.w_P - (1 / 3)) < 1e-9

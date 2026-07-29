@@ -134,7 +134,21 @@ def test_kernel_result_flows_into_classify_s1_infra():
 # --------------------------------------------------------------------------- #
 # 3. Real B RankedResult → Dev C remediation router                           #
 # --------------------------------------------------------------------------- #
-def test_kernel_result_flows_into_remediation():
+def test_kernel_result_flows_into_remediation(monkeypatch):
+    from remediation.apply import k8s as k8s_apply
+    from remediation import router as router_mod
+
+    monkeypatch.setattr(router_mod.runtime_profile, "supports_action", lambda *_a: True)
+    monkeypatch.setattr(
+        k8s_apply,
+        "read_workload_revision",
+        lambda *_a, **_k: {
+            "kind": "Deployment",
+            "revision": "2",
+            "resource_version": "10",
+            "images": ["example:v2"],
+        },
+    )
     result, _ = _kernel_rank(load_incident_s0)
     top = result.candidates[0]
     plan = RemediationRouter().route(FaultClass.DEPENDENCY, top, result)
@@ -164,7 +178,21 @@ def test_kernel_result_scores_top1_against_ground_truth():
 #    A report B persists is JSON; C reads it back and must reconstruct an      #
 #    equivalent RankedResult that its consumers still accept.                  #
 # --------------------------------------------------------------------------- #
-def test_ranked_result_survives_dict_roundtrip_across_seam():
+def test_ranked_result_survives_dict_roundtrip_across_seam(monkeypatch):
+    from remediation.apply import k8s as k8s_apply
+    from remediation import router as router_mod
+
+    monkeypatch.setattr(router_mod.runtime_profile, "supports_action", lambda *_a: True)
+    monkeypatch.setattr(
+        k8s_apply,
+        "read_workload_revision",
+        lambda *_a, **_k: {
+            "kind": "Deployment",
+            "revision": "2",
+            "resource_version": "10",
+            "images": ["example:v2"],
+        },
+    )
     result, _ = _kernel_rank(load_incident_s0)
     roundtrip = RankedResult.from_dict(result.to_dict())
 

@@ -1,17 +1,21 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useFetch } from '../hooks/useFetch.js'
 import { useDashboard } from '../context/DashboardContext.jsx'
+import { apiFetch } from '../api/client.js'
 import { Spinner, ErrorMsg } from '../components/Common.jsx'
 import InsightCard, { incidentPriority } from '../components/watchdog/InsightCard.jsx'
 import IncidentTable from '../components/watchdog/IncidentTable.jsx'
 import FacetPanel from '../components/watchdog/FacetPanel.jsx'
 import { normalizeIncidentPage } from '../api/incidents.js'
 import { Button, Input, Select } from '../components/ui/index.js'
+import { useIncidentStream } from '../hooks/useIncidentStream.js'
+import { apiQueryKey } from '../api/queries.js'
 
 function facetsFromSearch(searchParams) {
   const next = {}
-  for (const key of ['severity', 'failure_type', 'status', 'service']) {
+  for (const key of ['severity', 'failure_type', 'status', 'service', 'lifecycle']) {
     const value = searchParams.get(key)
     if (value) next[key] = value
   }
@@ -20,21 +24,28 @@ function facetsFromSearch(searchParams) {
 
 export default function IncidentInbox() {
   const { filters } = useDashboard()
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [q, setQ] = useState('')
+  const searchRef = useRef(null)
   const [sort, setSort] = useState('newest')
   const [minConfidence, setMinConfidence] = useState('')
   const [view, setView] = useState('table')
   const [offset, setOffset] = useState(0)
   const [facetFilters, setFacetFilters] = useState(() => facetsFromSearch(searchParams))
+  const [selected, setSelected] = useState(() => new Set())
+  const [cursor, setCursor] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [now] = useState(() => Date.now())
   const limit = 25
+  const streamStatus = useIncidentStream(true)
 
   const timeWindow = useMemo(() => {
     if (filters.from && filters.to) {
       return { start: filters.from, end: filters.to }
     }
     if (filters.minutes) {
-      const endMs = Math.floor(Date.now() / 60_000) * 60_000
+      const endMs = Math.floor(now / 60_000) * 60_000
       const startMs = endMs - Number(filters.minutes) * 60_000
       return {
         start: new Date(startMs).toISOString(),
@@ -42,7 +53,7 @@ export default function IncidentInbox() {
       }
     }
     return null
-  }, [filters.from, filters.to, filters.minutes])
+  }, [filters.from, filters.to, filters.minutes, now])
 
   const params = new URLSearchParams()
   if (q) params.set('q', q)
@@ -61,34 +72,101 @@ export default function IncidentInbox() {
   }
 
   const query = params.toString()
-  const { data, loading, error } = useFetch(`/api/incidents?${query}`, [query])
+  const { data, loading, error, reload } = useFetch(`/api/incidents?${query}`, [query])
   const page = useMemo(() => normalizeIncidentPage(data), [data])
 
   const items = useMemo(() => {
-    if (sort !== 'priority') return page.items
-    return [...page.items].sort((a, b) => incidentPriority(b) - incidentPriority(a))
-  }, [page.items, sort])
+    let list = page.items
+    if (facetFilters.lifecycle) {
+      list = list.filter(i => String(i.lifecycle || 'active') === facetFilters.lifecycle)
+    }
+    if (sort === 'priority') list = [...list].sort((a, b) => incidentPriority(b) - incidentPriority(a))
+    return list
+  }, [page.items, sort, facetFilters.lifecycle])
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+        if (e.key === 'Escape') e.target.blur()
+        return
+      }
+      if (e.key === '/') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        return
+      }
+      if (e.key === 'j') setCursor(c => Math.min(items.length - 1, c + 1))
+      if (e.key === 'k') setCursor(c => Math.max(0, c - 1))
+      if (e.key === 'Enter' && items[cursor]) {
+        window.location.href = `/incidents/${items[cursor].id}`
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [items, cursor])
 
   function updateFacets(next) {
     setFacetFilters(next)
     setOffset(0)
     const url = new URLSearchParams(searchParams)
-    for (const key of ['severity', 'failure_type', 'status', 'service']) {
+    for (const key of ['severity', 'failure_type', 'status', 'service', 'lifecycle']) {
       if (next[key]) url.set(key, next[key])
       else url.delete(key)
     }
     setSearchParams(url, { replace: true })
   }
 
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function bulk(action) {
+    setBusy(true)
+    try {
+      for (const id of selected) {
+        if (action === 'ack') {
+          await apiFetch(`/api/incidents/${encodeURIComponent(id)}/ack`, { method: 'POST', body: {} })
+        } else if (action === 'snooze') {
+          await apiFetch(`/api/incidents/${encodeURIComponent(id)}/snooze`, {
+            method: 'POST',
+            body: { minutes: 60 },
+          })
+        }
+      }
+      setSelected(new Set())
+      await reload()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function prefetch(incident) {
+    queryClient.prefetchQuery({
+      queryKey: apiQueryKey(`/api/incidents/${incident.id}`, [incident.id]),
+      queryFn: () => apiFetch(`/api/incidents/${encodeURIComponent(incident.id)}`),
+    })
+  }
+
   if (loading && !data) return <Spinner label="Loading incidents" />
   if (error && !data) return <ErrorMsg error={error} />
+
+  const lifecycleFacets = items.reduce((acc, i) => {
+    const k = i.lifecycle || 'active'
+    acc[k] = (acc[k] || 0) + 1
+    return acc
+  }, {})
 
   return (
     <div className="watchdog-page inbox-page">
       <header className="watchdog-page__header">
         <div>
-          <h1>Incidents & RCA</h1>
-          <p>Causa incident inbox from Postgres / local RCA dumps.</p>
+          <h1>Incidents</h1>
+          <p>Operational console — j/k move, / search, Enter open · updates: {streamStatus}</p>
         </div>
         <div className="view-toggle" role="group" aria-label="View mode">
           <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>Table</button>
@@ -97,7 +175,13 @@ export default function IncidentInbox() {
       </header>
 
       <form className="incident-query" onSubmit={event => { event.preventDefault(); setOffset(0) }}>
-        <Input value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} placeholder="Search incidents" aria-label="Search" />
+        <Input
+          ref={searchRef}
+          value={q}
+          onChange={e => { setQ(e.target.value); setOffset(0) }}
+          placeholder="Search incidents"
+          aria-label="Search"
+        />
         <Select value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort">
           <option value="newest">Newest</option>
           <option value="priority">Highest priority</option>
@@ -111,19 +195,13 @@ export default function IncidentInbox() {
         </Select>
       </form>
 
-      <p className="result-summary">
-        {page.total} incident{page.total === 1 ? '' : 's'}
-        {filters.minutes && !filters.from ? ` · last ${filters.minutes}m` : ''}
-        {filters.from && filters.to ? ' · absolute window' : ''}
-        {facetFilters.severity ? ` · severity: ${facetFilters.severity}` : ''}
-        {facetFilters.service ? ` · service: ${facetFilters.service}` : ''}
-        {facetFilters.status ? ` · status: ${facetFilters.status}` : ''}
-      </p>
-
-      {!loading && page.total === 0 && (
-        <p className="empty-hint">
-          No incidents in this time window. Widen the top-bar range (e.g. Last 6 hours) or clear the service filter.
-        </p>
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{selected.size} selected</span>
+          <Button disabled={busy} onClick={() => bulk('ack')}>Acknowledge</Button>
+          <Button disabled={busy} onClick={() => bulk('snooze')}>Snooze 1h</Button>
+          <Button variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        </div>
       )}
 
       <div className="incident-layout">
@@ -133,23 +211,28 @@ export default function IncidentInbox() {
             failure_type: page.facets.failure_type || {},
             status: page.facets.status || {},
             service: page.facets.service || {},
+            lifecycle: lifecycleFacets,
           }}
           filters={facetFilters}
-          onChange={(name, value) => {
-            updateFacets({ ...facetFilters, [name]: value })
-          }}
-          onClear={() => { updateFacets({}) }}
+          onChange={(name, value) => updateFacets({ ...facetFilters, [name]: value })}
+          onClear={() => updateFacets({})}
         />
         <div className="inbox-results">
           {view === 'table' ? (
-            <IncidentTable incidents={items} />
+            <IncidentTable
+              incidents={items}
+              selected={selected}
+              onToggle={toggle}
+              onPrefetch={prefetch}
+              now={now}
+            />
           ) : (
             <div className="insight-grid insight-grid--fixed">
               {items.map(incident => <InsightCard key={incident.id} incident={incident} />)}
             </div>
           )}
           <div className="pagination">
-            <Button variant="ghost" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</Button>
+            <Button variant="ghost" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Prev</Button>
             <span>{Math.min(offset + 1, page.total)}–{Math.min(offset + limit, page.total)} of {page.total}</span>
             <Button variant="ghost" disabled={offset + limit >= page.total} onClick={() => setOffset(offset + limit)}>Next</Button>
           </div>

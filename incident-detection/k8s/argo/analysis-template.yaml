@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: causa-prometheus-success
+  namespace: otel-demo
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: error-rate
+      interval: 30s
+      count: 3
+      successCondition: result < 0.05
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.prometheus.svc.cluster.local:9090
+          query: |
+            sum(rate(traces_span_metrics_calls_total{service_name="{{args.service-name}}",status_code="STATUS_CODE_ERROR"}[2m]))
+            /
+            clamp_min(sum(rate(traces_span_metrics_calls_total{service_name="{{args.service-name}}"}[2m])), 1e-9)
+    - name: latency-p99
+      interval: 30s
+      count: 3
+      successCondition: result < 800
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.prometheus.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.99,
+              sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name="{{args.service-name}}"}[2m]))
+            )

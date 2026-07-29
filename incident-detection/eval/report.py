@@ -16,7 +16,6 @@ from eval.fixture_scorer import FixtureScorer
 from eval.runner import run_golden_fixture
 from eval.splits import ANALYTICAL_CROSS_TOPOLOGY_ARGUMENT
 from fixtures import load_ground_truth, load_logs, load_ranked_result, load_subgraph
-from remediation.canary import SimulatedCanary
 from remediation.router import RemediationRouter
 
 
@@ -74,8 +73,8 @@ def generate_all() -> dict[str, Any]:
         "AppLogic": router.route(FaultClass.APP_LOGIC, top, ranked).to_dict(),
         "Config": router.route(FaultClass.CONFIG, top, ranked).to_dict(),
     }
-    canary_ok = SimulatedCanary().apply().to_dict()
-    canary_rb = SimulatedCanary(metric_fn=SimulatedCanary.breaching_metrics).apply().to_dict()
+    canary_ok = {"mode": "argo_prometheus", "note": "runtime uses live SLO gates; simulated canary removed"}
+    canary_rb = {"mode": "argo_abort", "note": "rollback via Rollout undo / inverse patch"}
 
     per_scenario = ablation.rows["Full"].metrics.per_scenario
     scenario_table = {

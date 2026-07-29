@@ -311,6 +311,9 @@ helm_deploy() {
 # The real Stage-2 engine is part of both environments. The explicit dev mock
 # occupies the same Helm release and service slot, so the count stays constant.
 TOTAL=17
+if [[ "${DEPLOY_REMEDIATION_WORKER:-0}" == "1" ]]; then
+  TOTAL=18
+fi
 
 # ── Deploy components (in dependency order) ────────────────────
 helm_deploy "kube-state-metrics" "kube-state-metrics" 2  "${TOTAL}"
@@ -342,6 +345,12 @@ else
 fi
 helm_deploy "causa-ingest"       "causa-ingest"       17 "${TOTAL}"
 
+# Optional: remediation worker chart (image must be built/loaded separately)
+if [[ "${DEPLOY_REMEDIATION_WORKER:-0}" == "1" ]]; then
+  kubectl create namespace causa-remediation --dry-run=client -o yaml | kubectl apply -f -
+  helm_deploy "causa-remediation-worker" "causa-remediation" 18 "${TOTAL}"
+fi
+
 # ── Summary ────────────────────────────────────────────────
 echo "========================================================"
 echo "  All components deployed successfully! [${ENV^^}]"
@@ -357,6 +366,9 @@ echo ""
   echo "    MinIO-Mimir:     kubectl -n minio-mimir port-forward svc/minio-mimir 9003:9001  (console)"
   echo "    Alertmgr:        kubectl -n alertmanager port-forward svc/alertmanager 9093:9093"
   echo "    Postgres:        kubectl -n postgres port-forward svc/postgres 5432:5432"
+  echo "    Remediation:     DEPLOY_REMEDIATION_WORKER=1 ./scripts/deploy.sh ${ENV}"
+  echo "    Argo Rollouts:   ./scripts/install-argo-rollouts.sh"
+  echo "    Gatekeeper:      ./scripts/install-gatekeeper-remediation.sh"
   echo "    Ingest trigger:  kubectl -n causa-ingest port-forward svc/causa-ingest 8080:8080"
   echo "                     → POST http://localhost:8080/trigger"
   echo "    Stage-2 (${STAGE2_PROFILE}): kubectl -n stage2-rca port-forward svc/stage2-rca 8081:8080"

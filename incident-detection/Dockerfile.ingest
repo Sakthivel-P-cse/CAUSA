@@ -21,6 +21,8 @@ COPY adapters/ ./adapters/
 COPY classify/ ./classify/
 COPY eval/ ./eval/
 COPY remediation/ ./remediation/
+COPY runtime/ ./runtime/
+COPY profiles/ ./profiles/
 COPY fixtures/ ./fixtures/
 COPY testbed/ ./testbed/
 

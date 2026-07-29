@@ -1,0 +1,33 @@
+replicaCount: 1
+production: false
+image:
+  repository: causa/remediation-worker
+  tag: local
+  digest: ""
+  pullPolicy: IfNotPresent
+serviceAccount:
+  create: true
+  name: causa-remediation-worker
+rbac:
+  namespace: otel-demo
+env:
+  PGHOST: postgres.postgres.svc.cluster.local
+  PGPORT: "5432"
+  PGDATABASE: causa
+  PGUSER: causa_remediator
+  PROMETHEUS_URL: http://prometheus.prometheus.svc.cluster.local:9090
+  REMEDIATION_NAMESPACE: otel-demo
+  REMEDIATION_WORKER_POLL_S: "5"
+  REMEDIATION_OBSERVE_SLEEP_S: "15"
+  REMEDIATION_MIN_CONFIDENCE: "0.10"
+  CAUSA_REMEDIATION_KILL_SWITCH: "0"
+  CAUSA_NIM_ENABLED: "0"
+existingSecret: ""
+databasePassword: causa_remediator_dev
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

@@ -23,6 +23,7 @@ def _scoped_service_name(raw: str | None) -> str | None:
 @router.get("/services")
 def list_services(prom=Depends(get_prometheus)) -> list[dict[str, Any]]:
     try:
+        prom.check_available()
         edges = prom.get_service_edges(window="5m")
     except Exception as exc:
         raise_upstream_error("prometheus", "list services", exc)

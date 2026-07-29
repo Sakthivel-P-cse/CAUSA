@@ -8,14 +8,22 @@ const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), selec
 function Overlay({ open, onClose, title, children, variant }) {
   const titleId = useId()
   const panelRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return undefined
     const previousFocus = document.activeElement
     const panel = panelRef.current
-    panel?.querySelector(FOCUSABLE)?.focus()
+    const preferredFocus = panel?.querySelector(
+      'input:not([disabled]), textarea:not([disabled]), select:not([disabled])',
+    )
+    ;(preferredFocus || panel?.querySelector(FOCUSABLE))?.focus()
     function onKeyDown(event) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
       if (event.key !== 'Tab') return
       const items = [...panel.querySelectorAll(FOCUSABLE)]
       if (!items.length) return
@@ -31,7 +39,7 @@ function Overlay({ open, onClose, title, children, variant }) {
       document.body.classList.remove('overlay-open')
       previousFocus?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return createPortal(
@@ -47,4 +55,3 @@ function Overlay({ open, onClose, title, children, variant }) {
 
 export function Dialog(props) { return <Overlay variant="dialog" {...props} /> }
 export function Drawer(props) { return <Overlay variant="drawer" {...props} /> }
-

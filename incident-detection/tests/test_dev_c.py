@@ -47,7 +47,6 @@ from fixtures import (
     load_subgraph,
 )
 from remediation.approval_cli import ApprovalCLI, ApprovalDecision
-from remediation.canary import SimulatedCanary
 from remediation.router import RemediationRouter
 
 
@@ -306,9 +305,40 @@ def test_isolation_ari_and_abstention():
     assert m3.abstention_correct == 1.0
 
 
-def test_remediation_three_deep_branches():
+def test_remediation_three_deep_branches(monkeypatch):
+    from remediation.apply import k8s as k8s_apply
+    from remediation import router as router_mod
+
+    monkeypatch.setattr(
+        router_mod.runtime_profile,
+        "supports_action",
+        lambda _service, action: action != "restart_data_path",
+    )
+    monkeypatch.setattr(
+        k8s_apply,
+        "read_workload_revision",
+        lambda *_a, **_k: {
+            "kind": "Deployment",
+            "revision": "2",
+            "resource_version": "10",
+            "images": ["example:v2"],
+        },
+    )
+    fake_flag = {
+        "resource_version": "10",
+        "doc": {
+            "flags": {
+                "testFailure": {
+                    "defaultVariant": "on",
+                    "variants": {"on": True, "off": False},
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(k8s_apply, "read_flagd_config", lambda *_a, **_k: fake_flag)
     ranked = load_ranked_result()
     top = ranked.candidates[0]
+    top.flags["flag_key"] = "testFailure"
     router = RemediationRouter()
 
     dep = router.route(FaultClass.DEPENDENCY, top, ranked)
@@ -348,14 +378,43 @@ def test_approval_cli_reject_then_approve():
     assert outcome.candidate_index == 1
 
 
-def test_canary_rollback_on_slo_breach():
-    ok = SimulatedCanary().apply()
-    assert ok.applied and not ok.rolled_back
+def test_typed_plan_and_policy():
+    from remediation.plan_schema import ExactTarget, PlanChange, SLOGate, TypedPlanSpec
+    from remediation.policy import check_plan_executable, kill_switch_active
 
-    bad = SimulatedCanary(metric_fn=SimulatedCanary.breaching_metrics).apply()
-    assert bad.rolled_back
-    assert not bad.applied
-    assert any(s.breached for s in bad.snapshots)
+    spec = TypedPlanSpec(
+        action="config_patch",
+        fault_class="Config",
+        target=ExactTarget(
+            cluster="kind",
+            namespace="otel-demo",
+            kind="ConfigMap",
+            name="flagd-config",
+            config_key="demo.flagd.json#flags.x.defaultVariant",
+        ),
+        before_fingerprint="abc",
+        change=PlanChange(
+            description="set flag",
+            patch={"flag_key": "x", "defaultVariant": "off", "resource_version": "1"},
+            inverse={"flag_key": "x", "defaultVariant": "on", "resource_version": "1"},
+        ),
+        risk_tier="low",
+        required_approvals=1,
+        slo_gates=SLOGate(require_fresh=False),
+        incident_id="inc-1",
+        candidate_node="flagd",
+        confidence=0.8,
+    )
+    assert check_plan_executable(spec).allowed
+    assert kill_switch_active().allowed
+
+
+def test_apply_plan_v1_disabled():
+    from remediation.service import apply_plan_v1
+
+    out = apply_plan_v1({"action": "config_patch"})
+    assert out["attempted"] is False
+    assert out["mode"] == "worker_required"
 
 
 def test_compute_metrics_per_scenario():

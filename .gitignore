@@ -25,6 +25,10 @@ node_modules/
 .ruff_cache/
 .coverage
 htmlcov/
+.run/
+outputs/
+*.pid
+*.log
 
 # Dev-A operational output (generated, not source)
 baselines/
@@ -32,3 +36,4 @@ ground_truth/
 
 # Fixture-smoke artifacts (regenerated in CI)
 incident-detection/artifacts/
+incident-detection/eval/artifacts/

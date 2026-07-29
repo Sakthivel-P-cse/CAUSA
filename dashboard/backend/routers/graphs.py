@@ -22,9 +22,19 @@ def _edge_to_dict(e: Any) -> dict[str, Any]:
 
 
 @router.get("/service-dependency")
-def service_dependency(prom=Depends(get_prometheus)) -> dict[str, Any]:
+def service_dependency(
+    service: str | None = Query(None),
+    minutes: int = Query(5, ge=1, le=1440),
+    prom=Depends(get_prometheus),
+) -> dict[str, Any]:
     try:
-        edges = [_edge_to_dict(e) for e in prom.get_service_edges(window="5m")]
+        prom.check_available()
+        edges = [_edge_to_dict(e) for e in prom.get_service_edges(window=f"{minutes}m")]
+        if service:
+            edges = [
+                edge for edge in edges
+                if service in {edge.get("source"), edge.get("target")}
+            ]
     except Exception as exc:
         raise_upstream_error("prometheus", "service dependency", exc)
     nodes: dict[str, dict[str, Any]] = {}
@@ -53,7 +63,10 @@ def service_dependency(prom=Depends(get_prometheus)) -> dict[str, Any]:
 
 
 @router.get("/infrastructure")
-def infrastructure(prom=Depends(get_prometheus)) -> dict[str, Any]:
+def infrastructure(
+    service: str | None = Query(None),
+    prom=Depends(get_prometheus),
+) -> dict[str, Any]:
     try:
         infra = prom.get_infra_nodes()
     except Exception as exc:
@@ -61,6 +74,8 @@ def infrastructure(prom=Depends(get_prometheus)) -> dict[str, Any]:
     nodes = []
     for n in infra:
         name = getattr(n, "name", None) or getattr(n, "node", None) or str(n)
+        if service and service.lower() not in name.lower():
+            continue
         kind = getattr(n, "kind", None) or "node"
         cpu = float(getattr(n, "cpu_usage_pct", 0) or 0)
         status = "error" if cpu > 90 else "warn" if cpu > 70 else "ok"

@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from collections import Counter
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 
+from dashboard.backend.ack_store import (
+    ack_incident,
+    lifecycle_for,
+    merge_ack_fields,
+    snooze_incident,
+)
+from dashboard.backend.app_scope import is_app_scope_incident
 from dashboard.backend.dependencies import get_store
 from dashboard.backend.db import DashboardStore
 from dashboard.backend.errors import api_error
@@ -90,21 +100,30 @@ def _facets(items: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
 
 
 def _list_item(item: dict[str, Any]) -> dict[str, Any]:
+    merged = merge_ack_fields(item)
     return {
-        "id": item.get("id"),
-        "incident_id": item.get("incident_id"),
-        "triggered_at": item.get("triggered_at"),
-        "alert_name": item.get("alert_name"),
-        "alerted_service": item.get("alerted_service"),
-        "root_cause_service": item.get("root_cause_service"),
-        "failure_type": item.get("failure_type"),
-        "severity": item.get("severity"),
-        "incident_status": item.get("incident_status"),
-        "confidence_score": item.get("confidence_score"),
-        "root_cause_summary": item.get("root_cause_summary"),
-        "trace_id": item.get("trace_id"),
-        "resolved_at": item.get("resolved_at"),
-        "has_rca": item.get("has_rca", False),
+        "id": merged.get("id"),
+        "incident_id": merged.get("incident_id"),
+        "triggered_at": merged.get("triggered_at"),
+        "alert_name": merged.get("alert_name"),
+        "alerted_service": merged.get("alerted_service"),
+        "root_cause_service": merged.get("root_cause_service"),
+        "failure_type": merged.get("failure_type"),
+        "severity": merged.get("severity"),
+        "incident_status": merged.get("incident_status"),
+        "confidence_score": merged.get("confidence_score"),
+        "root_cause_summary": merged.get("root_cause_summary"),
+        "trace_id": merged.get("trace_id"),
+        "resolved_at": merged.get("resolved_at"),
+        "has_rca": merged.get("has_rca", False),
+        "acked_at": merged.get("acked_at"),
+        "acked_by": merged.get("acked_by"),
+        "snoozed_until": merged.get("snoozed_until"),
+        "lifecycle": lifecycle_for(merged),
+        "routing": merged.get("routing") or merged.get("route"),
+        "route": merged.get("route") or merged.get("routing"),
+        "runbook_url": merged.get("runbook_url"),
+        "layer": merged.get("layer"),
     }
 
 
@@ -127,7 +146,8 @@ def list_incidents(
     filtered = [
         i
         for i in items
-        if _matches(
+        if is_app_scope_incident(i)
+        and _matches(
             i,
             q=q,
             service=service,
@@ -171,7 +191,8 @@ def list_history(
     filtered = [
         i
         for i in items
-        if _matches(
+        if is_app_scope_incident(i)
+        and _matches(
             i,
             q=q,
             service=service,
@@ -221,6 +242,26 @@ def history_detail(
     }
 
 
+@router.get("/stream")
+async def stream_incidents(request: Request, store: DashboardStore = Depends(get_store)):
+    async def event_gen():
+        last = ""
+        while True:
+            if await request.is_disconnected():
+                break
+            items = [_list_item(i) for i in store.list_incidents_joined()[:50]]
+            active = [i for i in items if i.get("lifecycle") in {"active", "investigating"}]
+            payload = json.dumps({"active": len(active), "items": active[:20]})
+            if payload != last:
+                last = payload
+                yield f"event: incidents\ndata: {payload}\n\n"
+            else:
+                yield "event: ping\ndata: {}\n\n"
+            await asyncio.sleep(5)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
 @router.get("/{report_id}")
 def get_incident(
     report_id: str,
@@ -236,8 +277,10 @@ def get_incident(
         else []
     )
     rem = store.load_remediation_index().get(str(item.get("incident_id") or ""))
+    merged = merge_ack_fields(item)
     return {
-        **item,
+        **merged,
+        "lifecycle": lifecycle_for(merged),
         "anomaly_score_list": anomaly_list,
         "remediation": rem,
         "references": {
@@ -246,6 +289,37 @@ def get_incident(
             "trace_apis": [f"/api/traces/{item['trace_id']}"] if item.get("trace_id") else [],
         },
     }
+
+
+@router.post("/{report_id}/ack")
+def post_ack(
+    report_id: str,
+    body: dict[str, Any] | None = None,
+    store: DashboardStore = Depends(get_store),
+) -> dict[str, Any]:
+    item = store.get_report(report_id)
+    if not item:
+        raise api_error(404, "not_found", "Report not found")
+    key = str(item.get("incident_id") or item.get("id") or report_id)
+    by = str((body or {}).get("acked_by") or "operator")
+    row = ack_incident(key, by=by)
+    return {"status": "ok", "incident_id": key, "lifecycle": "investigating", **row}
+
+
+@router.post("/{report_id}/snooze")
+def post_snooze(
+    report_id: str,
+    body: dict[str, Any] | None = None,
+    store: DashboardStore = Depends(get_store),
+) -> dict[str, Any]:
+    item = store.get_report(report_id)
+    if not item:
+        raise api_error(404, "not_found", "Report not found")
+    key = str(item.get("incident_id") or item.get("id") or report_id)
+    minutes = int((body or {}).get("minutes") or 60)
+    by = str((body or {}).get("acked_by") or "operator")
+    row = snooze_incident(key, minutes=minutes, by=by)
+    return {"status": "ok", "incident_id": key, "lifecycle": "investigating", **row}
 
 
 @router.post("/{report_id}/feedback")

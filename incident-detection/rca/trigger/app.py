@@ -112,7 +112,15 @@ class TriggerHandler(BaseHTTPRequestHandler):
         logger.debug("%s - " + fmt, self.address_string(), *args)
 
     def do_GET(self) -> None:
-        if self.path.rstrip("/") in ("", "/health", "/healthz"):
+        path = self.path.rstrip("/")
+        if path == "/ready":
+            try:
+                self.dispatcher.orchestrator.store.check_available()
+                self._send(200, {"status": "ready"})
+            except Exception:
+                logger.exception("readiness check failed")
+                self._send(503, {"status": "not_ready", "postgres": False})
+        elif path in ("", "/health", "/healthz"):
             self._send(
                 200,
                 {
@@ -121,7 +129,7 @@ class TriggerHandler(BaseHTTPRequestHandler):
                     "rca_process_failures_total": rca_process_failures_total,
                 },
             )
-        elif self.path.rstrip("/") == "/metrics":
+        elif path == "/metrics":
             body = (
                 f"# TYPE incident_not_opened_via_ingest_total counter\n"
                 f"incident_not_opened_via_ingest_total {incident_not_opened_via_ingest_total}\n"
@@ -140,8 +148,26 @@ class TriggerHandler(BaseHTTPRequestHandler):
         if self.path.rstrip("/") != "/trigger":
             self._send(404, {"error": "not found"})
             return
-        if _AUTH_TOKEN and self.headers.get("Authorization") != f"Bearer {_AUTH_TOKEN}":
-            self._send(401, {"error": "unauthorized"})
+        allow_unauthenticated = os.getenv(
+            "CAUSA_TRIGGER_ALLOW_UNAUTHENTICATED", "0"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if (
+            (not _AUTH_TOKEN and not allow_unauthenticated)
+            or (
+                _AUTH_TOKEN
+                and self.headers.get("Authorization") != f"Bearer {_AUTH_TOKEN}"
+            )
+        ):
+            self._send(
+                503 if not _AUTH_TOKEN else 401,
+                {
+                    "error": (
+                        "trigger authentication not configured"
+                        if not _AUTH_TOKEN
+                        else "unauthorized"
+                    )
+                },
+            )
             return
 
         raw_length = self.headers.get("Content-Length")

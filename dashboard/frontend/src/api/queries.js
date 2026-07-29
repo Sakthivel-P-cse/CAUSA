@@ -9,6 +9,10 @@ export const queryKeys = {
   incident: reportId => ['watchdog', 'incident', reportId],
 }
 
+export function apiQueryKey(url, deps = []) {
+  return ['api', url, ...deps]
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -28,4 +32,3 @@ export function useApiQuery({ queryKey, url, enabled = true, refreshMs = 0, ...o
     ...options,
   })
 }
-

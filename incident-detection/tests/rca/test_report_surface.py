@@ -92,10 +92,25 @@ def _write():
         _candidate("bystander", 0.10, Role.UNKNOWN, 0.05),    # below theta_fire
     ]
     anomalies = [
-        AnomalyOutput(node="root", anomaly_score=0.90, dev_vector={}),
-        AnomalyOutput(node="relay", anomaly_score=0.80, dev_vector={}),
-        AnomalyOutput(node="hit", anomaly_score=0.60, dev_vector={}),
-        AnomalyOutput(node="hosted", anomaly_score=0.55, dev_vector={}),
+        AnomalyOutput(node="root", anomaly_score=0.90, first_deviation=NOW, dev_vector={}),
+        AnomalyOutput(
+            node="relay",
+            anomaly_score=0.80,
+            first_deviation=NOW + timedelta(seconds=10),
+            dev_vector={},
+        ),
+        AnomalyOutput(
+            node="hit",
+            anomaly_score=0.60,
+            first_deviation=NOW + timedelta(seconds=20),
+            dev_vector={},
+        ),
+        AnomalyOutput(
+            node="hosted",
+            anomaly_score=0.55,
+            first_deviation=NOW + timedelta(seconds=25),
+            dev_vector={},
+        ),
         AnomalyOutput(node="bystander", anomaly_score=0.05, dev_vector={}),
     ]
     telemetry = IncidentTelemetry(
@@ -120,6 +135,7 @@ def _write():
         "amplifier_nodes": json.loads(params[8]),
         "blast_radius": json.loads(params[9]),
         "anomaly_scores": json.loads(params[10]),
+        "timeline": json.loads(params[15]),
     }
 
 
@@ -187,3 +203,16 @@ def test_anomaly_scores_stays_unfiltered():
 def test_amplifier_nodes_matches_the_role():
     written = _write()
     assert written["amplifier_nodes"] == ["relay"]
+
+
+def test_timeline_carries_score_role_and_offsets():
+    written = _write()
+    timeline = written["timeline"]
+    assert [e["service"] for e in timeline] == ["root", "relay", "hit", "hosted"]
+    assert timeline[0]["offset_seconds"] == 0.0
+    assert timeline[1]["offset_seconds"] == 10.0
+    assert timeline[0]["role"] == "origin"
+    assert timeline[1]["role"] == "amplifier"
+    assert timeline[0]["anomaly_score"] == 0.9
+    assert timeline[0]["ordering_source"] == "metric_onset"
+    assert "bystander" not in [e["service"] for e in timeline]

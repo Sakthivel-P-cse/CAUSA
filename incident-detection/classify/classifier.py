@@ -13,12 +13,12 @@ from contracts import CLASSIFICATION_TARGETS, FaultClass, NodeKind, RootCauseCan
 
 
 _PATTERNS: list[tuple[FaultClass, re.Pattern[str]]] = [
-    (FaultClass.DEPENDENCY, re.compile(r"redis|kafka|timeout|connection refused|upstream|circuit", re.I)),
-    (FaultClass.RESOURCE, re.compile(r"oom|maxmemory|cpu|memory|saturation|throttl", re.I)),
+    (FaultClass.DEPENDENCY, re.compile(r"redis|kafka|timeout|connection refused|upstream|circuit|valkey|postgres|postgresql|dependency", re.I)),
+    (FaultClass.RESOURCE, re.compile(r"oom|maxmemory|cpu|memory|saturation|throttl|slo.?latency", re.I)),
     (FaultClass.CONFIG, re.compile(r"flagd|feature.?flag|config|misconfig|env var|manifest", re.I)),
-    (FaultClass.INFRA, re.compile(r"node.?notready|cordon|kubelet|disk pressure|host", re.I)),
+    (FaultClass.INFRA, re.compile(r"node.?notready|cordon|kubelet|disk pressure|host|platform|ingestion|mimir|loki|tempo|minio", re.I)),
     (FaultClass.DATA, re.compile(r"corrupt|schema|migration|constraint|null.?pointer.?data", re.I)),
-    (FaultClass.APP_LOGIC, re.compile(r"panic|exception|nil pointer|assertion|bug|stack trace", re.I)),
+    (FaultClass.APP_LOGIC, re.compile(r"panic|exception|nil pointer|assertion|bug|stack trace|slo.?availability", re.I)),
 ]
 
 
@@ -93,6 +93,15 @@ def classify_candidate(
 
     # When RCA left failure_type NULL, lean on alert naming for AppLogic/Config/Resource.
     alert = str(alert_name or "").lower()
+    if alert.startswith("slo") or "burn" in alert:
+        if "latency" in alert:
+            combined[FaultClass.RESOURCE] += 1.4
+        else:
+            combined[FaultClass.APP_LOGIC] += 1.0
+    if alert.startswith("dependency") or "proxy" in alert:
+        combined[FaultClass.DEPENDENCY] += 1.5
+    if any(token in alert for token in ("loki", "tempo", "mimir", "otel", "prometheus", "minio", "platform")):
+        combined[FaultClass.INFRA] += 1.4
     if "crashloop" in alert or "oom" in alert:
         combined[FaultClass.RESOURCE] += 1.2
     if "flag" in alert or "config" in alert:

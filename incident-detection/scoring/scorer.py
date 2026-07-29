@@ -29,7 +29,11 @@ from rca.types import KernelAnomaly
 from .arbitration import arbitrate
 from .fault_class import derive_fault_class
 from .fitted_weights import load_fitted_weights
-from .output import build_candidates, demote_system_infra_hosts, resolve_origins, stamp_confidence
+from .output import (
+    build_candidates,
+    resolve_origins,
+    stamp_confidence,
+)
 from .signals import compute_signals
 
 
@@ -129,8 +133,6 @@ def score(
         raw_scores[nid] = s
 
     candidates = build_candidates(signals, raw_scores, anomaly, ig)
-    candidates = demote_system_infra_hosts(candidates)
-
     if run_arbitration:
         candidates = arbitrate(
             candidates,
@@ -141,7 +143,6 @@ def score(
         )
         # Re-stamp confidence after possible score swaps / reordering.
         stamp_confidence(candidates)
-        candidates = demote_system_infra_hosts(candidates)
 
     # ORIGIN is a claim about the incident, so it can only be settled once the
     # ranking is final — including any arbitration reorder above.

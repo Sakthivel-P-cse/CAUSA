@@ -220,6 +220,8 @@ def _origin_clustering(
     ig: InfluenceGraph,
     anomaly: KernelAnomaly,
     delta: float,
+    *,
+    alerted_service: str | None = None,
 ) -> list[set[str]] | str:
     """Split a component into origin clusters, or return abstain reason."""
     origins = _temporal_origins(component, anomaly, ig)
@@ -242,6 +244,13 @@ def _origin_clustering(
                 shared = (r1 & r2) - {o1, o2}
                 # Shared victim or mutual reachability => causally adjacent.
                 if o1 in r2 or o2 in r1 or shared:
+                    # Ops path: when the firing alert names one strong origin,
+                    # score that origin's cascade instead of hard-abstaining
+                    # (AppLogic single-target demos under flood noise).
+                    if alerted_service and alerted_service in origins:
+                        focused = _reachable(ig, alerted_service) & component
+                        if focused:
+                            return [focused]
                     return "MULTI-INCIDENT — ambiguous"
 
     # Otherwise partition by nearest temporal origin via IG reachability.
@@ -346,7 +355,9 @@ def isolate(
     # Stage 3
     final_clusters: list[set[str]] = []
     for comp in comps:
-        result = _origin_clustering(comp, ig, anomaly, delta)
+        result = _origin_clustering(
+            comp, ig, anomaly, delta, alerted_service=alerted_service
+        )
         if isinstance(result, str):
             return IsolationResult(clusters=[], abstain_reason=result)
         final_clusters.extend(result)

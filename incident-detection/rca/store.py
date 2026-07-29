@@ -101,6 +101,10 @@ class RCAStore:
             ) from exc
         return psycopg.connect(self._dsn, autocommit=True)
 
+    def check_available(self) -> None:
+        with self._connect() as conn:
+            conn.execute("SELECT 1")
+
     def load_incident(self, incident_id: str) -> IncidentState:
         with self._connect() as conn:
             row = conn.execute(
@@ -188,16 +192,40 @@ class RCAStore:
             }
             for candidate in result.candidates
         ]
-        timeline = [
-            {
-                "timestamp": output.first_deviation.isoformat(),
-                "service": output.node,
-                "event": "first deviation",
-            }
-            for output in anomalies
-            if output.first_deviation is not None
+        # Timeline is metric-onset order: first_deviation from anomaly series.
+        # Enrich with score/role so the UI does not invent fake uncertainty chips.
+        role_by_node = {
+            candidate.node_id: (
+                candidate.role.value if hasattr(candidate.role, "value") else str(candidate.role)
+            )
+            for candidate in result.candidates
+        }
+        onset_events = [
+            output for output in anomalies if output.first_deviation is not None
         ]
-        timeline.sort(key=lambda event: (event["timestamp"], event["service"]))
+        onset_events.sort(key=lambda output: (output.first_deviation, output.node))
+        origin_ts = onset_events[0].first_deviation if onset_events else None
+        timeline = []
+        for output in onset_events:
+            offset_s = (
+                (output.first_deviation - origin_ts).total_seconds()
+                if origin_ts is not None
+                else None
+            )
+            role = role_by_node.get(output.node)
+            timeline.append(
+                {
+                    "timestamp": output.first_deviation.isoformat(),
+                    "service": output.node,
+                    "event": "first deviation",
+                    "anomaly_score": round(float(output.anomaly_score), 4),
+                    "role": role,
+                    "offset_seconds": round(offset_s, 1) if offset_s is not None else None,
+                    "ordering_source": "metric_onset",
+                    "key_moment": role in {"origin", "amplifier"}
+                    or float(output.anomaly_score) >= thresholds.theta_fire,
+                }
+            )
         summary = operator_root_cause_summary(
             top_node=top.node_id if top is not None else None,
             alert_name=incident.alert_name,
@@ -219,7 +247,25 @@ class RCAStore:
                     %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
                 )
                 ON CONFLICT (incident_id) WHERE incident_id IS NOT NULL
-                DO NOTHING
+                DO UPDATE SET
+                    triggered_at = EXCLUDED.triggered_at,
+                    alert_name = EXCLUDED.alert_name,
+                    alerted_service = EXCLUDED.alerted_service,
+                    root_cause_service = EXCLUDED.root_cause_service,
+                    failure_type = EXCLUDED.failure_type,
+                    root_cause_summary = EXCLUDED.root_cause_summary,
+                    origin_candidates = EXCLUDED.origin_candidates,
+                    amplifier_nodes = EXCLUDED.amplifier_nodes,
+                    blast_radius = EXCLUDED.blast_radius,
+                    anomaly_scores = EXCLUDED.anomaly_scores,
+                    incident_scope = EXCLUDED.incident_scope,
+                    inference_evidence = EXCLUDED.inference_evidence,
+                    confidence_score = EXCLUDED.confidence_score,
+                    evidence = EXCLUDED.evidence,
+                    timeline = EXCLUDED.timeline,
+                    trace_id = EXCLUDED.trace_id,
+                    resolved_at = EXCLUDED.resolved_at
+                WHERE rca_reports.root_cause_summary ILIKE '%%missing_anomaly_baselines%%'
                 """,
                 (
                     incident.triggered_at,
@@ -248,11 +294,34 @@ class RCAStore:
                     incident.resolved_at,
                 ),
             )
-            # DO NOTHING is the desired outcome for an Alertmanager resend, but
-            # it must not be invisible — a silent no-op here reads identically
-            # to a successful write.
             if cursor.rowcount == 0:
                 logger.info(
                     "RCA report for incident %s already exists; skipped duplicate insert",
                     incident.incident_id,
                 )
+                return
+        report_payload = {
+            "incident_id": incident.incident_id,
+            "id": incident.incident_id,
+            "alert_name": incident.alert_name,
+            "alerted_service": incident.alerted_service,
+            "root_cause_service": top.node_id if top else None,
+            "failure_type": (
+                result.fault_class.value
+                if hasattr(result.fault_class, "value")
+                else result.fault_class
+            ),
+            "root_cause_summary": summary,
+            "confidence_score": top.confidence if top else 0.0,
+            "origin_candidates": origin_candidates,
+            "timeline": timeline,
+            "blast_radius": blast_radius,
+            "trace_id": telemetry.trace_id or incident.trace_id,
+        }
+        try:
+            from remediation.auto import auto_remediate_from_report
+
+            rem = auto_remediate_from_report(report_payload)
+            logger.info("auto remediation for %s: %s", incident.incident_id, rem)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("auto remediation failed for %s: %s", incident.incident_id, exc)

@@ -59,9 +59,11 @@ function traceIdFor(log) {
 }
 
 function LogRow({ log, index }) {
+  const [showRaw, setShowRaw] = useState(false)
   const level = log.level?.toLowerCase() || 'unknown'
   const traceId = traceIdFor(log)
-  const details = { ...log, labels: logLabels(log) }
+  const labels = logLabels(log)
+  const details = { ...log, labels }
   return (
     <details className="log-row">
       <summary aria-label={`Log ${index + 1}: ${log.message || 'no message'}`}>
@@ -71,21 +73,32 @@ function LogRow({ log, index }) {
         <span className="log-row__message">{log.message || '(no message)'}</span>
       </summary>
       <div className="log-row__detail">
-        {traceId && <Link className="explorer-link" to={`/traces?trace=${encodeURIComponent(traceId)}`}>Open trace {String(traceId).slice(0, 16)}…</Link>}
-        <pre>{JSON.stringify(details, null, 2)}</pre>
+        <dl className="log-fields">
+          <div><dt>Level</dt><dd>{level}</dd></div>
+          <div><dt>Service</dt><dd>{logSource(log)}</dd></div>
+          <div><dt>Message</dt><dd>{log.message || '—'}</dd></div>
+          {traceId && (
+            <div>
+              <dt>Trace</dt>
+              <dd><Link className="explorer-link" to={`/traces?trace=${encodeURIComponent(traceId)}`}>{String(traceId).slice(0, 24)}…</Link></dd>
+            </div>
+          )}
+        </dl>
+        <button type="button" className="btn-link" onClick={() => setShowRaw(v => !v)}>{showRaw ? 'Hide raw' : 'Show raw JSON'}</button>
+        {showRaw && <pre>{JSON.stringify(details, null, 2)}</pre>}
       </div>
     </details>
   )
 }
 
-function LogHistogram({ logs }) {
+function LogHistogram({ logs, onBrush }) {
   const buckets = useMemo(() => {
     const times = logs.map(log => new Date(typeof log.timestamp === 'number' && log.timestamp < 1e12 ? log.timestamp * 1000 : log.timestamp).getTime()).filter(Number.isFinite)
     if (!times.length) return []
     const min = Math.min(...times)
     const max = Math.max(...times)
     const width = Math.max((max - min) / 24, 1)
-    const result = Array.from({ length: 24 }, (_, index) => ({ start: min + index * width, count: 0 }))
+    const result = Array.from({ length: 24 }, (_, index) => ({ start: min + index * width, end: min + (index + 1) * width, count: 0 }))
     times.forEach(time => { result[Math.min(23, Math.floor((time - min) / width))].count += 1 })
     return result
   }, [logs])
@@ -94,21 +107,29 @@ function LogHistogram({ logs }) {
     <div>
       <div className="log-histogram" aria-label="Log volume histogram">
         {buckets.map((bucket, index) => (
-          <span className="log-histogram__bar" key={index} style={{ height: `${Math.max(3, (bucket.count / highest) * 100)}%` }} title={`${bucket.count} logs around ${new Date(bucket.start).toLocaleTimeString()}`} />
+          <button
+            type="button"
+            className="log-histogram__bar"
+            key={index}
+            style={{ height: `${Math.max(3, (bucket.count / highest) * 100)}%` }}
+            title={`${bucket.count} logs · click to zoom`}
+            onClick={() => onBrush?.(bucket.start, bucket.end)}
+          />
         ))}
       </div>
-      <p style={{ color: 'var(--muted-2)', fontSize: 10, margin: '8px 4px 12px' }}>Volume derived from returned log timestamps</p>
+      <p style={{ color: 'var(--muted-2)', fontSize: 10, margin: '8px 4px 12px' }}>Click a bar to zoom the time window</p>
     </div>
   )
 }
 
 export default function Logs() {
-  const { filters, refreshMs } = useExplorerScope()
+  const { filters, refreshMs, setFilter } = useExplorerScope()
 
   const urlService = initialUrlParam('service')
   const [level, setLevel] = useState(() => initialUrlParam('level'))
   const [source, setSource] = useState(() => initialUrlParam('source'))
   const [search, setSearch] = useState(() => initialUrlParam('search'))
+  const [liveTail, setLiveTail] = useState(false)
   const [query, setQuery] = useState(() => ({
     service: filters.service || urlService,
     level: initialUrlParam('level'),
@@ -118,7 +139,9 @@ export default function Logs() {
 
   useEffect(() => {
     setQuery(prev => ({ ...prev, service: filters.service || urlService, minutes: filters.minutes }))
-  }, [filters.service, filters.minutes])
+  }, [filters.service, filters.minutes, urlService])
+
+  const effectiveRefresh = liveTail ? Math.max(refreshMs || 0, 5000) : refreshMs
 
   const params = new URLSearchParams()
   if (query.service) params.set('service', query.service)
@@ -135,7 +158,7 @@ export default function Logs() {
   const { data: logsRaw, loading, error } = useFetch(
     `/api/logs?${params}`,
     [JSON.stringify(query), filters.from, filters.to],
-    { refreshMs }
+    { refreshMs: effectiveRefresh }
   )
 
   function submit(e) {
@@ -145,10 +168,21 @@ export default function Logs() {
     setUrlParams({ service, level, source, search })
   }
 
-  const logs = logsRaw ?? []
+  function brushZoom(startMs, endMs) {
+    if (!setFilter) return
+    setFilter('from', new Date(startMs).toISOString())
+    setFilter('to', new Date(endMs).toISOString())
+  }
+
+  const logs = useMemo(() => logsRaw ?? [], [logsRaw])
   const sources = useMemo(() => Array.from(new Set(logs.map(logSource))).sort(), [logs])
   const sourceCounts = useMemo(() => logs.reduce((counts, log) => {
     const value = logSource(log)
+    counts[value] = (counts[value] || 0) + 1
+    return counts
+  }, {}), [logs])
+  const levelCounts = useMemo(() => logs.reduce((counts, log) => {
+    const value = String(log.level || 'unknown').toLowerCase()
     counts[value] = (counts[value] || 0) + 1
     return counts
   }, {}), [logs])
@@ -164,9 +198,13 @@ export default function Logs() {
         <ExplorerField label="Level">
           <select value={level} onChange={event => setLevel(event.target.value)}>
             <option value="">All levels</option>
-            {['error', 'warn', 'info', 'debug'].map(value => <option key={value} value={value}>{value}</option>)}
+            {['error', 'warn', 'info', 'debug'].map(value => <option key={value} value={value}>{value}{levelCounts[value] ? ` (${levelCounts[value]})` : ''}</option>)}
           </select>
         </ExplorerField>
+        <label className="timeline-toggle">
+          <input type="checkbox" checked={liveTail} onChange={e => setLiveTail(e.target.checked)} />
+          Live tail
+        </label>
         <button className="explorer-button explorer-button--primary" type="submit">Run query</button>
       </form>
       <ExplorerSummary
@@ -174,7 +212,7 @@ export default function Logs() {
         count={visibleLogs.length}
         noun="logs"
         loading={loading}
-        live={refreshMs > 0}
+        live={effectiveRefresh > 0}
       />
       {query.service && <RelatedIncidentsStrip service={query.service} />}
       <div className="explorer-grid explorer-grid--sidebar">
@@ -186,12 +224,18 @@ export default function Logs() {
               <FacetButton key={value} active={source === value} count={sourceCounts[value]} onClick={() => { setSource(value); setUrlParams({ source: value }) }}>{value}</FacetButton>
             ))}
           </div>
+          <div className="explorer-section-heading" style={{ marginTop: 12 }}><div><h2>Levels</h2></div></div>
+          <div className="explorer-list">
+            {Object.entries(levelCounts).map(([value, count]) => (
+              <FacetButton key={value} active={level === value} count={count} onClick={() => setLevel(value)}>{value}</FacetButton>
+            ))}
+          </div>
         </aside>
         <section className="explorer-card">
-          <div className="explorer-section-heading"><div><h2>Returned events</h2><p>Select a row to inspect its complete structured payload</p></div></div>
-          <ExplorerState loading={loading} error={error} empty={!visibleLogs.length} emptyTitle="No matching logs" emptyBody="Loki returned no entries. If this persists, port-forward loki:3100 and widen the time window.">
+          <div className="explorer-section-heading"><div><h2>Returned events</h2><p>Formatted fields first; raw on demand</p></div></div>
+          <ExplorerState loading={loading} error={error} dependency="Loki" empty={!visibleLogs.length} emptyTitle="No matching logs" emptyBody="Loki returned no entries for the selected scope.">
             <>
-              <LogHistogram logs={visibleLogs} />
+              <LogHistogram logs={visibleLogs} onBrush={brushZoom} />
               {visibleLogs.map((log, index) => <LogRow key={`${log.timestamp}-${index}`} log={log} index={index} />)}
             </>
           </ExplorerState>

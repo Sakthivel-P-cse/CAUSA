@@ -36,10 +36,12 @@ def window_bounds(
 
 
 def init_resources(app: FastAPI) -> None:
+    from dashboard.backend.auth import validate_auth_configuration
     from ingest.clients.loki_client import LokiClient
     from ingest.clients.prometheus_client import PrometheusClient
     from ingest.clients.tempo_client import TempoClient
 
+    validate_auth_configuration()
     app.state.prometheus = PrometheusClient(
         os.getenv("PROMETHEUS_URL", "http://localhost:9090")
     )

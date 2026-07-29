@@ -1,0 +1,112 @@
+name: Remediation CD — build image and update Argo Rollout
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "src/recommendation/**"
+      - "src/payment/**"
+      - "src/cartservice/**"
+      - "src/checkout/**"
+      - "src/product-catalog/**"
+      - "demo-bugs/**"
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Microservice to build and canary
+        required: true
+        default: recommendation
+      image_tag:
+        description: Image tag
+        required: false
+        default: ""
+
+env:
+  REGISTRY: ${{ vars.CAUSA_IMAGE_REGISTRY || 'ghcr.io' }}
+  IMAGE_OWNER: ${{ github.repository_owner }}
+  DEMO_NS: otel-demo
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      service: ${{ steps.pick.outputs.service }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "service=${{ inputs.service }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          SVC=recommendation
+          for s in recommendation payment cart checkout product-catalog; do
+            if git diff --name-only HEAD~1 HEAD | grep -E "(src/$s|demo-bugs/$s|cartservice)" >/dev/null 2>&1; then
+              SVC=$s
+              [ "$s" = "cartservice" ] && SVC=cart
+              break
+            fi
+          done
+          echo "service=$SVC" >> "$GITHUB_OUTPUT"
+
+  build-push:
+    needs: detect
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: |
+          TAG="${{ inputs.image_tag }}"
+          if [ -z "$TAG" ]; then TAG="sha-${GITHUB_SHA::12}"; fi
+          SVC="${{ needs.detect.outputs.service }}"
+          IMAGE="${REGISTRY}/${IMAGE_OWNER}/causa-${SVC}:${TAG}"
+          echo "Building $IMAGE (context must provide Dockerfile for $SVC)"
+          if [ -f "demo-bugs/${SVC}/Dockerfile" ]; then
+            docker build -t "$IMAGE" "demo-bugs/${SVC}"
+          elif [ -f "src/${SVC}/Dockerfile" ]; then
+            docker build -t "$IMAGE" "src/${SVC}"
+          else
+            echo "::error::No Dockerfile found for $SVC"
+            exit 1
+          fi
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  promote-rollout:
+    needs: [detect, build-push]
+    if: ${{ needs.build-push.outputs.image != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Argo Rollout image
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+          IMAGE: ${{ needs.build-push.outputs.image }}
+          SVC: ${{ needs.detect.outputs.service }}
+        run: |
+          if [ -z "$KUBE_CONFIG_DATA" ]; then
+            echo "::error::KUBE_CONFIG_DATA secret is required for promotion"
+            exit 1
+          fi
+          mkdir -p ~/.kube
+          echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config
+          curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl
+          chmod +x /usr/local/bin/kubectl
+          curl -fsSL -o /usr/local/bin/kubectl-argo-rollouts \
+            https://github.com/argoproj/argo-rollouts/releases/download/v1.7.2/kubectl-argo-rollouts-linux-amd64
+          chmod +x /usr/local/bin/kubectl-argo-rollouts
+          kubectl argo rollouts set image "$SVC" "$SVC=$IMAGE" -n "$DEMO_NS" || \
+            kubectl set image "rollout/$SVC" "$SVC=$IMAGE" -n "$DEMO_NS"
+          kubectl argo rollouts status "$SVC" -n "$DEMO_NS" --timeout 10m

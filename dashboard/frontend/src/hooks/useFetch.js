@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../api/client.js'
+import { apiQueryKey } from '../api/queries.js'
 
 export function useFetch(url, deps = [], options = {}) {
   const refreshMs = Number(options.refreshMs || 0)
   const query = useQuery({
-    queryKey: ['legacy-api', url, ...deps],
+    queryKey: apiQueryKey(url, deps),
     queryFn: ({ signal }) => apiFetch(url, { signal }),
     enabled: Boolean(url),
     refetchInterval: refreshMs > 0 ? refreshMs : false,
@@ -19,6 +20,10 @@ export function useFetch(url, deps = [], options = {}) {
     loading: Boolean(url) && query.isPending && !hasData,
     fetching: Boolean(url) && query.isFetching,
     error: query.error ? (query.error.message || 'Request failed') : null,
+    errorCode: query.error?.code || null,
+    errorStatus: query.error?.status || null,
+    lastUpdated: query.dataUpdatedAt || null,
+    stale: Boolean(query.error && hasData),
     reload: query.refetch,
   }
 }

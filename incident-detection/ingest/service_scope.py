@@ -19,6 +19,8 @@ import os
 import re
 from functools import lru_cache
 
+from runtime import profile as runtime_profile
+
 _INTERNAL_NAMESPACES = {
     "alertmanager",
     "kube-system",
@@ -60,7 +62,7 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"load-generator(?:$|-.*)|"
     r"loadgenerator(?:$|-.*)|"
     r"mimir|"
-    r"minio-(?:loki|mimir|tempo)(?:$|-.*)|"
+    r"minio(?:$|-.*)|"
     r"node-exporter|"
     r"otel-(?:agent|collector|lb)(?:$|-.*)|"
     r"postgres|"
@@ -93,7 +95,7 @@ _SYSTEM_INFRA_HOST_NAMES = frozenset({
 
 @lru_cache(maxsize=1)
 def _monitored_services_re() -> re.Pattern[str] | None:
-    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (runtime_profile.load_profile().monitored_services_regex or "").strip()
     if not raw:
         return None
     try:
@@ -104,7 +106,8 @@ def _monitored_services_re() -> re.Pattern[str] | None:
 
 @lru_cache(maxsize=1)
 def _excluded_services_re() -> re.Pattern[str] | None:
-    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
+    prof = runtime_profile.load_profile()
+    extra = (prof.excluded_services_regex or "").strip()
     pattern = (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -154,20 +157,17 @@ def is_system_infra_host(name: str | None) -> bool:
 
 
 def _service_name_label_keys() -> list[str]:
-    keys_env = os.getenv(
-        "CAUSA_SERVICE_NAME_LABEL_KEYS",
-        "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
-    )
-    return [k.strip() for k in keys_env.split(",") if k.strip()]
+    keys = runtime_profile.load_profile().alert_mapping.service_label_keys
+    return [k.strip() for k in keys if k.strip()]
 
 
 def monitored_services_pattern() -> str | None:
-    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (runtime_profile.load_profile().monitored_services_regex or "").strip()
     return raw or None
 
 
 def excluded_services_pattern() -> str:
-    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
+    extra = (runtime_profile.load_profile().excluded_services_regex or "").strip()
     return (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -218,7 +218,8 @@ def infer_service_name_from_pod(pod_name: str | None) -> str | None:
 def is_internal_namespace(namespace: str | None) -> bool:
     if not namespace:
         return False
-    return namespace.strip().lower() in _INTERNAL_NAMESPACES
+    names = set(_INTERNAL_NAMESPACES) | {x.lower() for x in runtime_profile.load_profile().internal_namespaces}
+    return namespace.strip().lower() in names
 
 
 def is_monitored_service(service: str | None) -> bool:
@@ -243,9 +244,35 @@ def is_monitored_service(service: str | None) -> bool:
     return not bool(exclude_re and exclude_re.search(value))
 
 
+_PLATFORM_LAYERS = frozenset({"platform", "slo"})
+_PLATFORM_ALERT_RE = re.compile(
+    r"^(?:"
+    r"Minio|"
+    r"Loki|"
+    r"Tempo|"
+    r"Mimir|"
+    r"Otel|"
+    r"Prometheus|"
+    r"Alertmanager|"
+    r"PersistentVolume|"
+    r"HPA|"
+    r"SLO"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def is_monitored_alert(labels: dict[str, str], resolved_service: str | None = None) -> bool:
     """True if an alert belongs to external/app service scope."""
     if is_internal_namespace(labels.get("namespace")):
+        return False
+
+    layer = str(labels.get("layer") or "").strip().lower()
+    if layer in _PLATFORM_LAYERS:
+        return False
+
+    alert_name = str(labels.get("alertname") or "").strip()
+    if alert_name and _PLATFORM_ALERT_RE.match(alert_name):
         return False
 
     service = resolved_service or extract_service_from_labels(labels)

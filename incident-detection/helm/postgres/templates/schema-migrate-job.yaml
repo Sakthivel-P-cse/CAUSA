@@ -140,8 +140,17 @@ spec:
                   true_root_node TEXT        NOT NULL,
                   fault_class    TEXT        NOT NULL,
                   inject_start   TIMESTAMPTZ,
-                  inject_end     TIMESTAMPTZ
+                  inject_end     TIMESTAMPTZ,
+                  topology_id    TEXT,
+                  labeler        TEXT,
+                  verified_at    TIMESTAMPTZ,
+                  label_notes    TEXT
               );
+              ALTER TABLE groundtruth.ground_truth
+                  ADD COLUMN IF NOT EXISTS topology_id TEXT,
+                  ADD COLUMN IF NOT EXISTS labeler TEXT,
+                  ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ,
+                  ADD COLUMN IF NOT EXISTS label_notes TEXT;
 
               CREATE TABLE IF NOT EXISTS stage2_outbox (
                   id          BIGSERIAL   PRIMARY KEY,
@@ -170,6 +179,16 @@ spec:
                   decided_by      TEXT,
                   apply_result    JSONB
               );
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS plan_spec JSONB;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS before_fingerprint TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS risk_tier TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS claimed_by TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
+              CREATE UNIQUE INDEX IF NOT EXISTS idx_remediation_plans_idempotency
+                  ON remediation_plans (idempotency_key) WHERE idempotency_key IS NOT NULL;
               CREATE INDEX IF NOT EXISTS idx_remediation_plans_status
                   ON remediation_plans (status);
               CREATE INDEX IF NOT EXISTS idx_remediation_plans_incident
@@ -183,6 +202,31 @@ spec:
               );
               CREATE INDEX IF NOT EXISTS idx_remediation_events_plan
                   ON remediation_events (plan_id);
+              DO $$$$
+              BEGIN
+                  IF NOT EXISTS (
+                      SELECT 1 FROM pg_constraint
+                      WHERE conname = 'remediation_plans_status_check'
+                  ) THEN
+                      ALTER TABLE remediation_plans
+                      ADD CONSTRAINT remediation_plans_status_check
+                      CHECK (status IN (
+                          'proposed', 'approved', 'claimed', 'executing',
+                          'observing', 'succeeded', 'failed', 'rolled_back',
+                          'rejected', 'expired'
+                      )) NOT VALID;
+                  END IF;
+                  IF NOT EXISTS (
+                      SELECT 1 FROM pg_constraint
+                      WHERE conname = 'remediation_events_plan_fk'
+                  ) THEN
+                      ALTER TABLE remediation_events
+                      ADD CONSTRAINT remediation_events_plan_fk
+                      FOREIGN KEY (plan_id) REFERENCES remediation_plans(id)
+                      ON DELETE CASCADE NOT VALID;
+                  END IF;
+              END
+              $$$$;
 
               DO $$$$
               BEGIN

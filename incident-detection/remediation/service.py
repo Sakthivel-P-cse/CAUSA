@@ -1,9 +1,8 @@
-"""Propose / approve / apply orchestration for Dev C remediation plans."""
+"""Propose orchestration for remediation plans (apply runs in the worker)."""
 
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from classify.classifier import FaultClassifier
@@ -15,13 +14,18 @@ from contracts import (
     RootCauseCandidate,
     SignalScores,
 )
-from remediation.canary import SimulatedCanary
 from remediation.nim_client import (
     classify_with_nim,
     merge_fault_class,
     nim_health,
+    normalize_prompt_mode,
+    prompt_hash,
     propose_applogic_patch_with_nim,
+    propose_ops_guidance_with_nim,
+    sanitize_operator_prompt,
 )
+from remediation.policy import check_plan_executable
+from remediation.plan_schema import TypedPlanSpec
 from remediation.router import RemediationPlan, RemediationRouter
 
 logger = logging.getLogger(__name__)
@@ -135,29 +139,64 @@ def build_nim_context(report: dict[str, Any], ranked: RankedResult) -> dict[str,
     }
 
 
-def propose_for_report(report: dict[str, Any]) -> dict[str, Any]:
-    """Classify + route one plan for the top candidate. Returns serializable plan dict."""
+def propose_for_report(
+    report: dict[str, Any],
+    *,
+    manual_prompt: str | None = None,
+    prompt_mode: str | None = None,
+    regen_of_plan_id: str | None = None,
+    parent_plan_id: str | None = None,
+    regen_reason: str | None = None,
+) -> dict[str, Any]:
     ranked = ranked_from_report(report)
     if not ranked.candidates:
-        return {
-            "ok": False,
-            "error": "no origin candidates",
-            "plan": None,
-        }
+        return {"ok": False, "error": "no origin candidates", "plan": None}
 
-    top = ranked.candidates[0]
+    from remediation.policy import allowlist
+
+    allowed = allowlist()
+    top = None
+    for cand in ranked.candidates:
+        if cand.node_id in allowed:
+            top = cand
+            break
+    if top is None:
+        top = ranked.candidates[0]
+        for key in ("root_cause_service", "alerted_service"):
+            name = str(report.get(key) or "")
+            if name in allowed:
+                for cand in ranked.candidates:
+                    if cand.node_id == name:
+                        top = cand
+                        break
+                break
+
+    operator_prompt = sanitize_operator_prompt(manual_prompt)
+    mode = normalize_prompt_mode(prompt_mode)
+    has_operator = bool(operator_prompt)
+    nim_ctx = build_nim_context(report, ranked)
+
     rules = FaultClassifier().classify(
         top,
         alert_name=str(report.get("alert_name") or "") or None,
         rca_failure_type=report.get("failure_type"),
     )
-    nim = classify_with_nim(build_nim_context(report, ranked))
+    nim = classify_with_nim(
+        nim_ctx,
+        manual_prompt=operator_prompt or None,
+        prompt_mode=mode if has_operator else None,
+    )
     chosen, source = merge_fault_class(
         nim=nim,
         rules_fault_class=rules.fault_class,
         rca_failure_type=report.get("failure_type"),
     )
-    plan: RemediationPlan = RemediationRouter().route(chosen, top, ranked)
+    if has_operator and source == "nim":
+        source = "nim_manual_prompt"
+    elif has_operator and nim.ok:
+        source = f"{source}+nim_manual_prompt"
+    incident_id = str(report.get("incident_id") or report.get("id") or "")
+    plan: RemediationPlan = RemediationRouter().route(chosen, top, ranked, incident_id=incident_id)
 
     details = dict(plan.details or {})
     details["source"] = source
@@ -166,64 +205,127 @@ def propose_for_report(report: dict[str, Any]) -> dict[str, Any]:
     details["nim"] = nim.to_dict()
     details["rationale"] = nim.rationale or rules.rationale
     details["operator_remediation"] = nim.remediation or plan.summary
+    if has_operator:
+        details["operator_prompt"] = operator_prompt
+        details["prompt_mode"] = mode
+        details["prompt_hash"] = prompt_hash(operator_prompt)
+        details["nim_prompt_source"] = "nim_manual_prompt"
+    else:
+        details["nim_prompt_source"] = "nim_default"
+    parent_id = parent_plan_id or regen_of_plan_id
+    if regen_of_plan_id:
+        details["regen_of_plan_id"] = regen_of_plan_id
+    if parent_id:
+        details["parent_plan_id"] = parent_id
+    if regen_reason:
+        details["regen_reason"] = str(regen_reason)[:500]
 
     if chosen == FaultClass.APP_LOGIC:
-        patch = propose_applogic_patch_with_nim(build_nim_context(report, ranked))
+        patch = propose_applogic_patch_with_nim(
+            nim_ctx,
+            manual_prompt=operator_prompt or None,
+            prompt_mode=mode if has_operator else None,
+        )
         if patch:
             details["nim_patch"] = patch
+        from remediation.branches.applogic import propose_code_fix_pr
+
+        refreshed = propose_code_fix_pr(
+            top, ranked, incident_id=incident_id, nim_patch=patch if patch else None
+        )
+        details.update(refreshed)
+        plan.summary = refreshed.get("solution", {}).get("summary") or plan.summary
+    elif chosen in (FaultClass.RESOURCE, FaultClass.INFRA, FaultClass.DATA):
+        guidance = propose_ops_guidance_with_nim(
+            nim_ctx,
+            fault_class=chosen.value,
+            planned_action=plan.action,
+            manual_prompt=operator_prompt or None,
+            prompt_mode=mode if has_operator else None,
+        )
+        solution = dict(details.get("solution") or {})
+        if not solution.get("summary"):
+            solution["summary"] = plan.summary
+        if guidance:
+            details["nim_ops_guidance"] = guidance
+            details["ai_summary"] = guidance.get("summary") or ""
+            details["fix_recommendation"] = guidance.get("recommendation") or ""
+            details["operator_remediation"] = (
+                guidance.get("recommendation")
+                or details.get("operator_remediation")
+                or plan.summary
+            )
+            if guidance.get("summary"):
+                details["rationale"] = guidance["summary"]
+            solution["ai_summary"] = guidance.get("summary") or ""
+            solution["recommendation"] = guidance.get("recommendation") or ""
+            solution["steps"] = guidance.get("steps") or []
+            solution["risks"] = guidance.get("risks") or ""
+            solution["verify"] = guidance.get("verify") or ""
+            if guidance.get("recommendation"):
+                solution["summary"] = guidance["recommendation"]
+                plan.summary = guidance["recommendation"]
+        elif nim.ok and (nim.rationale or nim.remediation):
+            details["ai_summary"] = nim.rationale or ""
+            details["fix_recommendation"] = nim.remediation or ""
+            solution["ai_summary"] = nim.rationale or ""
+            solution["recommendation"] = nim.remediation or ""
+            if nim.remediation:
+                solution["summary"] = nim.remediation
+                plan.summary = nim.remediation
+        details["solution"] = solution
+
+    plan_spec = details.get("plan_spec")
+    if isinstance(plan_spec, dict):
+        details["plan_spec"] = plan_spec
+    policy = None
+    if isinstance(plan_spec, dict):
+        try:
+            spec = TypedPlanSpec.from_dict(plan_spec)
+            policy = check_plan_executable(spec)
+            details["policy"] = policy.to_dict()
+        except Exception as exc:  # noqa: BLE001
+            details["policy"] = {"allowed": False, "reason": str(exc), "code": "invalid_plan_spec"}
+
+    solution = details.get("solution") or details.get("patch") or details.get("rollback") or {}
+
+    out_plan = {
+        "incident_id": incident_id,
+        "report_id": str(report.get("id") or report.get("incident_id") or ""),
+        "candidate_node": top.node_id,
+        "fault_class": plan.fault_class.value,
+        "action": plan.action,
+        "depth": plan.depth,
+        "summary": plan.summary,
+        "details": details,
+        "plan_spec": plan_spec if isinstance(plan_spec, dict) else None,
+        "before_fingerprint": details.get("before_fingerprint")
+        or (plan_spec.get("before_fingerprint") if isinstance(plan_spec, dict) else None),
+        "idempotency_key": (plan_spec or {}).get("idempotency_key") if isinstance(plan_spec, dict) else None,
+        "expires_at": (plan_spec or {}).get("expires_at") if isinstance(plan_spec, dict) else None,
+        "risk_tier": (plan_spec or {}).get("risk_tier") if isinstance(plan_spec, dict) else None,
+        "solution": solution,
+        "source": source,
+        "nim_ok": nim.ok,
+        "policy": policy.to_dict() if policy else details.get("policy"),
+    }
+    if parent_id and out_plan.get("idempotency_key"):
+        out_plan["idempotency_key"] = f"{out_plan['idempotency_key']}:regen:{prompt_hash(parent_id + (operator_prompt or ''))}"
 
     return {
         "ok": True,
         "error": None,
-        "plan": {
-            "incident_id": str(report.get("incident_id") or report.get("id") or ""),
-            "report_id": str(report.get("id") or report.get("incident_id") or ""),
-            "candidate_node": top.node_id,
-            "fault_class": plan.fault_class.value,
-            "action": plan.action,
-            "depth": plan.depth,
-            "summary": plan.summary,
-            "details": details,
-            "source": source,
-            "nim_ok": nim.ok,
-        },
+        "plan": out_plan,
         "nim_health": nim_health(),
     }
 
 
 def apply_plan_v1(plan_row: dict[str, Any], *, breach: bool = False) -> dict[str, Any]:
-    """v1 apply: SimulatedCanary. Phase 2/3 hooks call real apply when enabled."""
-    action = str(plan_row.get("action") or "")
-    dry_run = os.getenv("REMEDIATION_DRY_RUN", "0") in ("1", "true", "True")
-
-    # Prefer real applyers when available and not dry-run.
-    if not dry_run and not breach:
-        if action == "config_patch":
-            from remediation.apply.k8s import apply_config_patch
-
-            result = apply_config_patch(plan_row)
-            if result.get("attempted"):
-                return result
-        if action == "rollback_to_last_good":
-            from remediation.apply.k8s import apply_dependency_rollback
-
-            result = apply_dependency_rollback(plan_row)
-            if result.get("attempted"):
-                return result
-        if action == "code_fix_pr":
-            from remediation.apply.github_pr import open_draft_pr
-
-            result = open_draft_pr(plan_row)
-            if result.get("attempted"):
-                return result
-
-    metric_fn = SimulatedCanary.breaching_metrics if breach else None
-    canary = SimulatedCanary(metric_fn=metric_fn).apply()
-    status = "rolled_back" if canary.rolled_back else ("succeeded" if canary.applied else "failed")
+    """Deprecated: execution moved to remediation.worker. Kept for test imports."""
     return {
-        "attempted": True,
-        "mode": "simulated_canary",
-        "dry_run": dry_run,
-        "status": status,
-        "canary": canary.to_dict(),
+        "attempted": False,
+        "mode": "worker_required",
+        "status": "failed",
+        "error": "apply_plan_v1 disabled; approve plans and let the remediation worker execute",
+        "breach_ignored": breach,
     }

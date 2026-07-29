@@ -44,7 +44,7 @@ if [[ "${BUILD_STAGE2}" -eq 1 ]]; then
   docker build \
     -f "${ROOT_DIR}/Dockerfile.stage2-rca" \
     -t causa/stage2-rca:latest \
-    "${ROOT_DIR}"
+    "$(dirname "${ROOT_DIR}")"
   IMAGES+=(causa/stage2-rca:latest)
 fi
 

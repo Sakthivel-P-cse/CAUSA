@@ -3,9 +3,9 @@ import { useFetch } from './useFetch.js'
 import { useDashboard } from '../context/DashboardContext.jsx'
 
 export function useExplorerScope() {
-  const { filters } = useDashboard()
+  const { filters, setFilter } = useDashboard()
   const refreshMs = filters.refreshSec > 0 ? filters.refreshSec * 1000 : 0
-  return { filters, refreshMs, serviceFilter: filters.service || '' }
+  return { filters, setFilter, refreshMs, serviceFilter: filters.service || '' }
 }
 
 export function filterByServiceName(items, serviceFilter, nameKey = 'name') {

@@ -9,6 +9,7 @@ DASH="${ROOT}/dashboard"
 FE="${DASH}/frontend"
 CONTEXT="${CONTEXT:-kind-gcp-demo-test}"
 KIND_CLUSTER="${KIND_CLUSTER:-gcp-demo-test}"
+APP_NS="${APP_NS:-${CAUSA_APP_NAMESPACE:-otel-demo}}"
 API_PORT="${API_PORT:-8090}"
 UI_PORT="${UI_PORT:-5174}"
 PID_DIR="${ROOT}/.run"
@@ -114,15 +115,39 @@ start_api() {
     export PROMETHEUS_URL='http://127.0.0.1:9090'
     export LOKI_URL='http://127.0.0.1:3100'
     export TEMPO_URL='http://127.0.0.1:3200'
-    export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER=causa PGPASSWORD=causa
+    export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER='${PGUSER:-rca_engine}'
+    export REMEDIATION_PGHOST=127.0.0.1 REMEDIATION_PGPORT=15432 REMEDIATION_PGDATABASE=causa REMEDIATION_PGUSER='${REMEDIATION_PGUSER:-causa_remediator}'
     export CONTEXT='${CONTEXT}'
-    export REMEDIATION_DRY_RUN='${REMEDIATION_DRY_RUN:-1}'
     export CAUSA_NIM_ENABLED='${CAUSA_NIM_ENABLED:-1}'
+    export CAUSA_REMEDIATION_KILL_SWITCH='${CAUSA_REMEDIATION_KILL_SWITCH:-0}'
     if [[ -f '${ROOT}/.env' ]]; then set -a; source '${ROOT}/.env'; set +a; fi
+    source '${ROOT}/scripts/load-dashboard-demo-env.sh'
+    load_dashboard_demo_env
     exec '${DASH}/.venv/bin/uvicorn' dashboard.backend.main:app --host 0.0.0.0 --port '${API_PORT}'
   " </dev/null >"${LOG_DIR}/api.log" 2>&1 &
   echo $! >"${PID_DIR}/api.pid"
   log "API → http://127.0.0.1:${API_PORT}"
+}
+
+start_remediation_worker() {
+  setsid bash -c "
+    cd '${ROOT}'
+    export PYTHONPATH='${ROOT}:${ID_ROOT}:${PYTHONPATH:-}'
+    export CAUSA_DASHBOARD_OUTPUTS='${CAUSA_DASHBOARD_OUTPUTS:-${ROOT}/outputs}'
+    export PROMETHEUS_URL='http://127.0.0.1:9090'
+    export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER='${PGUSER:-rca_engine}'
+    export REMEDIATION_PGHOST=127.0.0.1 REMEDIATION_PGPORT=15432 REMEDIATION_PGDATABASE=causa REMEDIATION_PGUSER='${REMEDIATION_PGUSER:-causa_remediator}'
+    export CONTEXT='${CONTEXT}'
+    export REMEDIATION_NAMESPACE='${REMEDIATION_NAMESPACE:-${APP_NS}}'
+    export REMEDIATION_WORKER_POLL_S='${REMEDIATION_WORKER_POLL_S:-5}'
+    export CAUSA_REMEDIATION_KILL_SWITCH='${CAUSA_REMEDIATION_KILL_SWITCH:-0}'
+    if [[ -f '${ROOT}/.env' ]]; then set -a; source '${ROOT}/.env'; set +a; fi
+    source '${ROOT}/scripts/load-dashboard-demo-env.sh'
+    load_dashboard_demo_env
+    exec '${DASH}/.venv/bin/python' -m remediation.worker
+  " </dev/null >"${LOG_DIR}/remediation-worker.log" 2>&1 &
+  echo $! >"${PID_DIR}/remediation-worker.pid"
+  log "Remediation worker started (pid file ${PID_DIR}/remediation-worker.pid)"
 }
 
 start_ui() {
@@ -166,7 +191,25 @@ main() {
 
   start_api
   start_ui
+  if [[ "${START_LOCAL_REMEDIATION_WORKER:-0}" == "1" ]]; then
+    start_remediation_worker
+  else
+    log "Local remediation worker disabled (set START_LOCAL_REMEDIATION_WORKER=1 to opt in)"
+  fi
   wait_http "http://127.0.0.1:${API_PORT}/health" "API"
+
+  local baseline_n
+  baseline_n="$(
+    source "${ROOT}/scripts/load-dashboard-demo-env.sh"
+    load_dashboard_demo_env
+    PGPASSWORD="${PGPASSWORD:-}" psql -h 127.0.0.1 -p 15432 -U "${PGUSER:-rca_engine}" -d "${PGDATABASE:-causa}" -Atc 'SELECT COUNT(*) FROM anomaly_baseline' 2>/dev/null || echo 0
+  )"
+  if [[ "${baseline_n}" == "0" || -z "${baseline_n}" ]]; then
+    log "WARNING: anomaly_baseline is empty — RCA will abstain until baselines exist"
+    log "Run after demo is healthy: SETTLE_SEC=30 WINDOW_MIN=20 ./scripts/recapture-baselines.sh"
+  else
+    log "anomaly_baseline rows: ${baseline_n}"
+  fi
 
   echo ""
   echo "Causa is up:"
@@ -176,10 +219,12 @@ main() {
   echo "  Loki   http://127.0.0.1:3100"
   echo "  Tempo  http://127.0.0.1:3200"
   echo "  PG     127.0.0.1:15432"
+  [[ "${START_LOCAL_REMEDIATION_WORKER:-0}" == "1" ]] && echo "  Worker remediation (claims approved plans)"
   echo ""
   echo "PIDs under ${PID_DIR}/  logs under ${LOG_DIR}/"
   echo "Demo apps: ./microservice-startup.sh"
-  echo "Stop local processes: pkill -f 'dashboard.backend.main|causa/dashboard/frontend.*vite|kubectl -n (prometheus|loki|tempo|postgres|stage2-rca) port-forward'"
+  echo "Argo canary: ./incident-detection/scripts/install-argo-rollouts.sh"
+  echo "Stop local processes: pkill -f 'dashboard.backend.main|remediation.worker|causa/dashboard/frontend.*vite|kubectl -n (prometheus|loki|tempo|postgres|stage2-rca) port-forward'"
 }
 
 main "$@"

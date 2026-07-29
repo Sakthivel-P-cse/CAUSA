@@ -42,6 +42,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "postgres.secretName" . }}
                   key: {{ .Values.auth.existingSecretKey }}
+            - name: REMEDIATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgres.secretName" . }}
+                  key: remediator-password
           command: ["/bin/sh", "-ec"]
           args:
             - |
@@ -58,7 +63,17 @@ spec:
                 --port={{ .Values.service.port }} \
                 --username={{ .Values.auth.username | quote }} \
                 --dbname={{ .Values.auth.database | quote }} \
-                --set=ON_ERROR_STOP=1 <<'SQL'
+                --set=ON_ERROR_STOP=1 \
+                --set=remediator_password="$REMEDIATOR_PASSWORD" <<'SQL'
+              SELECT format(
+                  'CREATE ROLE causa_remediator LOGIN PASSWORD %L',
+                  :'remediator_password'
+              )
+              WHERE NOT EXISTS (
+                  SELECT 1 FROM pg_roles WHERE rolname = 'causa_remediator'
+              ) \gexec
+              ALTER ROLE causa_remediator PASSWORD :'remediator_password';
+
               DO $$$$
               BEGIN
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
@@ -79,6 +94,13 @@ spec:
 
               GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
               GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
+
+              REVOKE ALL ON SCHEMA groundtruth FROM causa_remediator;
+              GRANT CONNECT ON DATABASE "{{ .Values.auth.database }}" TO causa_remediator;
+              GRANT USAGE ON SCHEMA public TO causa_remediator;
+              GRANT SELECT ON incidents, rca_reports, anomaly_baseline TO causa_remediator;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON remediation_plans TO causa_remediator;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON remediation_events TO causa_remediator;
 
               GRANT USAGE ON SCHEMA groundtruth TO causa_eval;
               GRANT SELECT ON groundtruth.ground_truth TO causa_eval;

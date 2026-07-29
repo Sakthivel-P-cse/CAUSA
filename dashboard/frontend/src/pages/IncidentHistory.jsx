@@ -3,7 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import { useFetch } from '../hooks/useFetch.js'
 import { Spinner, ErrorMsg, Card, Badge } from '../components/Common.jsx'
 import { Button, Input, Select } from '../components/ui/index.js'
-import { formatFailureType, normalizeIncidentPage, normalizeReport } from '../api/incidents.js'
+import { formatFailureType, isAbstainedSummary, normalizeIncidentPage, normalizeReport } from '../api/incidents.js'
+
+function formatConfidence(item = {}) {
+  if (isAbstainedSummary(item.root_cause_summary)) return 'Inconclusive'
+  if (item.confidence_score != null) return `${Math.round(item.confidence_score * 100)}%`
+  return '—'
+}
 
 function HistoryList() {
   const [status, setStatus] = useState('all')
@@ -64,7 +70,7 @@ function HistoryList() {
                 <td><Badge>{item.incident_status}</Badge></td>
                 <td>{item.root_cause_service || item.alerted_service || '—'}</td>
                 <td>{formatFailureType(item)}</td>
-                <td>{item.confidence_score != null ? `${Math.round(item.confidence_score * 100)}%` : '—'}</td>
+                <td>{formatConfidence(item)}</td>
                 <td>{item.triggered_at ? new Date(item.triggered_at).toLocaleString() : '—'}</td>
               </tr>
             ))}
@@ -116,17 +122,36 @@ function HistoryDetail({ incidentId }) {
         </dl>
       </Card>
       <Card title="RCA report versions">
-        {(item.reports || [{ id: item.id, triggered_at: item.triggered_at, root_cause_service: item.root_cause_service, failure_type: item.failure_type, confidence_score: item.confidence_score, root_cause_summary: item.root_cause_summary, remediation: item.remediation }]).map(report => (
-          <div key={report.id} className="history-report-row">
-            <Link to={`/incidents/${encodeURIComponent(report.id)}`}>
-              {report.id}
-            </Link>
-            <span>{report.root_cause_service || '—'}</span>
-            <span>{formatFailureType(report)}</span>
-            <span>{report.confidence_score != null ? `${Math.round(report.confidence_score * 100)}%` : '—'}</span>
-            <time>{report.triggered_at ? new Date(report.triggered_at).toLocaleString() : '—'}</time>
-          </div>
-        ))}
+        {(() => {
+          const reports = item.reports || [{ id: item.id, triggered_at: item.triggered_at, root_cause_service: item.root_cause_service, failure_type: item.failure_type, confidence_score: item.confidence_score, root_cause_summary: item.root_cause_summary, remediation: item.remediation }]
+          return reports.map((report, idx) => {
+            const prev = idx > 0 ? reports[idx - 1] : null
+            const rootChanged = prev && prev.root_cause_service !== report.root_cause_service
+            const confPrev = prev?.confidence_score
+            const confNext = report.confidence_score
+            const confChanged = prev && confPrev != null && confNext != null && Math.abs(confPrev - confNext) > 0.01
+            return (
+              <div key={report.id} className="history-report-row">
+                <div>
+                  <Link to={`/incidents/${encodeURIComponent(report.id)}`}>{report.id}</Link>
+                  <span className="muted"> v{idx + 1}</span>
+                  {(rootChanged || confChanged) && (
+                    <p className="history-diff">
+                      Re-analysis changed
+                      {rootChanged ? ` root ${prev.root_cause_service || '—'} → ${report.root_cause_service || '—'}` : ''}
+                      {confChanged ? ` · confidence ${Math.round(confPrev * 100)}%→${Math.round(confNext * 100)}%` : ''}
+                    </p>
+                  )}
+                  <p className="muted" style={{ fontSize: 11 }}>Immutable snapshot at incident time</p>
+                </div>
+                <span>{report.root_cause_service || '—'}</span>
+                <span>{formatFailureType(report)}</span>
+                <span>{formatConfidence(report)}</span>
+                <time>{report.triggered_at ? new Date(report.triggered_at).toLocaleString() : '—'}</time>
+              </div>
+            )
+          })
+        })()}
       </Card>
     </div>
   )

@@ -1,4 +1,10 @@
-import { formatFailureType, isAbstainedSummary } from './incidents.js'
+import {
+  abstainContext,
+  formatAbstainReason,
+  formatFailureType,
+  isAbstainedSummary,
+  parseAbstainReason,
+} from './incidents.js'
 import { confidenceBand, confidencePct } from './confidence.js'
 
 function topCandidate(report) {
@@ -97,7 +103,11 @@ export function plainIncidentSummary(item = {}) {
   const name = item.alert_name || 'Alert'
   const raw = String(item.root_cause_summary || item.summary || '')
   if (/slow-burn|no-deviation|out-influence|Role:|RCA abstained/i.test(raw)) {
-    if (/abstained/i.test(raw)) return `${name} on ${service} — RCA abstained.`
+    if (/abstained/i.test(raw)) {
+      const reason = formatAbstainReason(parseAbstainReason(raw))
+      const short = reason.length > 72 ? `${reason.slice(0, 71)}…` : reason
+      return `${name} on ${service} — inconclusive: ${short}`
+    }
     return `${name} on ${service} — weak / unknown-role candidate.`
   }
   const m = raw.match(/Top root-cause candidate:\s*([^\s.]+)/i)
@@ -122,16 +132,25 @@ export function buildRcaNarrative(report = {}, { abstained = false } = {}) {
   const weak = isWeakSignal(top)
 
   if (abstained || isAbstainedSummary(report.root_cause_summary) || !root) {
-    const reason = isAbstainedSummary(report.root_cause_summary)
-      ? String(report.root_cause_summary).replace(/^RCA abstained:\s*/i, '')
-      : 'insufficient signal'
+    const rawReason = parseAbstainReason(report.root_cause_summary) || 'insufficient signal'
+    const reason = formatAbstainReason(rawReason)
+    const { scopeCount, hotServices } = abstainContext(report)
+    const alertedLine = alerted ? `Alert fired on ${alerted}.` : null
+    const scopeLine = scopeCount
+      ? `${scopeCount} service${scopeCount === 1 ? '' : 's'} in scope`
+      : null
+    const hotLine = hotServices.length
+      ? `${hotServices.length} with strong anomaly: ${hotServices.slice(0, 5).join(', ')}${hotServices.length > 5 ? '…' : ''}`
+      : null
+    const detail = [alertedLine, scopeLine, hotLine].filter(Boolean).join(' ')
     return {
       headline: `Could not name a root cause for ${alert}`,
-      why: `RCA abstained: ${reason}.`,
-      impact: 'No impact graph.',
-      confidence_label: confPct != null ? `${band} confidence (${confPct}%)` : 'No confidence',
+      why: reason,
+      abstain_reason: rawReason,
+      impact: detail || 'No services in scope.',
+      confidence_label: 'Inconclusive',
       limited_detail: true,
-      limited_reason: 'RCA abstained — not enough evidence to rank origins.',
+      limited_reason: reason,
       root,
       alerted,
       failureLabel,

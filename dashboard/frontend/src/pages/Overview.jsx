@@ -2,16 +2,11 @@ import React, { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useFetch } from '../hooks/useFetch.js'
 import { useDashboard } from '../context/DashboardContext.jsx'
-import { StatusDot, Spinner, ErrorMsg } from '../components/Common.jsx'
-import HealthSummary from '../components/watchdog/HealthSummary.jsx'
+import { Spinner, ErrorMsg } from '../components/Common.jsx'
 import InsightCard, { incidentPriority, incidentSeverity } from '../components/watchdog/InsightCard.jsx'
-import AnomalySparkline from '../components/watchdog/AnomalySparkline.jsx'
 import { normalizeIncidentPage } from '../api/incidents.js'
-import { plainIncidentSummary } from '../api/rcaNarrative.js'
+import { useIncidentStream } from '../hooks/useIncidentStream.js'
 
-const PRIORITY_SEVERITIES = new Set(['critical', 'high', 'warning', 'medium'])
-const SEVERITY_ORDER = ['critical', 'high', 'warning', 'medium', 'low', 'info']
-const ALERT_VISIBLE = 3
 const INSIGHT_CAP = 6
 
 function buildQuery(filters) {
@@ -21,55 +16,106 @@ function buildQuery(filters) {
     params.set('start', filters.from)
     params.set('end', filters.to)
   }
-  params.set('limit', '25')
+  params.set('limit', '50')
   params.set('sort', 'severity_desc')
   return params.toString()
 }
 
-function ActivityPanel({ items, perDay }) {
-  const counts = useMemo(() => {
-    const map = Object.fromEntries(SEVERITY_ORDER.map(s => [s, 0]))
-    for (const item of items) {
-      const sev = incidentSeverity(item)
-      map[sev] = (map[sev] || 0) + 1
-    }
-    return map
-  }, [items])
-  const max = Math.max(1, ...Object.values(counts))
+function formatDuration(seconds) {
+  if (seconds == null || Number.isNaN(Number(seconds))) return '—'
+  const s = Math.max(0, Number(seconds))
+  if (s < 60) return `${Math.round(s)}s`
+  if (s < 3600) return `${Math.round(s / 60)}m`
+  return `${(s / 3600).toFixed(1)}h`
+}
 
+function SystemStatusBar({ critical, degraded, active }) {
+  let tone = 'good'
+  let label = 'All systems operational'
+  if (critical > 0) {
+    tone = 'danger'
+    label = `${critical} critical incident${critical === 1 ? '' : 's'}`
+  } else if (degraded > 0 || active > 0) {
+    tone = 'warn'
+    label = degraded > 0
+      ? `${degraded} service${degraded === 1 ? '' : 's'} degraded`
+      : `${active} active incident${active === 1 ? '' : 's'}`
+  }
   return (
-    <div className="panel activity-panel">
-      <h2>Incident activity</h2>
-      <div className="severity-bars" aria-label="Severity breakdown">
-        {SEVERITY_ORDER.filter(sev => counts[sev] > 0 || ['critical', 'warning'].includes(sev)).map(sev => (
-          <div className="severity-bar-row" key={sev}>
-            <span className={`status-chip status-${sev}`}>{sev}</span>
-            <div className="severity-bar-track" aria-hidden="true">
-              <div
-                className={`severity-bar-fill severity-${sev}`}
-                style={{ width: `${(counts[sev] / max) * 100}%` }}
-              />
-            </div>
-            <strong>{counts[sev]}</strong>
-          </div>
-        ))}
-      </div>
-      {perDay.length >= 2 && (
-        <div className="activity-sparkline">
-          <AnomalySparkline values={perDay} label="Incidents per day" />
-        </div>
-      )}
-      <div className="activity-panel__footer">
-        <Link className="btn-link" to="/incidents">Open inbox</Link>
-      </div>
+    <div className={`system-status-bar system-status-bar--${tone}`} role="status">
+      <span className="system-status-bar__dot" aria-hidden="true" />
+      <strong>{label}</strong>
     </div>
   )
+}
+
+function servicesFromIncidents(incidents) {
+  const seen = new Map()
+  for (const inc of incidents) {
+    for (const name of [inc.alerted_service, inc.root_cause_service]) {
+      if (!name || seen.has(name)) continue
+      const sev = incidentSeverity(inc)
+      seen.set(name, {
+        name,
+        health: sev === 'critical' ? 'red' : sev === 'warning' ? 'yellow' : 'green',
+        error_rate: 0,
+        latency_p99_ms: 0,
+        request_rate: 0,
+        degraded: true,
+      })
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function ServiceHeatGrid({ services, degraded = false }) {
+  const list = Array.isArray(services) ? services : []
+  if (!list.length) {
+    return <p className="muted empty-hint">No service metrics yet.</p>
+  }
+  return (
+    <>
+      {degraded && (
+        <p className="live-data-notice live-data-notice--inline">
+          Prometheus metrics unavailable — showing services from active incidents.
+        </p>
+      )}
+      <div className="service-heat-grid" aria-label="Service health heat grid">
+        {list.map(svc => {
+          const errPct = Math.min(100, Number(svc.error_rate || 0) * 100)
+          const health = svc.health || (errPct > 5 ? 'red' : errPct > 1 ? 'yellow' : 'green')
+          const title = svc.degraded
+            ? `${svc.name}: incident signal (metrics unavailable)`
+            : `${svc.name}: ${errPct.toFixed(1)}% err · ${Number(svc.latency_p99_ms || 0).toFixed(0)}ms p99 · ${Number(svc.request_rate || 0).toFixed(1)} r/s`
+          return (
+            <Link
+              key={svc.name}
+              to={`/metrics?service=${encodeURIComponent(svc.name)}`}
+              className={`heat-cell heat-cell--${health}`}
+              title={title}
+            >
+              <span className="heat-cell__name">{svc.name}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function isActiveLifecycle(incident) {
+  const life = String(incident.lifecycle || '').toLowerCase()
+  if (life === 'resolved') return false
+  if (incident.resolved_at) return false
+  if (String(incident.incident_status || '').toLowerCase() === 'resolved') return false
+  return true
 }
 
 export default function Overview() {
   const { filters } = useDashboard()
   const refreshMs = filters.refreshSec ? filters.refreshSec * 1000 : 0
   const qs = buildQuery(filters)
+  useIncidentStream(true)
 
   const alerts = useFetch('/api/alerts?limit=10', [], { refreshMs })
   const services = useFetch('/api/metrics/services', [], { refreshMs })
@@ -78,92 +124,86 @@ export default function Overview() {
   const remStats = useFetch('/api/remediation/stats', [], { refreshMs })
 
   const page = useMemo(() => normalizeIncidentPage(incidents.data), [incidents.data])
-  const priorityIncidents = useMemo(
+  const activeItems = useMemo(
     () => [...page.items]
-      .filter(i => PRIORITY_SEVERITIES.has(incidentSeverity(i)))
+      .filter(isActiveLifecycle)
       .sort((a, b) => incidentPriority(b) - incidentPriority(a)),
     [page.items],
   )
-  const insightItems = priorityIncidents.slice(0, INSIGHT_CAP)
-  const insightOverflow = priorityIncidents.length > INSIGHT_CAP
-
-  const health = {
-    activeAlerts: (alerts.data || []).length,
-    recentIncidents: stats.data?.total ?? page.total,
-    completeAnalyses: page.items.filter(i => i.has_rca || i.root_cause_service).length,
-    needsInvestigation: page.items.filter(i => !i.root_cause_service).length,
-    degradedServices: (services.data || []).filter(s => s.health !== 'green').length,
-  }
+  const incidentServices = useMemo(
+    () => servicesFromIncidents(activeItems),
+    [activeItems],
+  )
+  const insightItems = activeItems.slice(0, INSIGHT_CAP)
 
   if (incidents.loading && !incidents.data) return <Spinner label="Loading overview" />
-  if (incidents.error && !incidents.data) return <ErrorMsg error={incidents.error} />
+  if (incidents.error && !incidents.data) {
+    return (
+      <div className="watchdog-page overview-page">
+        <ErrorMsg error={incidents.error} />
+        <p className="muted empty-hint">
+          Dashboard API unreachable. Ensure it is running on :8090
+          (<code>./causa-startup.sh</code>) then reload.
+        </p>
+      </div>
+    )
+  }
 
-  const perDay = (stats.data?.incidents_per_day || []).map((row) => {
-    if (Array.isArray(row)) return Number(row[1] || 0)
-    return Number(row?.count || 0)
-  })
-  const serviceList = services.data || []
+  const serviceList = Array.isArray(services.data) ? services.data : []
+  const heatServices = serviceList.length ? serviceList : incidentServices
+  const heatDegraded = !serviceList.length && incidentServices.length > 0
   const alertList = alerts.data || []
-  const visibleAlerts = alertList.slice(0, ALERT_VISIBLE)
+  const degraded = heatServices.filter(s => s.health && s.health !== 'green').length
+  const critical = activeItems.filter(i => incidentSeverity(i) === 'critical').length
+  const remRate = stats.data?.auto_remediation_rate
+  const awaiting = remStats.data?.awaiting_review || 0
 
   return (
-    <div className="watchdog-page overview-page">
-      <header className="watchdog-page__header">
-        <div>
-          <h1>Overview</h1>
-          <p>Active incidents and service health from Causa RCA.</p>
-        </div>
-      </header>
+    <div className="watchdog-page overview-page overview-page--glance">
+      <SystemStatusBar critical={critical} degraded={degraded} active={activeItems.length} />
 
-      <section className="alert-banner" aria-label="Active alerts">
-        <div className="alert-banner__head">
-          <strong>
-            {alertList.length > 0
-              ? `${alertList.length}+ ongoing alert${alertList.length === 1 ? '' : 's'}`
-              : 'No ongoing alerts'}
-          </strong>
-          <Link className="btn-link" to="/incidents">View all</Link>
+      <section className="kpi-strip" aria-label="Operational KPIs">
+        <div className="kpi-tile">
+          <span>Active</span>
+          <strong>{stats.data?.active_incidents ?? activeItems.length}</strong>
         </div>
-        {visibleAlerts.length > 0 && (
-          <ul className="alert-banner__list">
-            {visibleAlerts.map(alert => {
-              const id = alert.fingerprint || alert.incident_id
-              return (
-                <li key={id || `${alert.alert_name}-${alert.service}`}>
-                  <Link
-                    className="alert-banner__link"
-                    to={id ? `/incidents/${encodeURIComponent(id)}` : '/incidents'}
-                  >
-                    <span className={`status-chip status-${alert.severity}`}>{alert.severity}</span>
-                    <div className="alert-banner__body">
-                      <strong>{alert.alert_name || 'Alert'}</strong>
-                      <span className="alert-banner__meta">
-                        {alert.service || 'unknown'}
-                        {alert.category ? ` · ${alert.category}` : ''}
-                      </span>
-                      <p>{plainIncidentSummary({ ...alert, alerted_service: alert.service, root_cause_summary: alert.summary })}</p>
-                    </div>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+        <div className="kpi-tile">
+          <span>MTTA</span>
+          <strong>{formatDuration(stats.data?.mtta_seconds)}</strong>
+        </div>
+        <div className="kpi-tile">
+          <span>MTTR</span>
+          <strong>{formatDuration(stats.data?.mttr_seconds)}</strong>
+        </div>
+        <div className="kpi-tile">
+          <span>Auto-rem rate</span>
+          <strong>{remRate == null ? '—' : `${Math.round(remRate * 100)}%`}</strong>
+        </div>
+        <div className="kpi-tile">
+          <span>Alerts</span>
+          <strong>{alertList.length}</strong>
+        </div>
       </section>
 
-      <HealthSummary
-        activeAlerts={health.activeAlerts}
-        recentIncidents={health.recentIncidents}
-        completeAnalyses={health.completeAnalyses}
-        needsInvestigation={health.needsInvestigation}
-        degradedServices={health.degradedServices}
-      />
+      {awaiting > 0 && (
+        <div className="glance-rem-link">
+          <Link to="/remediation?status=proposed">{awaiting} remediation awaiting review →</Link>
+        </div>
+      )}
 
-      {(remStats.data?.awaiting_review || 0) > 0 && (
-        <section className="alert-banner rem-banner" aria-label="Proposed remediations">
-          <div className="alert-banner__head">
-            <strong>{remStats.data.awaiting_review} proposed fix{remStats.data.awaiting_review === 1 ? '' : 'es'} awaiting review</strong>
-            <Link className="btn-link" to="/remediation?status=proposed">Open Remediation</Link>
+      {insightItems.length > 0 && (
+        <section className="overview-section">
+          <div className="section-heading">
+            <div>
+              <h2>Active incidents</h2>
+              <p>Needs action now</p>
+            </div>
+            <Link className="btn-link" to="/incidents">Inbox</Link>
+          </div>
+          <div className="insight-grid insight-grid--fixed">
+            {insightItems.map(incident => (
+              <InsightCard key={incident.id} incident={incident} compact showFilterLink />
+            ))}
           </div>
         </section>
       )}
@@ -171,56 +211,17 @@ export default function Overview() {
       <section className="overview-section">
         <div className="section-heading">
           <div>
-            <h2>Watchdog insights</h2>
-            <p>Severity-ranked findings — open investigation or filter the inbox.</p>
+            <h2>Services</h2>
+            <p>Health heat map — click to open Metrics</p>
           </div>
-          {insightOverflow && (
-            <Link className="btn-link" to="/incidents">View all</Link>
-          )}
         </div>
-        <div className="insight-grid insight-grid--fixed">
-          {insightItems.length === 0 && <p className="muted">No priority or warning incidents in scope.</p>}
-          {insightItems.map(incident => (
-            <InsightCard key={incident.id} incident={incident} compact showFilterLink />
-          ))}
-        </div>
-      </section>
-
-      <section className="overview-columns">
-        <ActivityPanel items={page.items} perDay={perDay} />
-
-        <div className="panel">
-          <h2>Service health</h2>
-          {services.error && (
-            <div className="live-data-notice">
-              Prometheus unreachable. Port-forward <code>svc/prometheus:9090</code> then refresh.
-            </div>
-          )}
-          {!services.error && serviceList.length === 0 && !services.loading && (
-            <div className="live-data-notice">
-              No live service metrics yet. Forward Prometheus to localhost:9090 after the demo stack is up.
-            </div>
-          )}
-          {serviceList.length > 0 && (
-            <div className="service-health-grid">
-              {serviceList.slice(0, 8).map(svc => {
-                const errPct = Math.min(100, Number(svc.error_rate || 0) * 100)
-                return (
-                  <div className="service-health-row" key={svc.name}>
-                    <StatusDot status={svc.health} />
-                    <Link to={`/metrics?service=${encodeURIComponent(svc.name)}`}>{svc.name}</Link>
-                    <div className="service-health-bar" title={`${errPct.toFixed(1)}% error rate`} aria-hidden="true">
-                      <div className="service-health-bar__fill" style={{ width: `${Math.max(errPct, errPct > 0 ? 4 : 0)}%` }} />
-                    </div>
-                    <span>{errPct.toFixed(1)}% err</span>
-                    <span>{Number(svc.latency_p99_ms || 0).toFixed(0)} ms</span>
-                    <span>{Number(svc.request_rate || 0).toFixed(1)} r/s</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        {services.error && !heatDegraded && (
+          <div className="live-data-notice">
+            Prometheus unreachable — start port-forward:{' '}
+            <code>kubectl -n prometheus port-forward svc/prometheus 9090:9090</code>
+          </div>
+        )}
+        <ServiceHeatGrid services={heatServices} degraded={heatDegraded} />
       </section>
     </div>
   )

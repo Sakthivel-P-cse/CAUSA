@@ -13,8 +13,6 @@ import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import { Badge, Card } from './Common.jsx';
 
-const LAYER_BY_KIND = { node: 0, infra: 0, pod: 1, service: 2, span: 1 };
-
 function overlayState(hypotheses = []) {
   const primary = hypotheses?.[0] || null;
   if (!primary) return null;
@@ -223,7 +221,7 @@ function Inspector({ node, degree }) {
   )
 }
 
-export default function TopologyGraph({ graph, focusId = null, height = 540, hypotheses = [] }) {
+export default function TopologyGraph({ graph, focusId = null, height = 540, hypotheses = [], onNodeSelect = null }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedId, setSelectedId] = useState(focusId);
@@ -284,7 +282,12 @@ export default function TopologyGraph({ graph, focusId = null, height = 540, hyp
       'TB'
     );
 
-    setNodes(layoutedNodes);
+    setNodes(current => {
+      const positions = new Map(current.map(node => [node.id, node.position]))
+      return layoutedNodes.map(node => (
+        positions.has(node.id) ? { ...node, position: positions.get(node.id) } : node
+      ))
+    });
     setEdges(layoutedEdges);
   }, [graph, overlays, setNodes, setEdges]);
 
@@ -294,7 +297,10 @@ export default function TopologyGraph({ graph, focusId = null, height = 540, hyp
 
   const onNodeClick = useCallback((_, node) => {
     setSelectedId(node.id);
-  }, []);
+    if (typeof onNodeSelect === 'function') {
+      onNodeSelect({ id: node.id, ...node.data })
+    }
+  }, [onNodeSelect]);
 
   const onPaneClick = useCallback(() => {
     setSelectedId(null);
@@ -328,8 +334,8 @@ export default function TopologyGraph({ graph, focusId = null, height = 540, hyp
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 280px', gap: 16 }}>
-      <div style={{ height: height, border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', background: 'radial-gradient(circle at top left, rgba(39,212,160,0.05), transparent 35%), linear-gradient(180deg, rgba(13,25,39,0.96), rgba(8,18,30,0.96))' }}>
+    <div className="topology-layout">
+      <div className="topology-canvas" style={{ height }}>
         <ReactFlow
           nodes={displayNodes}
           edges={displayEdges}

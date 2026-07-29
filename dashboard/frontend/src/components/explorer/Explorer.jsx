@@ -37,14 +37,19 @@ export function ExplorerState({
   empty,
   emptyTitle = 'No results',
   emptyBody = 'Try changing the active filters or time window.',
+  onRetry,
+  dependency,
+  lastUpdated,
   children,
 }) {
   if (error) {
     return (
       <div className="explorer-state explorer-state--error" role="alert">
-        <strong>Telemetry could not be loaded</strong>
+        <strong>{dependency ? `${dependency} could not be reached` : 'Telemetry could not be loaded'}</strong>
         <span>{typeof error === 'string' ? error : error?.message || 'Upstream unavailable'}</span>
-        <span className="explorer-state__hint">Port-forward Prometheus :9090, Loki :3100, and Tempo :3200, then refresh.</span>
+        {lastUpdated && <span className="explorer-state__hint">Last successful update: {new Date(lastUpdated).toLocaleString()}</span>}
+        <span className="explorer-state__hint">Check dependency health or retry. Local port-forward instructions are available in the development runbook.</span>
+        {onRetry && <button className="explorer-button" type="button" onClick={onRetry}>Retry</button>}
       </div>
     )
   }

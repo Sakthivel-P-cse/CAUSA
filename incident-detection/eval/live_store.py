@@ -28,7 +28,8 @@ def dsn_from_env() -> str:
 
 _JOIN_SQL = """
 SELECT r.incident_id, r.root_cause_service, r.failure_type, r.confidence_score,
-       r.origin_candidates, g.true_root_node, g.fault_class
+       r.origin_candidates, g.true_root_node, g.fault_class, r.alert_name,
+       g.topology_id, g.labeler, g.verified_at
 FROM rca_reports r
 JOIN groundtruth.ground_truth g ON r.incident_id = g.incident_id
 """
@@ -81,6 +82,10 @@ class LiveEvalStore:
                     "origin_candidates": _parse_candidates(row[4]),
                     "true_root_node": row[5],
                     "fault_class": row[6],
+                    "alert_name": row[7],
+                    "topology_id": row[8],
+                    "labeler": row[9],
+                    "verified_at": row[10].isoformat() if row[10] else None,
                 }
             )
         return out

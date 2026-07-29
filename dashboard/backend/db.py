@@ -278,6 +278,17 @@ class DashboardStore:
                 "notes": report.get("feedback_notes"),
                 "updated_at": _iso(report.get("feedback_updated_at")),
             }
+        refs = _parse_jsonish(
+            report.get("telemetry_refs") or inc.get("telemetry_refs")
+        ) or {}
+        if not isinstance(refs, dict):
+            refs = {}
+        route = (
+            report.get("routing")
+            or refs.get("route")
+            or None
+        )
+        runbook_url = refs.get("runbook_url") or refs.get("runbook")
         return {
             "id": str(report.get("id") or report.get("incident_id")),
             "incident_id": report.get("incident_id"),
@@ -286,7 +297,11 @@ class DashboardStore:
             "alerted_service": report.get("alerted_service") or inc.get("alerted_service"),
             "root_cause_service": report.get("root_cause_service"),
             "failure_type": report.get("failure_type"),
-            "routing": report.get("routing"),
+            "routing": route,
+            "route": route,
+            "runbook_url": runbook_url,
+            "layer": refs.get("layer"),
+            "slo_target": refs.get("slo_target"),
             "severity": (report.get("severity") or inc.get("severity") or "info").lower(),
             "incident_status": inc.get("status") or ("resolved" if report.get("resolved_at") else "open"),
             "confidence_score": report.get("confidence_score"),
@@ -295,9 +310,7 @@ class DashboardStore:
             "resolved_at": _iso(report.get("resolved_at") or inc.get("resolved_at")),
             "window_start": _iso(report.get("window_start") or inc.get("window_start")),
             "window_end": _iso(report.get("window_end") or inc.get("window_end")),
-            "telemetry_refs": _parse_jsonish(
-                report.get("telemetry_refs") or inc.get("telemetry_refs")
-            ) or {},
+            "telemetry_refs": refs,
             "namespace": report.get("namespace") or inc.get("namespace"),
             "node": report.get("node") or inc.get("node"),
             "origin_candidates": _parse_jsonish(report.get("origin_candidates")) or [],

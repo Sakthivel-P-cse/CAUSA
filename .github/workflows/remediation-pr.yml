@@ -4,8 +4,10 @@ on:
   pull_request:
     branches: [main, master]
     paths:
-      - "remediation-sandbox/**"
+      - "src/**"
       - "incident-detection/remediation/**"
+      - "demo-bugs/**"
+      - ".github/workflows/remediation-*.yml"
   push:
     branches: ["causa/fix-*"]
 
@@ -17,9 +19,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Syntax-check sandbox + remediation modules
+      - name: Compile remediation modules
+        run: python -m compileall incident-detection/remediation -q
+      - name: Unit tests (plan schema + propose)
+        working-directory: incident-detection
+        env:
+          CAUSA_NIM_ENABLED: "0"
+          PYTHONPATH: "."
         run: |
-          python -m compileall remediation-sandbox incident-detection/remediation -q
+          pip install -q pytest httpx
+          pytest -q tests/test_remediation_service.py tests/test_dev_c.py -k "typed_plan or propose or apply_plan_v1_disabled" --maxfail=5
       - name: Rules-only propose smoke
         working-directory: incident-detection
         env:
@@ -46,7 +55,7 @@ jobs:
           }
           out = propose_for_report(report)
           assert out["ok"], out
-          applied = apply_plan_v1(out["plan"], breach=False)
-          assert applied.get("attempted"), applied
-          print("ok", out["plan"]["fault_class"], applied.get("mode"))
+          disabled = apply_plan_v1(out["plan"])
+          assert disabled.get("mode") == "worker_required"
+          print("ok", out["plan"]["fault_class"], out["plan"].get("action"))
           PY

@@ -15,3 +15,6 @@ config:
   repeatInterval: 3h
   groupWait: 1m
   groupInterval: 10m
+
+auth:
+  triggerToken: "causa-dev-ingest-token"

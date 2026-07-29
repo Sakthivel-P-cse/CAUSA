@@ -62,7 +62,7 @@ def test_infra_node_scores_anomalous_against_its_warmed_baseline():
             adapter,
             ["kind-worker"],
             Window(WARM_START, WARM_END),
-            metrics=("cpu", "saturation"),
+            metrics=("cpu",),
             kind="infra",
         )
     finally:

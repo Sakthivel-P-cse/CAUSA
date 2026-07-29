@@ -1,0 +1,38 @@
+{
+  "name": "otel-demo",
+  "namespaces": ["otel-demo"],
+  "remediation_namespace": "otel-demo",
+  "service_allowlist": [
+    "flagd",
+    "product-catalog",
+    "payment",
+    "cart",
+    "recommendation",
+    "ad",
+    "email",
+    "checkout",
+    "currency",
+    "shipping",
+    "fraud-detection",
+    "frontend",
+    "frontend-proxy",
+    "valkey-cart"
+  ],
+  "auto_actions": [],
+  "configmap_name": "flagd-config",
+  "configmap_key": "demo.flagd.json",
+  "remediation_base_branch": "master",
+  "min_confidence": 0.15
+  ,
+  "capabilities": {
+    "flagd": ["config_patch"],
+    "payment": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "cart": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "checkout": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "recommendation": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "product-catalog": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "frontend": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "frontend-proxy": ["code_fix_pr", "scale_up", "rollback_to_last_good"],
+    "valkey-cart": ["scale_up"]
+  }
+}

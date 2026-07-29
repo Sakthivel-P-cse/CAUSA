@@ -1,0 +1,12 @@
+production: true
+replicaCount: 2
+
+existingSecret: causa-remediation-worker-secret
+databasePassword: ""
+
+image:
+  tag: ""
+  digest: ""
+
+env:
+  CAUSA_REMEDIATION_KILL_SWITCH: "1"

@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { formatFailureType } from '../../api/incidents.js'
+import { formatFailureType, isAbstainedSummary, parseAbstainReason } from '../../api/incidents.js'
 import { plainIncidentSummary } from '../../api/rcaNarrative.js'
 import ConfidenceBadge from './ConfidenceBadge.jsx'
 
@@ -20,6 +20,7 @@ export function incidentPriority(incident) {
 export default function InsightCard({ incident, compact = false, showFilterLink = false }) {
   const severity = incidentSeverity(incident)
   const confidence = incident.confidence_score ?? incident.confidence
+  const abstained = isAbstainedSummary(incident.root_cause_summary)
   const service = incident.root_cause_service || incident.alerted_service || 'Unknown service'
   const filterService = incident.alerted_service || incident.root_cause_service
   const failure = formatFailureType(incident)
@@ -43,7 +44,14 @@ export default function InsightCard({ incident, compact = false, showFilterLink 
         <span>{service}</span>
         <span>{failure}</span>
         <span>{status}</span>
-        {confidence != null && <ConfidenceBadge score={confidence} />}
+        {(confidence != null || abstained) && (
+          <ConfidenceBadge
+            score={confidence}
+            abstained={abstained}
+            abstainReason={parseAbstainReason(incident.root_cause_summary)}
+            compact
+          />
+        )}
         <time dateTime={incident.triggered_at}>
           {incident.triggered_at ? new Date(incident.triggered_at).toLocaleString() : 'Unknown time'}
         </time>

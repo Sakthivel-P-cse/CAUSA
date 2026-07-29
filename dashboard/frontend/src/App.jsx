@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -7,7 +7,7 @@ import {
   RefreshCw, Settings2, Sun, UserRound, Wrench,
 } from 'lucide-react'
 import { useDashboard } from './context/DashboardContext.jsx'
-import { Button, Drawer, LoadingState, Popover, Select, TimeRangePicker } from './components/ui/index.js'
+import { Button, Dialog, Drawer, Input, LoadingState, Popover, Select, TimeRangePicker } from './components/ui/index.js'
 import { useFetch } from './hooks/useFetch.js'
 
 const Overview = lazy(() => import('./pages/Overview.jsx'))
@@ -25,19 +25,21 @@ const RemediationReview = lazy(() => import('./pages/RemediationReview.jsx'))
 const NAV_GROUPS = [
   { label: 'Watchdog', items: [
     { to: '/', label: 'Overview', icon: CircleGauge },
-    { to: '/incidents', label: 'Incidents & RCA', icon: BellRing, end: true },
+    { to: '/incidents', label: 'Incidents', icon: BellRing, end: true },
     { to: '/incidents/history', label: 'History', icon: Archive },
-    { to: '/remediation', label: 'Remediation', icon: Wrench, end: true },
   ] },
   { label: 'Investigate', items: [
-    { to: '/graphs', label: 'Graph Maps', icon: GitBranch },
+    { to: '/graphs', label: 'Topology', icon: GitBranch },
   ] },
   { label: 'Explore', items: [
     { to: '/metrics', label: 'Metrics', icon: Activity },
     { to: '/logs', label: 'Logs', icon: ChartNoAxesCombined },
     { to: '/traces', label: 'Traces', icon: Network },
   ] },
-  { label: 'Analytics', items: [{ to: '/stats', label: 'Statistics', icon: BarChart3 }] },
+  { label: 'Operate', items: [
+    { to: '/remediation', label: 'Remediation', icon: Wrench, end: true },
+    { to: '/stats', label: 'Statistics', icon: BarChart3 },
+  ] },
 ]
 
 const PATH_LABELS = Object.fromEntries(NAV_GROUPS.flatMap(group => group.items.map(item => [item.to, item.label])))
@@ -72,7 +74,10 @@ function GlobalControls() {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   const { data: services } = useFetch('/api/metrics/services', [])
-  const serviceNames = (services || []).map(s => s.name).filter(Boolean).sort()
+  const serviceNames = (Array.isArray(services) ? services : [])
+    .map(s => s?.name)
+    .filter(Boolean)
+    .sort()
 
   async function refresh() {
     setRefreshing(true)
@@ -113,19 +118,92 @@ function GlobalControls() {
 
 function UserMenu() {
   const { preferences, setPreference } = useDashboard()
+  const queryClient = useQueryClient()
+  const [hasToken, setHasToken] = useState(() => Boolean(window.sessionStorage.getItem('causa_api_token')))
+  const [authOpen, setAuthOpen] = useState(false)
+  const [draftToken, setDraftToken] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
+  const { data: session } = useFetch('/api/session', [])
+
+  useEffect(() => {
+    const onAuthError = event => {
+      setAuthMessage(event.detail?.status === 403
+        ? 'Your token is valid, but its role cannot perform that action.'
+        : 'Authentication is required or your token has expired.')
+      setDraftToken('')
+      setAuthOpen(true)
+    }
+    window.addEventListener('causa:auth-error', onAuthError)
+    return () => window.removeEventListener('causa:auth-error', onAuthError)
+  }, [])
+
+  async function submitToken(event) {
+    event.preventDefault()
+    const cleaned = draftToken.trim()
+    if (!cleaned) return
+    window.sessionStorage.setItem('causa_api_token', cleaned)
+    setHasToken(true)
+    setDraftToken('')
+    setAuthMessage('')
+    setAuthOpen(false)
+    await queryClient.resetQueries()
+  }
+
+  async function clearToken() {
+    window.sessionStorage.removeItem('causa_api_token')
+    setHasToken(false)
+    setDraftToken('')
+    setAuthMessage('Credentials cleared.')
+    await queryClient.resetQueries()
+  }
+
+  function openTokenDialog() {
+    setDraftToken('')
+    setAuthMessage('')
+    setAuthOpen(true)
+  }
   return (
-    <Popover label="User preferences" trigger={<Button variant="ghost" aria-label="Open user menu"><UserRound size={18} /><span className="desktop-label">Preferences</span></Button>}>
-      <div className="user-menu">
-        <Button variant="ghost" role="menuitem" onClick={() => setPreference('theme', preferences.theme === 'dark' ? 'light' : 'dark')}>
-          {preferences.theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          {preferences.theme === 'dark' ? 'Light theme' : 'Dark theme'}
-        </Button>
-        <Button variant="ghost" role="menuitem" onClick={() => setPreference('density', preferences.density === 'compact' ? 'comfortable' : 'compact')}>
-          <Settings2 size={16} />
-          {preferences.density === 'compact' ? 'Comfortable density' : 'Compact density'}
-        </Button>
-      </div>
-    </Popover>
+    <>
+      <Popover label="User preferences" trigger={<Button variant="ghost" aria-label="Open user menu"><UserRound size={18} /><span className="desktop-label">Preferences</span></Button>}>
+        <div className="user-menu">
+          <div className="user-menu__label">
+            {session?.subject || (hasToken ? 'Token configured' : 'Development session')}
+            {session?.role && <span> · {session.role}</span>}
+          </div>
+          <Button variant="ghost" role="menuitem" onClick={openTokenDialog}>
+            <UserRound size={16} />
+            {hasToken ? 'Replace API token' : 'Set API token'}
+          </Button>
+          {hasToken && <Button variant="ghost" role="menuitem" onClick={clearToken}>Clear credentials</Button>}
+          <Button variant="ghost" role="menuitem" onClick={() => setPreference('theme', preferences.theme === 'dark' ? 'light' : 'dark')}>
+            {preferences.theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {preferences.theme === 'dark' ? 'Light theme' : 'Dark theme'}
+          </Button>
+          <Button variant="ghost" role="menuitem" onClick={() => setPreference('density', preferences.density === 'compact' ? 'comfortable' : 'compact')}>
+            <Settings2 size={16} />
+            {preferences.density === 'compact' ? 'Comfortable density' : 'Compact density'}
+          </Button>
+        </div>
+      </Popover>
+      <Dialog open={authOpen} onClose={() => setAuthOpen(false)} title="Causa authentication">
+        <form className="auth-form" onSubmit={submitToken}>
+          {authMessage && <p role="status">{authMessage}</p>}
+          <Input
+            autoComplete="off"
+            autoFocus
+            label="Bearer token"
+            type="password"
+            value={draftToken}
+            onChange={event => setDraftToken(event.target.value)}
+            hint="The existing token is never displayed. It is stored for this browser tab only."
+          />
+          <div className="ui-dialog-actions">
+            <Button type="button" variant="ghost" onClick={() => setAuthOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={!draftToken.trim()}>Save token</Button>
+          </div>
+        </form>
+      </Dialog>
+    </>
   )
 }
 
@@ -137,6 +215,10 @@ function Breadcrumbs() {
       ? '/incidents'
       : location.pathname
   const label = PATH_LABELS[base] || 'Watchdog'
+  useEffect(() => {
+    document.title = `${label} · Causa`
+    document.getElementById('main-content')?.focus()
+  }, [label, location.pathname])
   return (
     <nav aria-label="Breadcrumb" className="breadcrumbs">
       <ol>
@@ -144,6 +226,18 @@ function Breadcrumbs() {
         {location.pathname !== '/' && <li aria-current="page">{label}</li>}
       </ol>
     </nav>
+  )
+}
+
+function NotFound() {
+  return (
+    <section className="route-placeholder">
+      <div>
+        <h1>Page not found</h1>
+        <p>The requested Causa route does not exist.</p>
+        <Button onClick={() => { window.location.href = '/' }}>Return to overview</Button>
+      </div>
+    </section>
   )
 }
 
@@ -184,6 +278,7 @@ function ProductShell() {
               <Route path="/graphs" element={<Graphs />} />
               <Route path="/rca" element={<Navigate replace to="/incidents" />} />
               <Route path="/stats" element={<Statistics />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </main>

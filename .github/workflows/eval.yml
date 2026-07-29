@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   unit-and-golden:
     runs-on: ubuntu-latest
@@ -19,16 +22,18 @@ jobs:
         run: |
           pip install -e ".[dev]"
           pip install -r requirements-devc.txt
-      - name: A+B unit tests
-        run: PYTHONPATH=. pytest -q tests --ignore=tests/test_infra_end_to_end.py -x
+          pip install pip-audit
+      - name: Python dependency audit
+        run: pip-audit
+      - name: Full Python test suite
+        run: PYTHONPATH=. pytest -q tests
       - name: Dev C lane + golden smoke
         run: |
           PYTHONPATH=. python -m eval.runner
           PYTHONPATH=. pytest -q tests/test_dev_c.py
-      - name: Demo loop (auto-approve + canary breach)
+      - name: Demo loop (typed plan propose via CLI)
         run: |
           PYTHONPATH=. python -m remediation.cli --auto-approve
-          PYTHONPATH=. python -m remediation.cli --auto-approve --breach
       - name: NIM client + remediation service (rules-only)
         env:
           CAUSA_NIM_ENABLED: "0"
@@ -36,6 +41,20 @@ jobs:
           PYTHONPATH=. pytest -q tests/test_nim_client.py tests/test_remediation_service.py
       - name: Fixture-smoke artifacts
         run: PYTHONPATH=. python -m eval.report
+      - name: Prometheus Phase-2 rule packs
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+      - name: Check Phase-2 rule packs
+        env:
+          REQUIRE_PROMTOOL: "1"
+        run: bash ../scripts/check-prom-rules.sh
+      - name: Helm lint
+        working-directory: ${{ github.workspace }}
+        run: |
+          for chart in incident-detection/helm/* dashboard/helm/*; do
+            if [ -f "$chart/Chart.yaml" ]; then helm lint "$chart"; fi
+          done
       - name: Live eval unit tests (mocked PG)
         run: PYTHONPATH=. pytest -q tests/test_live_eval.py
       - name: Upload artifacts
@@ -43,3 +62,21 @@ jobs:
         with:
           name: causa-fixture-smoke
           path: incident-detection/artifacts/
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/frontend/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

@@ -54,6 +54,7 @@ _LOOKBACK_MIN = int(os.getenv("CAUSA_LOOKBACK_MIN", "10"))
 _NAMESPACE = os.getenv("CAUSA_APP_NAMESPACE") or None
 _MAX_BODY = int(os.getenv("TRIGGER_MAX_BODY_BYTES", str(1024 * 1024)))
 _AUTH_TOKEN = os.getenv("TRIGGER_AUTH_TOKEN") or None
+_STAGE2_AUTH_TOKEN = os.getenv("STAGE2_AUTH_TOKEN") or None
 _FORWARD_RETRIES = int(os.getenv("STAGE2_FORWARD_RETRIES", "3"))
 _FORWARD_TIMEOUT = float(os.getenv("STAGE2_FORWARD_TIMEOUT", "5.0"))
 _OUTBOX_INTERVAL = float(os.getenv("STAGE2_OUTBOX_INTERVAL", "30"))
@@ -128,25 +129,42 @@ class Dispatcher:
                 self._q.task_done()
 
     def _process(self, alerts: list[Alert], payload: dict) -> None:
-        opened_ok = False
+        if not alerts:
+            logger.info("No monitored alerts — skip open/forward")
+            return
+
+        opened_ids: set[str] = set()
+        firing = 0
         for alert in alerts:
             try:
                 if alert.is_resolved:
                     self.store.resolve_incident(
                         alert.incident_id, alert.ends_at or datetime.now(timezone.utc)
                     )
-                    opened_ok = True
                 else:
+                    firing += 1
                     if self._open(alert):
-                        opened_ok = True
+                        opened_ids.add(alert.incident_id)
             except Exception:
                 logger.exception("Failed handling alert %s", alert.alert_name)
-        if opened_ok:
-            self._forward_with_retry(payload)
-        else:
-            logger.error(
-                "Skipping Stage-2 forward — no successful snapshot/open in batch"
-            )
+
+        if not opened_ids:
+            if firing:
+                logger.error(
+                    "Skipping Stage-2 forward — %d firing alert(s) failed to open",
+                    firing,
+                )
+            return
+
+        scoped = dict(payload)
+        raw_alerts = payload.get("alerts") or []
+        scoped["alerts"] = [
+            a
+            for a in raw_alerts
+            if isinstance(a, dict)
+            and f"inc-{a.get('fingerprint') or ''}" in opened_ids
+        ]
+        self._forward_with_retry(scoped)
 
     def _open(self, alert: Alert) -> bool:
         global ingest_snapshot_failed_total
@@ -156,6 +174,13 @@ class Dispatcher:
         trace_id = None
         refs: dict = {}
         snapshot_status = "ok"
+        alert_meta = {
+            "route": alert.route,
+            "runbook_url": alert.runbook_url,
+            "layer": alert.labels.get("layer"),
+            "slo_target": alert.labels.get("slo_target"),
+        }
+        alert_meta = {k: v for k, v in alert_meta.items() if v}
         try:
             reader = self.reader_factory()
             telem = reader.read_incident_window(
@@ -187,13 +212,14 @@ class Dispatcher:
                 window_start=window_start,
                 window_end=window_end,
                 trace_id=None,
-                telemetry_refs={},
+                telemetry_refs=alert_meta,
                 snapshot_status=snapshot_status,
             )
             # Still open + forward Stage-2 even when the telemetry snapshot fails;
             # otherwise AppLogic/error-rate alerts never become RCA incidents.
             return True
 
+        refs = {**refs, **alert_meta}
         self.store.open_incident(
             incident_id=alert.incident_id,
             alert_name=alert.alert_name,
@@ -216,9 +242,19 @@ class Dispatcher:
         import httpx
 
         last_error = ""
+        headers = (
+            {"Authorization": f"Bearer {_STAGE2_AUTH_TOKEN}"}
+            if _STAGE2_AUTH_TOKEN
+            else None
+        )
         for attempt in range(1, _FORWARD_RETRIES + 1):
             try:
-                resp = httpx.post(self.forward_url, json=payload, timeout=_FORWARD_TIMEOUT)
+                resp = httpx.post(
+                    self.forward_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=_FORWARD_TIMEOUT,
+                )
                 resp.raise_for_status()
                 return
             except Exception as exc:
@@ -250,7 +286,14 @@ class Dispatcher:
             for row in rows:
                 try:
                     resp = httpx.post(
-                        self.forward_url, json=row["payload"], timeout=_FORWARD_TIMEOUT
+                        self.forward_url,
+                        json=row["payload"],
+                        headers=(
+                            {"Authorization": f"Bearer {_STAGE2_AUTH_TOKEN}"}
+                            if _STAGE2_AUTH_TOKEN
+                            else None
+                        ),
+                        timeout=_FORWARD_TIMEOUT,
                     )
                     resp.raise_for_status()
                     self.store.mark_outbox_sent(row["id"])
@@ -277,11 +320,21 @@ class TriggerHandler(BaseHTTPRequestHandler):
 
     def _authorized(self) -> bool:
         if not _AUTH_TOKEN:
-            return True
+            return os.getenv(
+                "CAUSA_TRIGGER_ALLOW_UNAUTHENTICATED", "0"
+            ).strip().lower() in {"1", "true", "yes", "on"}
         return self.headers.get("Authorization", "") == f"Bearer {_AUTH_TOKEN}"
 
     def do_GET(self) -> None:
-        if self.path.rstrip("/") in ("/health", "/healthz", ""):
+        path = self.path.rstrip("/")
+        if path == "/ready":
+            try:
+                self.dispatcher.store.check_available()
+                self._send(200, {"status": "ready"})
+            except Exception:
+                logger.exception("readiness check failed")
+                self._send(503, {"status": "not_ready", "postgres": False})
+        elif path in ("/health", "/healthz", ""):
             self._send(
                 200,
                 {
@@ -293,7 +346,7 @@ class TriggerHandler(BaseHTTPRequestHandler):
                     "ingest_outbox_lost_total": ingest_outbox_lost_total,
                 },
             )
-        elif self.path.rstrip("/") == "/metrics":
+        elif path == "/metrics":
             body = (
                 f"# TYPE ingest_snapshot_failed_total counter\n"
                 f"ingest_snapshot_failed_total {ingest_snapshot_failed_total}\n"

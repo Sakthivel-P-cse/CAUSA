@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: stage2-rca-planner
+  namespace: {{ .Values.remediation.namespace }}
+  labels:
+    {{- include "stage2-rca.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["flagd-config"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: stage2-rca-planner
+  namespace: {{ .Values.remediation.namespace }}
+  labels:
+    {{- include "stage2-rca.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: stage2-rca-planner
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "stage2-rca.fullname" . }}
+    namespace: {{ .Release.Namespace }}

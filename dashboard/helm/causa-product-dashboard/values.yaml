@@ -1,7 +1,9 @@
 replicaCount: 1
+production: false
 image:
   repository: causa/dashboard
-  tag: latest
+  tag: local
+  digest: ""
   pullPolicy: IfNotPresent
 service:
   type: ClusterIP
@@ -13,5 +15,23 @@ env:
   PGHOST: postgres.postgres.svc.cluster.local
   PGPORT: "5432"
   PGDATABASE: causa
-  PGUSER: rca_engine
-resources: {}
+  PGUSER: causa_remediator
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+networkPolicy:
+  enabled: false
+  allowedIngressNamespaces:
+    - ingress-nginx
+auth:
+  existingSecret: causa-dashboard-auth
+  # This Secret must exist in the dashboard release namespace.
+  databaseSecret: causa-dashboard-db
+  databasePasswordKey: remediator-password

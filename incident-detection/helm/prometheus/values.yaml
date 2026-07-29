@@ -48,6 +48,41 @@ config:
       staticConfigs:
         - targets:
             - mimir.mimir.svc.cluster.local:8080
+    # stage2-rca — required by RCAEngineDown (up{job="stage2-rca"})
+    - jobName: stage2-rca
+      staticConfigs:
+        - targets:
+            - stage2-rca.stage2-rca.svc.cluster.local:8080
+    # causa-ingest — webhook front-door health
+    - jobName: causa-ingest
+      staticConfigs:
+        - targets:
+            - causa-ingest.causa-ingest.svc.cluster.local:8080
+    # loki / tempo / minio — required by Phase-2 platform alerts
+    - jobName: loki
+      staticConfigs:
+        - targets:
+            - loki.loki.svc.cluster.local:3100
+    - jobName: tempo
+      staticConfigs:
+        - targets:
+            - tempo.tempo.svc.cluster.local:3200
+    - jobName: minio-loki
+      staticConfigs:
+        - targets:
+            - minio-loki.minio-loki.svc.cluster.local:9000
+    - jobName: minio-tempo
+      staticConfigs:
+        - targets:
+            - minio-tempo.minio-tempo.svc.cluster.local:9000
+    - jobName: minio-mimir
+      staticConfigs:
+        - targets:
+            - minio-mimir.minio-mimir.svc.cluster.local:9000
+    - jobName: alertmanager
+      staticConfigs:
+        - targets:
+            - alertmanager.alertmanager.svc.cluster.local:9093
 
   # Extra scrape configs using Kubernetes SD — rendered as raw YAML via tpl.
   # Required for node-exporter (endpoint discovery) and cAdvisor (node role).
@@ -154,6 +189,27 @@ rules:
     enabled: true
   appWorkloads:
     enabled: true
+  phase2:
+    enabled: false
+    disablePhase1ServiceAlerts: false
+    slo:
+      enabled: false
+      availabilityTarget: 0.995
+      latencyFastSeconds: 2.0
+      latencySlowSeconds: 1.5
+      services:
+        - frontend
+        - checkout
+        - cart
+        - payment
+        - product-catalog
+        - recommendation
+    dependencies:
+      enabled: true
+    platform:
+      enabled: false
+    runbooks:
+      baseUrl: "https://github.com/causa-io/causa/blob/main/runbooks"
 
 resources:
   requests:
