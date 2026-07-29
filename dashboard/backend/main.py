@@ -4,9 +4,8 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from dashboard.backend.dependencies import dashboard_lifespan
@@ -27,21 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.middleware("http")
-async def authenticate_api(request: Request, call_next):
-    if request.url.path.startswith("/api/") and request.url.path != "/api/health":
-        from dashboard.backend.auth import AuthenticationError, authenticate
-
-        try:
-            request.state.identity = authenticate(request.headers.get("Authorization"))
-        except AuthenticationError as exc:
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={"detail": exc.detail},
-                headers=exc.headers,
-            )
-    return await call_next(request)
 
 app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
@@ -81,16 +65,6 @@ def api_health(request: Request):
             "checks": checks,
         },
     )
-
-
-@app.get("/api/session")
-def api_session(request: Request):
-    identity = request.state.identity
-    return {
-        "authenticated": identity.subject != "development-auth-disabled",
-        "subject": identity.subject,
-        "role": identity.role,
-    }
 
 
 _DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"

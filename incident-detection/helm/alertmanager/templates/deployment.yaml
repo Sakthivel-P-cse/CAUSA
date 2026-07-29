@@ -54,21 +54,12 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/alertmanager
-            - name: webhook-auth
-              mountPath: /etc/alertmanager/secrets
-              readOnly: true
             - name: storage
               mountPath: /alertmanager
       volumes:
         - name: config
           configMap:
             name: {{ include "alertmanager.fullname" . }}-config
-        - name: webhook-auth
-          secret:
-            secretName: {{ if .Values.auth.existingSecret }}{{ .Values.auth.existingSecret }}{{ else }}{{ include "alertmanager.fullname" . }}-webhook-auth{{ end }}
-            items:
-              - key: {{ .Values.auth.tokenKey }}
-                path: trigger-token
         - name: storage
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:

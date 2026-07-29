@@ -2,7 +2,7 @@
 {{- fail "production requires image.digest or an immutable image.tag (not local/latest)" }}
 {{- end }}
 {{- if and .Values.production (not .Values.existingSecret) }}
-{{- fail "production requires existingSecret with PGPASSWORD, TRIGGER_AUTH_TOKEN, and STAGE2_AUTH_TOKEN" }}
+{{- fail "production requires existingSecret with PGPASSWORD" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -62,16 +62,6 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "causa-ingest.fullname" . }}-secret{{ end }}
                   key: PGPASSWORD
-            - name: TRIGGER_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "causa-ingest.fullname" . }}-secret{{ end }}
-                  key: TRIGGER_AUTH_TOKEN
-            - name: STAGE2_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "causa-ingest.fullname" . }}-secret{{ end }}
-                  key: STAGE2_AUTH_TOKEN
           livenessProbe:
             httpGet:
               path: /health

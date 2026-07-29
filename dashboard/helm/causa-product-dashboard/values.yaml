@@ -30,8 +30,7 @@ networkPolicy:
   enabled: false
   allowedIngressNamespaces:
     - ingress-nginx
-auth:
-  existingSecret: causa-dashboard-auth
+database:
   # This Secret must exist in the dashboard release namespace.
-  databaseSecret: causa-dashboard-db
-  databasePasswordKey: remediator-password
+  secret: causa-dashboard-db
+  passwordKey: remediator-password

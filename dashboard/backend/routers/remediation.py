@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, field_validator
 
 from dashboard.backend.dependencies import get_store
-from dashboard.backend.auth import AuthIdentity, require_role
 from dashboard.backend.db import DashboardStore
 from dashboard.backend.errors import api_error
 from dashboard.backend.remediation_store import APPROVABLE, RemediationStore
@@ -20,10 +19,6 @@ if str(_ID) not in sys.path:
 
 router = APIRouter()
 _rem_store: RemediationStore | None = None
-require_proposer = require_role("proposer")
-require_approver = require_role("approver")
-
-
 def get_rem_store() -> RemediationStore:
     global _rem_store
     if _rem_store is None:
@@ -117,7 +112,6 @@ def get_plan(plan_id: str, rem: RemediationStore = Depends(get_rem_store)) -> di
 @router.post("/ensure")
 def ensure_plan(
     body: ProposeBody,
-    identity: AuthIdentity = Depends(require_proposer),
     store: DashboardStore = Depends(get_store),
     rem: RemediationStore = Depends(get_rem_store),
 ) -> dict[str, Any]:
@@ -135,7 +129,6 @@ def ensure_plan(
 @router.post("/propose")
 def propose(
     body: ProposeBody,
-    identity: AuthIdentity = Depends(require_proposer),
     store: DashboardStore = Depends(get_store),
     rem: RemediationStore = Depends(get_rem_store),
 ) -> dict[str, Any]:
@@ -175,7 +168,6 @@ def propose(
 def regenerate(
     plan_id: str,
     body: RegenerateBody | None = None,
-    identity: AuthIdentity = Depends(require_proposer),
     store: DashboardStore = Depends(get_store),
     rem: RemediationStore = Depends(get_rem_store),
 ) -> dict[str, Any]:
@@ -232,7 +224,6 @@ def regenerate(
 def approve(
     plan_id: str,
     body: DecisionBody | None = None,
-    identity: AuthIdentity = Depends(require_approver),
     rem: RemediationStore = Depends(get_rem_store),
 ) -> dict[str, Any]:
     body = body or DecisionBody()
@@ -262,7 +253,7 @@ def approve(
         ):
             raise api_error(403, "infra_blocked", "infra actions are approval-only / not executable")
 
-    decided_by = identity.subject
+    decided_by = body.decided_by or "operator"
     updated = rem.set_status(plan_id, "approved", decided_by=decided_by)
     rem.add_event(plan_id, "approved", {"decided_by": decided_by, "queued_for_worker": True})
     return {
@@ -275,13 +266,13 @@ def approve(
 def reject(
     plan_id: str,
     body: DecisionBody | None = None,
-    identity: AuthIdentity = Depends(require_approver),
     rem: RemediationStore = Depends(get_rem_store),
 ) -> dict[str, Any]:
     body = body or DecisionBody()
     row = rem.get(plan_id)
     if not row:
         raise api_error(404, "not_found", "Remediation plan not found")
-    updated = rem.set_status(plan_id, "rejected", decided_by=identity.subject)
-    rem.add_event(plan_id, "rejected", {"decided_by": identity.subject})
+    decided_by = body.decided_by or "operator"
+    updated = rem.set_status(plan_id, "rejected", decided_by=decided_by)
+    rem.add_event(plan_id, "rejected", {"decided_by": decided_by})
     return {"plan": updated}

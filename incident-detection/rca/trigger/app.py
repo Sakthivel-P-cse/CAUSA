@@ -16,8 +16,6 @@ from rca.store import RCAStore
 logger = logging.getLogger(__name__)
 
 _MAX_BODY = int(os.getenv("TRIGGER_MAX_BODY_BYTES", str(1024 * 1024)))
-_AUTH_TOKEN = os.getenv("TRIGGER_AUTH_TOKEN") or None
-
 incident_not_opened_via_ingest_total = 0
 rca_process_failures_total = 0
 
@@ -148,28 +146,6 @@ class TriggerHandler(BaseHTTPRequestHandler):
         if self.path.rstrip("/") != "/trigger":
             self._send(404, {"error": "not found"})
             return
-        allow_unauthenticated = os.getenv(
-            "CAUSA_TRIGGER_ALLOW_UNAUTHENTICATED", "0"
-        ).strip().lower() in {"1", "true", "yes", "on"}
-        if (
-            (not _AUTH_TOKEN and not allow_unauthenticated)
-            or (
-                _AUTH_TOKEN
-                and self.headers.get("Authorization") != f"Bearer {_AUTH_TOKEN}"
-            )
-        ):
-            self._send(
-                503 if not _AUTH_TOKEN else 401,
-                {
-                    "error": (
-                        "trigger authentication not configured"
-                        if not _AUTH_TOKEN
-                        else "unauthorized"
-                    )
-                },
-            )
-            return
-
         raw_length = self.headers.get("Content-Length")
         if raw_length is None:
             self._send(411, {"error": "length required"})

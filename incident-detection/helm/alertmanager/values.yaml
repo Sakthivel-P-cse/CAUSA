@@ -43,11 +43,6 @@ persistence:
 # set ALLOW_STAGE2_BYPASS=1 only for local debug and accept LookupError noise.
 stage2WebhookUrl: "http://causa-ingest.causa-ingest.svc.cluster.local:8080/trigger"
 
-auth:
-  existingSecret: ""
-  tokenKey: TRIGGER_AUTH_TOKEN
-  triggerToken: "causa-dev-ingest-token"
-
 config:
   # How long to wait before re-sending a firing alert
   repeatInterval: 1h

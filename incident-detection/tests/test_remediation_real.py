@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from remediation.plan_schema import ExactTarget, PlanChange, SLOGate, TypedPlanSpec, fingerprint_payload
-from remediation.policy import check_approve_identity, check_plan_executable, kill_switch_active
+from remediation.policy import check_plan_executable, kill_switch_active
 from remediation.slo import SLOSnapshot, evaluate_gates
 from runtime.profile import load_profile
 
@@ -38,12 +38,6 @@ def test_kill_switch(monkeypatch):
     monkeypatch.setenv("CAUSA_REMEDIATION_KILL_SWITCH", "1")
     d = kill_switch_active()
     assert not d.allowed
-
-
-def test_approval_token(monkeypatch):
-    monkeypatch.setenv("REMEDIATION_APPROVAL_TOKEN", "secret")
-    assert not check_approve_identity(None).allowed
-    assert check_approve_identity("Bearer secret").allowed
 
 
 def test_evaluate_gates_fail_closed():

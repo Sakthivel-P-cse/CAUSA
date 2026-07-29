@@ -2,14 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { apiFetch } from './client.js'
 
-describe('apiFetch authentication', () => {
+describe('apiFetch', () => {
   afterEach(() => {
-    window.sessionStorage.clear()
     vi.restoreAllMocks()
   })
 
-  it('sends the bearer token from session storage', async () => {
-    window.sessionStorage.setItem('causa_api_token', 'viewer-secret')
+  it('sends API requests without authorization credentials', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -21,9 +19,7 @@ describe('apiFetch authentication', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/stats',
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer viewer-secret',
-        }),
+        headers: expect.not.objectContaining({ Authorization: expect.anything() }),
       }),
     )
   })

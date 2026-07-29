@@ -25,9 +25,6 @@ env:
 # In production, point this at a pre-created Secret containing PGPASSWORD.
 existingSecret: ""
 
-auth:
-  triggerToken: ""
-
 remediation:
   namespace: otel-demo
   autoPropose: "0"

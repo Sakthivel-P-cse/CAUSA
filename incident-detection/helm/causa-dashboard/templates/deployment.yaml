@@ -2,7 +2,7 @@
 {{- fail "production requires image.digest or an immutable image.tag (not local/latest)" }}
 {{- end }}
 {{- if not .Values.existingSecret }}
-{{- fail "existingSecret is required and must contain dashboard and database credentials" }}
+{{- fail "existingSecret is required and must contain dashboard database credentials" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -46,7 +46,7 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- range $key := list "PGPASSWORD" "REMEDIATION_PGPASSWORD" "CAUSA_API_VIEWER_TOKEN" "CAUSA_REMEDIATION_PROPOSER_TOKEN" "REMEDIATION_APPROVAL_TOKEN" "CAUSA_REMEDIATION_EXECUTOR_TOKEN" }}
+            {{- range $key := list "PGPASSWORD" "REMEDIATION_PGPASSWORD" }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:

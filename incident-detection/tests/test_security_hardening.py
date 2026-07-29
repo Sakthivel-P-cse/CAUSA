@@ -1,4 +1,4 @@
-"""Regression tests for fail-closed production safety controls."""
+"""Regression tests for production safety controls."""
 
 from __future__ import annotations
 
@@ -13,15 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dashboard.backend.auth import (
-    authenticate,
-    configured_tokens,
-    validate_auth_configuration,
-)
 from dashboard.backend.remediation_store import RemediationStore
 from remediation.auto import auto_remediate_from_report
 from remediation.calibration_gate import automation_calibrated
-from remediation.policy import check_approve_identity
 
 
 def _clear_pg(monkeypatch) -> None:
@@ -34,29 +28,6 @@ def _clear_pg(monkeypatch) -> None:
         "PGPASSWORD",
     ):
         monkeypatch.delenv(name, raising=False)
-
-
-def test_api_auth_is_required_and_role_is_derived(monkeypatch):
-    monkeypatch.setenv("CAUSA_API_REQUIRE_AUTH", "1")
-    monkeypatch.setenv("CAUSA_API_VIEWER_TOKEN", "viewer-secret")
-    monkeypatch.setenv("REMEDIATION_APPROVAL_TOKEN", "approver-secret")
-    assert configured_tokens()["viewer-secret"] == "viewer"
-    assert authenticate("Bearer approver-secret").role == "approver"
-    with pytest.raises(Exception):
-        authenticate(None)
-    with pytest.raises(Exception):
-        authenticate("Bearer wrong")
-
-
-def test_approval_fails_closed_without_token_configuration(monkeypatch):
-    monkeypatch.setenv("CAUSA_API_REQUIRE_AUTH", "1")
-    monkeypatch.setenv("CAUSA_API_VIEWER_TOKEN", "viewer-secret")
-    monkeypatch.delenv("REMEDIATION_APPROVAL_TOKEN", raising=False)
-    with pytest.raises(RuntimeError, match="REMEDIATION_APPROVAL_TOKEN"):
-        validate_auth_configuration()
-    decision = check_approve_identity(None)
-    assert decision.allowed is False
-    assert decision.code == "auth_misconfigured"
 
 
 def test_automation_defaults_off(monkeypatch):

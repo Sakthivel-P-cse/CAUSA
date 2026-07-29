@@ -2,7 +2,7 @@
 {{- fail "production requires image.digest or an immutable image.tag (not local/latest)" }}
 {{- end }}
 {{- if and .Values.production (not .Values.existingSecret) }}
-{{- fail "production requires existingSecret with PGPASSWORD and TRIGGER_AUTH_TOKEN" }}
+{{- fail "production requires existingSecret with database passwords" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -55,11 +55,6 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "stage2-rca.fullname" . }}-secret{{ end }}
                   key: PGPASSWORD
-            - name: TRIGGER_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ if .Values.existingSecret }}{{ .Values.existingSecret }}{{ else }}{{ include "stage2-rca.fullname" . }}-secret{{ end }}
-                  key: TRIGGER_AUTH_TOKEN
             - name: REMEDIATION_PGUSER
               value: "causa_remediator"
             - name: REMEDIATION_PGPASSWORD

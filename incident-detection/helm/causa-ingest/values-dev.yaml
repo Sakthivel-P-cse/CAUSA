@@ -2,6 +2,3 @@
 # This must match helm/postgres auth.password.
 env:
   PGPASSWORD: "causa_dev_pass"
-auth:
-  triggerToken: "causa-dev-ingest-token"
-  stage2Token: "causa-dev-stage2-token"

@@ -19,7 +19,8 @@ with the required sample count is absent.
 
 ## Operational gates
 
-- All API and trigger authentication Secrets are configured and rotated.
+- Dashboard and trigger endpoints are restricted to trusted networks by ingress,
+  firewall or service-mesh policy.
 - Remediation uses the dedicated database role and Kubernetes service account.
 - Images are referenced by immutable release tag or digest.
 - Readiness checks verify required persistence.

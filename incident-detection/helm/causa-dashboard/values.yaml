@@ -25,7 +25,6 @@ env:
   PROMETHEUS_URL: http://prometheus.prometheus.svc.cluster.local:9090
   TEMPO_URL: http://tempo.tempo.svc.cluster.local:3200
   LOKI_URL: http://loki.loki.svc.cluster.local:3100
-  CAUSA_API_REQUIRE_AUTH: "1"
   CAUSA_CORS_ORIGINS: ""
   CAUSA_PROFILE: otel-demo
   CAUSA_ENVIRONMENT: local-kind

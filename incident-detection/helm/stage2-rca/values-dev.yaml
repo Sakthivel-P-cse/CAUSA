@@ -2,8 +2,6 @@
 env:
   PGPASSWORD: "rca_engine"
   REMEDIATION_MIN_CONFIDENCE: "0.10"
-auth:
-  triggerToken: "causa-dev-stage2-token"
 environment: local-kind
 remediation:
   autoPropose: "1"

@@ -20,7 +20,7 @@ Alertmanager
   → causa-ingest (scope, snapshot, durable incident/outbox)
   → stage2-rca (anomaly, graph, isolation, ranking)
   → Postgres
-  → authenticated dashboard
+  → dashboard
   → proposed plan → approver → leased remediation worker
 ```
 
@@ -30,10 +30,9 @@ corresponding `helm/` directories.
 
 ## Local development
 
-1. Copy `.env.example` to `.env` and replace every placeholder token.
+1. Copy `.env.example` to `.env` and configure the integrations you use.
 2. Start the Causa stack with `./causa-startup.sh`.
 3. Start the OpenTelemetry demo with `./microservice-startup.sh`.
-4. In the dashboard user menu, enter a viewer, proposer or approver token.
 
 Normal demo startup no longer deletes the application namespace. Set
 `RECREATE_DEMO_NAMESPACE=1` only when a destructive clean reinstall is intended.

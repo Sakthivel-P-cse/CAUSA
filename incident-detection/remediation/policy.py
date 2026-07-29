@@ -94,23 +94,6 @@ def check_plan_executable(spec: TypedPlanSpec, *, min_confidence: float | None =
     return PolicyDecision(True)
 
 
-def check_approve_identity(authorization: str | None) -> PolicyDecision:
-    required = os.getenv("REMEDIATION_APPROVAL_TOKEN", "").strip()
-    if not required:
-        return PolicyDecision(
-            False,
-            "REMEDIATION_APPROVAL_TOKEN not configured",
-            "auth_misconfigured",
-        )
-    if not authorization:
-        return PolicyDecision(False, "missing Authorization bearer token", "auth_missing")
-    parts = authorization.split(None, 1)
-    token = parts[1].strip() if len(parts) == 2 and parts[0].lower() == "bearer" else authorization.strip()
-    if token != required:
-        return PolicyDecision(False, "invalid approval token", "auth_invalid")
-    return PolicyDecision(True)
-
-
 def risk_tier_for(action: str, confidence: float) -> tuple[str, int]:
     if action in ("code_fix_pr",):
         return "high", 1

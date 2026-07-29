@@ -1,8 +1,8 @@
 {{- if and .Values.production (not .Values.image.digest) (or (not .Values.image.tag) (eq .Values.image.tag "latest") (eq .Values.image.tag "local")) }}
 {{- fail "production requires image.digest or an immutable image.tag (not local/latest)" }}
 {{- end }}
-{{- if and .Values.production (or (not .Values.auth.existingSecret) (not .Values.auth.databaseSecret)) }}
-{{- fail "production requires existing auth and database Secrets" }}
+{{- if and .Values.production (not .Values.database.secret) }}
+{{- fail "production requires an existing database Secret" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -56,25 +56,8 @@ spec:
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.auth.databaseSecret }}
-                  key: {{ .Values.auth.databasePasswordKey }}
-            - name: CAUSA_API_REQUIRE_AUTH
-              value: "1"
-            - name: CAUSA_API_VIEWER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.existingSecret }}
-                  key: CAUSA_API_VIEWER_TOKEN
-            - name: CAUSA_REMEDIATION_PROPOSER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.existingSecret }}
-                  key: CAUSA_REMEDIATION_PROPOSER_TOKEN
-            - name: REMEDIATION_APPROVAL_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.auth.existingSecret }}
-                  key: REMEDIATION_APPROVAL_TOKEN
+                  name: {{ .Values.database.secret }}
+                  key: {{ .Values.database.passwordKey }}
             - name: CAUSA_REMEDIATION_AUTO_PROPOSE
               value: "0"
             - name: CAUSA_REMEDIATION_AUTO_APPLY

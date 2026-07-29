@@ -7,7 +7,7 @@ import {
   RefreshCw, Settings2, Sun, UserRound, Wrench,
 } from 'lucide-react'
 import { useDashboard } from './context/DashboardContext.jsx'
-import { Button, Dialog, Drawer, Input, LoadingState, Popover, Select, TimeRangePicker } from './components/ui/index.js'
+import { Button, Drawer, LoadingState, Popover, Select, TimeRangePicker } from './components/ui/index.js'
 import { useFetch } from './hooks/useFetch.js'
 
 const Overview = lazy(() => import('./pages/Overview.jsx'))
@@ -118,92 +118,19 @@ function GlobalControls() {
 
 function UserMenu() {
   const { preferences, setPreference } = useDashboard()
-  const queryClient = useQueryClient()
-  const [hasToken, setHasToken] = useState(() => Boolean(window.sessionStorage.getItem('causa_api_token')))
-  const [authOpen, setAuthOpen] = useState(false)
-  const [draftToken, setDraftToken] = useState('')
-  const [authMessage, setAuthMessage] = useState('')
-  const { data: session } = useFetch('/api/session', [])
-
-  useEffect(() => {
-    const onAuthError = event => {
-      setAuthMessage(event.detail?.status === 403
-        ? 'Your token is valid, but its role cannot perform that action.'
-        : 'Authentication is required or your token has expired.')
-      setDraftToken('')
-      setAuthOpen(true)
-    }
-    window.addEventListener('causa:auth-error', onAuthError)
-    return () => window.removeEventListener('causa:auth-error', onAuthError)
-  }, [])
-
-  async function submitToken(event) {
-    event.preventDefault()
-    const cleaned = draftToken.trim()
-    if (!cleaned) return
-    window.sessionStorage.setItem('causa_api_token', cleaned)
-    setHasToken(true)
-    setDraftToken('')
-    setAuthMessage('')
-    setAuthOpen(false)
-    await queryClient.resetQueries()
-  }
-
-  async function clearToken() {
-    window.sessionStorage.removeItem('causa_api_token')
-    setHasToken(false)
-    setDraftToken('')
-    setAuthMessage('Credentials cleared.')
-    await queryClient.resetQueries()
-  }
-
-  function openTokenDialog() {
-    setDraftToken('')
-    setAuthMessage('')
-    setAuthOpen(true)
-  }
   return (
-    <>
-      <Popover label="User preferences" trigger={<Button variant="ghost" aria-label="Open user menu"><UserRound size={18} /><span className="desktop-label">Preferences</span></Button>}>
-        <div className="user-menu">
-          <div className="user-menu__label">
-            {session?.subject || (hasToken ? 'Token configured' : 'Development session')}
-            {session?.role && <span> · {session.role}</span>}
-          </div>
-          <Button variant="ghost" role="menuitem" onClick={openTokenDialog}>
-            <UserRound size={16} />
-            {hasToken ? 'Replace API token' : 'Set API token'}
-          </Button>
-          {hasToken && <Button variant="ghost" role="menuitem" onClick={clearToken}>Clear credentials</Button>}
-          <Button variant="ghost" role="menuitem" onClick={() => setPreference('theme', preferences.theme === 'dark' ? 'light' : 'dark')}>
-            {preferences.theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            {preferences.theme === 'dark' ? 'Light theme' : 'Dark theme'}
-          </Button>
-          <Button variant="ghost" role="menuitem" onClick={() => setPreference('density', preferences.density === 'compact' ? 'comfortable' : 'compact')}>
-            <Settings2 size={16} />
-            {preferences.density === 'compact' ? 'Comfortable density' : 'Compact density'}
-          </Button>
-        </div>
-      </Popover>
-      <Dialog open={authOpen} onClose={() => setAuthOpen(false)} title="Causa authentication">
-        <form className="auth-form" onSubmit={submitToken}>
-          {authMessage && <p role="status">{authMessage}</p>}
-          <Input
-            autoComplete="off"
-            autoFocus
-            label="Bearer token"
-            type="password"
-            value={draftToken}
-            onChange={event => setDraftToken(event.target.value)}
-            hint="The existing token is never displayed. It is stored for this browser tab only."
-          />
-          <div className="ui-dialog-actions">
-            <Button type="button" variant="ghost" onClick={() => setAuthOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={!draftToken.trim()}>Save token</Button>
-          </div>
-        </form>
-      </Dialog>
-    </>
+    <Popover label="User preferences" trigger={<Button variant="ghost" aria-label="Open preferences"><UserRound size={18} /><span className="desktop-label">Preferences</span></Button>}>
+      <div className="user-menu">
+        <Button variant="ghost" role="menuitem" onClick={() => setPreference('theme', preferences.theme === 'dark' ? 'light' : 'dark')}>
+          {preferences.theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          {preferences.theme === 'dark' ? 'Light theme' : 'Dark theme'}
+        </Button>
+        <Button variant="ghost" role="menuitem" onClick={() => setPreference('density', preferences.density === 'compact' ? 'comfortable' : 'compact')}>
+          <Settings2 size={16} />
+          {preferences.density === 'compact' ? 'Comfortable density' : 'Compact density'}
+        </Button>
+      </div>
+    </Popover>
   )
 }
 

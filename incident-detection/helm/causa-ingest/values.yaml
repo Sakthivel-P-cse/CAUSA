@@ -51,10 +51,6 @@ env:
 
 existingSecret: ""   # set in prod to avoid a plain-text password in values
 
-auth:
-  triggerToken: ""
-  stage2Token: ""
-
 baselineCron:
   enabled: true
   schedule: "0 */6 * * *"

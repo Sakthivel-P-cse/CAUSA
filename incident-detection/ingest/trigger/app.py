@@ -25,7 +25,6 @@ Env config:
   CAUSA_APP_NAMESPACE        namespace for container CPU/mem metrics
   CAUSA_LOOKBACK_MIN         window lookback minutes (default 10)
   TRIGGER_MAX_BODY_BYTES     max accepted request body (default 1 MiB)
-  TRIGGER_AUTH_TOKEN         if set, require `Authorization: Bearer <token>`
   TRIGGER_WORKERS            background worker threads (default 2)
   TRIGGER_PORT               listen port (default 8080)
 """
@@ -53,8 +52,6 @@ _STAGE2_URL = os.getenv(
 _LOOKBACK_MIN = int(os.getenv("CAUSA_LOOKBACK_MIN", "10"))
 _NAMESPACE = os.getenv("CAUSA_APP_NAMESPACE") or None
 _MAX_BODY = int(os.getenv("TRIGGER_MAX_BODY_BYTES", str(1024 * 1024)))
-_AUTH_TOKEN = os.getenv("TRIGGER_AUTH_TOKEN") or None
-_STAGE2_AUTH_TOKEN = os.getenv("STAGE2_AUTH_TOKEN") or None
 _FORWARD_RETRIES = int(os.getenv("STAGE2_FORWARD_RETRIES", "3"))
 _FORWARD_TIMEOUT = float(os.getenv("STAGE2_FORWARD_TIMEOUT", "5.0"))
 _OUTBOX_INTERVAL = float(os.getenv("STAGE2_OUTBOX_INTERVAL", "30"))
@@ -242,17 +239,11 @@ class Dispatcher:
         import httpx
 
         last_error = ""
-        headers = (
-            {"Authorization": f"Bearer {_STAGE2_AUTH_TOKEN}"}
-            if _STAGE2_AUTH_TOKEN
-            else None
-        )
         for attempt in range(1, _FORWARD_RETRIES + 1):
             try:
                 resp = httpx.post(
                     self.forward_url,
                     json=payload,
-                    headers=headers,
                     timeout=_FORWARD_TIMEOUT,
                 )
                 resp.raise_for_status()
@@ -288,11 +279,6 @@ class Dispatcher:
                     resp = httpx.post(
                         self.forward_url,
                         json=row["payload"],
-                        headers=(
-                            {"Authorization": f"Bearer {_STAGE2_AUTH_TOKEN}"}
-                            if _STAGE2_AUTH_TOKEN
-                            else None
-                        ),
                         timeout=_FORWARD_TIMEOUT,
                     )
                     resp.raise_for_status()
@@ -317,13 +303,6 @@ class TriggerHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt: str, *args) -> None:  # quiet the default stderr spam
         logger.debug("%s - " + fmt, self.address_string(), *args)
-
-    def _authorized(self) -> bool:
-        if not _AUTH_TOKEN:
-            return os.getenv(
-                "CAUSA_TRIGGER_ALLOW_UNAUTHENTICATED", "0"
-            ).strip().lower() in {"1", "true", "yes", "on"}
-        return self.headers.get("Authorization", "") == f"Bearer {_AUTH_TOKEN}"
 
     def do_GET(self) -> None:
         path = self.path.rstrip("/")
@@ -371,10 +350,6 @@ class TriggerHandler(BaseHTTPRequestHandler):
         if self.path.rstrip("/") != "/trigger":
             self._send(404, {"error": "not found"})
             return
-        if not self._authorized():
-            self._send(401, {"error": "unauthorized"})
-            return
-
         # Content-Length: required, numeric, and within the body cap. A bad or
         # oversized length gets a clean 4xx instead of a hung/closed socket.
         raw_len = self.headers.get("Content-Length")

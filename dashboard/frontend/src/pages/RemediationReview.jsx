@@ -75,7 +75,6 @@ export default function RemediationReview() {
   const [pendingDecision, setPendingDecision] = useState('')
   const confirmationRef = useRef(null)
   const [successMessage, setSuccessMessage] = useState('')
-  const { data: session } = useFetch('/api/session', [])
 
   useEffect(() => {
     if (!plan || !ACTIVE.has(plan.status)) return undefined
@@ -425,7 +424,7 @@ export default function RemediationReview() {
             <div><dt>Action</dt><dd>{plan.action || 'unspecified'}</dd></div>
             <div><dt>Risk</dt><dd>{plan.risk_tier || 'not classified'}</dd></div>
             <div><dt>Policy</dt><dd>{policy?.allowed === false ? `Blocked: ${policy.reason || policy.code}` : 'Allowed'}</dd></div>
-            <div><dt>Approver</dt><dd>{session?.subject || 'current token'} ({session?.role || 'unknown role'})</dd></div>
+            <div><dt>Approver</dt><dd>Operator</dd></div>
             <div><dt>Rollback</dt><dd>{sol.rollback ? 'Defined' : 'No rollback details supplied'}</dd></div>
             <div><dt>Verification</dt><dd>{sol.verify || details.observation_window || 'Worker observation policy'}</dd></div>
           </dl>
