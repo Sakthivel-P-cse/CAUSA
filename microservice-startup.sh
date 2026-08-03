@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # microservice-startup.sh — Start Kind (if needed) + OpenTelemetry Demo apps.
 # Prereq for telemetry: Causa stack agent should already be deployed
-# (run ./causa-startup.sh once, or ./incident-detection/scripts/deploy.sh dev).
+# (run ./causa-startup.sh once, or ./deploy/scripts/deploy.sh dev).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ID_ROOT="${ROOT}/incident-detection"
 CONTEXT="${CONTEXT:-kind-gcp-demo-test}"
 KIND_CLUSTER="${KIND_CLUSTER:-gcp-demo-test}"
 DEMO_NS="${DEMO_NS:-${CAUSA_APP_NAMESPACE:-otel-demo}}"
-VALUES="${ID_ROOT}/testbed/otel-demo/values.yaml"
+VALUES="${ROOT}/testbed/otel-demo/values.yaml"
 
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -48,7 +47,7 @@ ensure_kind() {
 
 ensure_agent() {
   if ! kubectl --context "${CONTEXT}" -n otel-agent get ds otel-agent &>/dev/null; then
-    die "otel-agent not found. Deploy Causa stack first: ./causa-startup.sh  (or incident-detection/scripts/deploy.sh dev)"
+    die "otel-agent not found. Deploy Causa stack first: ./causa-startup.sh  (or deploy/scripts/deploy.sh dev)"
   fi
 }
 

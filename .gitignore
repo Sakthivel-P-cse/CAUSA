@@ -33,7 +33,8 @@ outputs/
 # Dev-A operational output (generated, not source)
 baselines/
 ground_truth/
+eval/baselines/
 
 # Fixture-smoke artifacts (regenerated in CI)
-incident-detection/artifacts/
-incident-detection/eval/artifacts/
+eval/artifacts/
+!eval/artifacts/.gitkeep

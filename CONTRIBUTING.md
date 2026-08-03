@@ -7,7 +7,7 @@ idempotency key, expiry, SLO gate and least-privilege capability mapping.
 Before submitting a change, run:
 
 ```bash
-cd incident-detection && PYTHONPATH=. .venv/bin/pytest -q
+PYTHONPATH=.import:. .venv/bin/pytest -q
 cd ../dashboard/frontend && npm run lint && npm test && npm run build
 cd ../.. && bash scripts/check-prom-rules.sh
 ```

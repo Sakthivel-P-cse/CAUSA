@@ -13,9 +13,12 @@ from dashboard.backend.db import DashboardStore
 from dashboard.backend.errors import api_error
 from dashboard.backend.remediation_store import APPROVABLE, RemediationStore
 
-_ID = Path(__file__).resolve().parents[3] / "incident-detection"
-if str(_ID) not in sys.path:
-    sys.path.insert(0, str(_ID))
+_IMPORT = Path(__file__).resolve().parents[3] / ".import"
+if str(_IMPORT) not in sys.path:
+    sys.path.insert(0, str(_IMPORT))
+_REPO = Path(__file__).resolve().parents[3]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
 
 router = APIRouter()
 _rem_store: RemediationStore | None = None

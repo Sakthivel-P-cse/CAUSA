@@ -4,7 +4,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ID_ROOT="${ROOT}/incident-detection"
+ID_ROOT="${ROOT}"
+DEPLOY_SCRIPTS="${ROOT}/deploy/scripts"
+IMPORT_ROOT="${ROOT}/.import"
 DASH="${ROOT}/dashboard"
 FE="${DASH}/frontend"
 CONTEXT="${CONTEXT:-kind-gcp-demo-test}"
@@ -65,7 +67,7 @@ ensure_stack() {
   fi
   log "Deploying Causa observability stack (dev)"
   need helm
-  "${ID_ROOT}/scripts/deploy.sh" dev
+  "${DEPLOY_SCRIPTS}/deploy.sh" dev
 }
 
 free_port() {
@@ -110,7 +112,7 @@ start_api() {
   ensure_venv
   setsid bash -c "
     cd '${ROOT}'
-    export PYTHONPATH='${ROOT}:${ID_ROOT}:${PYTHONPATH:-}'
+    export PYTHONPATH='${IMPORT_ROOT}:${ROOT}:${PYTHONPATH:-}'
     export CAUSA_DASHBOARD_OUTPUTS='${CAUSA_DASHBOARD_OUTPUTS:-${ROOT}/outputs}'
     export PROMETHEUS_URL='http://127.0.0.1:9090'
     export LOKI_URL='http://127.0.0.1:3100'
@@ -132,7 +134,7 @@ start_api() {
 start_remediation_worker() {
   setsid bash -c "
     cd '${ROOT}'
-    export PYTHONPATH='${ROOT}:${ID_ROOT}:${PYTHONPATH:-}'
+    export PYTHONPATH='${IMPORT_ROOT}:${ROOT}:${PYTHONPATH:-}'
     export CAUSA_DASHBOARD_OUTPUTS='${CAUSA_DASHBOARD_OUTPUTS:-${ROOT}/outputs}'
     export PROMETHEUS_URL='http://127.0.0.1:9090'
     export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER='${PGUSER:-rca_engine}'
@@ -223,7 +225,7 @@ main() {
   echo ""
   echo "PIDs under ${PID_DIR}/  logs under ${LOG_DIR}/"
   echo "Demo apps: ./microservice-startup.sh"
-  echo "Argo canary: ./incident-detection/scripts/install-argo-rollouts.sh"
+  echo "Argo canary: ./deploy/scripts/install-argo-rollouts.sh"
   echo "Stop local processes: pkill -f 'dashboard.backend.main|remediation.worker|causa/dashboard/frontend.*vite|kubectl -n (prometheus|loki|tempo|postgres|stage2-rca) port-forward'"
 }
 

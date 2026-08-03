@@ -12,7 +12,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CHART="${ROOT}/incident-detection/helm/postgres"
+CHART="${ROOT}/deploy/helm/postgres"
 
 command -v helm >/dev/null 2>&1 || { echo "missing required tool: helm" >&2; exit 1; }
 

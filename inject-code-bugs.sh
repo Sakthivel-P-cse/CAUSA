@@ -19,7 +19,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEMO_SRC="${DEMO_SRC:-/home/bhuvi/PROJECTS/opentelemetry-demo}"
-BUGS="${ROOT}/demo-bugs"
+BUGS="${ROOT}/testbed/demo-bugs"
 CONTEXT="${CONTEXT:-kind-gcp-demo-test}"
 KIND_CLUSTER="${KIND_CLUSTER:-gcp-demo-test}"
 DEMO_NS="${DEMO_NS:-${CAUSA_APP_NAMESPACE:-otel-demo}}"

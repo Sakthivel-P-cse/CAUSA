@@ -14,9 +14,12 @@ from dashboard.backend.db import DashboardStore
 
 logger = logging.getLogger(__name__)
 
-_INCIDENT_DETECTION = Path(__file__).resolve().parents[2] / "incident-detection"
-if str(_INCIDENT_DETECTION) not in sys.path:
-    sys.path.insert(0, str(_INCIDENT_DETECTION))
+_IMPORT_ROOT = Path(__file__).resolve().parents[2] / ".import"
+if str(_IMPORT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_IMPORT_ROOT))
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 
 def _utcnow() -> datetime:

@@ -45,11 +45,11 @@ export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER=causa PGPASSWORD=ca
 - Causa pods: `causa-ingest`, `stage2-rca` — both `Running`.
 
 ### 2. Baselines captured
-- **41 baselines** written to `incident-detection/baselines/otel-demo.json`
+- **41 baselines** written to `eval/baselines/otel-demo.json`
 - **41 rows** upserted into `anomaly_baseline` table in Postgres
 - Command used:
   ```bash
-  cd incident-detection && source .venv/bin/activate
+  cd /home/sakthi/projects/causa && source .venv/bin/activate
   PYTHONPATH=. python -m testbed.harness.capture_baseline \
     --namespace otel-demo --window-minutes 30 \
     --out baselines/otel-demo.json --write-db \
@@ -137,7 +137,7 @@ cd /home/sakthi/projects/causa
 ./inject-issues.sh --clear   # if this was also run earlier
 sleep 300  # wait 5 min for metrics to settle
 
-cd incident-detection && source .venv/bin/activate
+cd /home/sakthi/projects/causa && source .venv/bin/activate
 export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER=causa PGPASSWORD=causa
 PYTHONPATH=. python -m testbed.harness.capture_baseline \
   --namespace otel-demo --window-minutes 60 \
@@ -149,7 +149,7 @@ PYTHONPATH=. python -m testbed.harness.capture_baseline \
 
 ### Step 2 — Add HTTP-level alert rule
 
-Edit `incident-detection/helm/prometheus/templates/rules-configmap.yaml`.
+Edit `observability/helm/prometheus/templates/rules-configmap.yaml`.
 Add under the `service-health` group, alongside `ServiceHighErrorRate`:
 
 ```yaml
@@ -174,13 +174,13 @@ Add under the `service-health` group, alongside `ServiceHighErrorRate`:
 
 Then redeploy:
 ```bash
-helm upgrade --install prometheus ./incident-detection/helm/prometheus \
+helm upgrade --install prometheus ./observability/helm/prometheus \
   --namespace prometheus --kube-context kind-gcp-demo-test
 ```
 
 ### Step 3 — Tune scoring weights toward T signal
 
-Write `incident-detection/eval/artifacts/fit_result.json`:
+Write `eval/artifacts/fit_result.json`:
 ```json
 {
   "best_weights": {"w_T": 0.5, "w_D": 0.35, "w_P": 0.15}
@@ -194,7 +194,7 @@ kubectl --context kind-gcp-demo-test -n causa rollout restart deploy/stage2-rca
 
 ### Step 4 — Increase temporal horizon
 
-In `incident-detection/scoring/signals.py`, change:
+In `rca/scoring/signals.py`, change:
 ```python
 H_DEFAULT = 60.0
 ```
@@ -219,7 +219,7 @@ Expected: `ServiceHighErrorRate` on `payment` or `flagd` with >15% confidence.
 
 After accumulating 10+ labeled incidents:
 ```bash
-cd incident-detection && source .venv/bin/activate
+cd /home/sakthi/projects/causa && source .venv/bin/activate
 export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER=causa PGPASSWORD=causa
 PYTHONPATH=. python -m eval.fit_from_live
 ```
@@ -233,8 +233,8 @@ This writes a `fit_result.json` with both optimized weights and a calibration ma
 |------|---------|
 | `handoff.md` | This document |
 | `rca-improvement.md` | Detailed RCA improvement analysis |
-| `incident-detection/baselines/otel-demo.json` | Current (impure) baselines |
-| `incident-detection/eval/artifacts/live_eval.json` | Existing eval artifact |
+| `eval/baselines/otel-demo.json` | Current (impure) baselines |
+| `eval/artifacts/live_eval.json` | Existing eval artifact |
 | `.run/flagd-applogic.backup.json` | Backup of flagd config before inject |
 | `inject-applogic.sh` | AppLogic fault inject/clear/status |
 | `inject-issues.sh` | Broader fault injection (heavier) |

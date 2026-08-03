@@ -24,9 +24,10 @@ Alertmanager
   → proposed plan → approver → leased remediation worker
 ```
 
-The main Python package is under `incident-detection/`; the FastAPI/React
-product dashboard is under `dashboard/`; Kubernetes deployments live in the
-corresponding `helm/` directories.
+The Python packages are organized by domain (`incidents/`, `rca/`,
+`remediation/`, `shared/`, …); the FastAPI/React product dashboard is under
+`dashboard/`; Kubernetes charts live next to their domain under each `helm/`
+subdirectory.
 
 ## Local development
 
@@ -40,10 +41,9 @@ Normal demo startup no longer deletes the application namespace. Set
 ## Verification
 
 ```bash
-cd incident-detection
-PYTHONPATH=. .venv/bin/pytest -q
+PYTHONPATH=.import:. .venv/bin/pytest -q
 
-cd ../dashboard/frontend
+cd dashboard/frontend
 npm ci
 npm run lint
 npm test

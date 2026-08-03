@@ -62,7 +62,7 @@ If `flagd` scored 0.08 and the next candidate scored 0.06, the margin is only 0.
 2. Wait ~5 minutes for metrics to settle.
 3. Re-capture with a longer window (60 min instead of 30):
    ```bash
-   cd incident-detection && source .venv/bin/activate
+   cd /home/sakthi/projects/causa && source .venv/bin/activate
    export PGHOST=127.0.0.1 PGPORT=15432 PGDATABASE=causa PGUSER=causa PGPASSWORD=causa
    PYTHONPATH=. python -m testbed.harness.capture_baseline \
      --namespace otel-demo --window-minutes 60 \
@@ -82,7 +82,7 @@ Current defaults: `T = D = P = 1/3`
 - **T is the strongest signal** for AppLogic — flagd changed its behavior first, clearly preceding all shop services by ~315s.
 - **P is weak** — `productCatalogFailure` doesn't produce consistent propagation chains because it affects one SKU, not all calls.
 
-**What to try:** Write a `fit_result.json` at `incident-detection/eval/artifacts/fit_result.json`:
+**What to try:** Write a `fit_result.json` at `eval/artifacts/fit_result.json`:
 
 ```json
 {

@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: incident-detection
+        working-directory: .
     # Real Postgres so the infra-handoff blockers are proven, not skipped. The
     # `ON CONFLICT (incident_id) WHERE incident_id IS NOT NULL` clause infers a
     # partial unique index and is invisible to the fake-cursor unit tests — it
@@ -60,12 +60,12 @@ jobs:
         # partial-index clause is exercised against a server that parses it.
         env:
           CAUSA_TEST_PG_DSN: postgresql://causa_ci:causa_ci@127.0.0.1:5432/causa_test
-        run: PYTHONPATH=. pytest -q tests
+        run: PYTHONPATH=.import:. pytest -q tests
       - name: Assert the Postgres blocker actually ran (not silently skipped)
         env:
           CAUSA_TEST_PG_DSN: postgresql://causa_ci:causa_ci@127.0.0.1:5432/causa_test
         run: |
-          PYTHONPATH=. pytest -q \
+          PYTHONPATH=.import:. pytest -q \
             tests/test_infra_handoff.py::test_on_conflict_clause_parses_and_is_idempotent \
             -o addopts= --no-header -rN \
             | tee /tmp/pg_blocker.txt
@@ -75,29 +75,29 @@ jobs:
           }
       - name: Dev C lane + golden smoke
         run: |
-          PYTHONPATH=. python -m eval.runner
-          PYTHONPATH=. pytest -q tests/test_dev_c.py
+          PYTHONPATH=.import:. python -m eval.runner
+          PYTHONPATH=.import:. pytest -q tests/test_dev_c.py
       - name: Demo loop (typed plan propose via CLI)
         run: |
-          PYTHONPATH=. python -m remediation.cli --auto-approve
+          PYTHONPATH=.import:. python -m remediation.cli --auto-approve
       - name: NIM client + remediation service (rules-only)
         env:
           CAUSA_NIM_ENABLED: "0"
         run: |
-          PYTHONPATH=. pytest -q tests/test_nim_client.py tests/test_remediation_service.py
+          PYTHONPATH=.import:. pytest -q tests/test_nim_client.py tests/test_remediation_service.py
       - name: Fixture-smoke artifacts
-        run: PYTHONPATH=. python -m eval.report
+        run: PYTHONPATH=.import:. python -m eval.report
       - name: Check Phase-2 rule packs
         env:
           REQUIRE_PROMTOOL: "1"
-        run: bash ../scripts/check-prom-rules.sh
+        run: bash scripts/check-prom-rules.sh
       - name: Helm lint
         working-directory: ${{ github.workspace }}
         run: |
           # Announce skips. A directory under helm/ without a Chart.yaml used to
           # pass silently, so a malformed chart and a non-chart were
           # indistinguishable from a green run.
-          for chart in incident-detection/helm/* dashboard/helm/*; do
+          for chart in alerts/helm/* incidents/helm/* rca/helm/* remediation/helm/* observability/helm/* deploy/helm/* dashboard/helm/*; do
             [ -d "$chart" ] || continue
             if [ -f "$chart/Chart.yaml" ]; then
               helm lint "$chart"
@@ -106,12 +106,12 @@ jobs:
             fi
           done
       - name: Live eval unit tests (mocked PG)
-        run: PYTHONPATH=. pytest -q tests/test_live_eval.py
+        run: PYTHONPATH=.import:. pytest -q tests/test_live_eval.py
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: causa-fixture-smoke
-          path: incident-detection/artifacts/
+          path: eval/artifacts/
 
   frontend:
     runs-on: ubuntu-latest

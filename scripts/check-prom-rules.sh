@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CHART="${ROOT}/incident-detection/helm/prometheus"
+CHART="${ROOT}/observability/helm/prometheus"
 OUT_DIR="${TMPDIR:-/tmp}/causa-prom-rules-$$"
 mkdir -p "${OUT_DIR}"
 cleanup() { rm -rf "${OUT_DIR}"; }

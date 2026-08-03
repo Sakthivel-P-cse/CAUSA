@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "causa-ingest"
+version = "0.1.0"
+description = "Causa Dev-A lane — telemetry ingestion (C1), anomaly primitives (C2), and testbed ground truth (C5)."
+readme = "incidents/ingest/README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27,<1.0",
+]
+
+[project.optional-dependencies]
+trigger = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=8", "respx>=0.21"]
+
+[tool.setuptools]
+packages = [
+    "contracts",
+    "ingest",
+    "ingest.clients",
+    "ingest.trigger",
+    "anomaly",
+    "graphs",
+    "isolation",
+    "rca",
+    "rca.trigger",
+    "scoring",
+    "testbed",
+    "testbed.harness",
+    "adapters",
+    "classify",
+    "eval",
+    "remediation",
+    "remediation.branches",
+    "fixtures",
+    "runtime",
+]
+
+[tool.setuptools.package-dir]
+contracts = "shared/contracts"
+ingest = "incidents/ingest"
+anomaly = "rca/anomaly"
+graphs = "rca/graphs"
+isolation = "rca/isolation"
+scoring = "rca/scoring"
+classify = "rca/classify"
+adapters = "rca/adapters"
+rca = "rca/engine"
+remediation = "remediation"
+runtime = "shared/runtime"
+eval = "eval"
+testbed = "testbed"
+fixtures = "eval/fixtures"
+
+[tool.setuptools.package-data]
+testbed = ["chaos/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".import", "."]

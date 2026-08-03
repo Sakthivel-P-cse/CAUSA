@@ -12,7 +12,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTLE_SEC="${SETTLE_SEC:-300}"
 WINDOW_MIN="${WINDOW_MIN:-60}"
-ID="${ROOT}/incident-detection"
+ID="${ROOT}"
+IMPORT_ROOT="${ROOT}/.import"
 
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -38,15 +39,15 @@ export PGDATABASE="${PGDATABASE:-causa}"
 export PGUSER="${PGUSER:-causa}"
 export PGPASSWORD="${PGPASSWORD:-causa}"
 
-cd "$ID"
 # shellcheck disable=SC1091
 [[ -f .venv/bin/activate ]] && source .venv/bin/activate
+[[ -f "${ID}/.venv/bin/activate" ]] && source "${ID}/.venv/bin/activate"
 
-log "Capturing ${WINDOW_MIN}-min healthy baselines → baselines/otel-demo.json (+ DB)"
-PYTHONPATH=. python -m testbed.harness.capture_baseline \
+log "Capturing ${WINDOW_MIN}-min healthy baselines → eval/baselines/otel-demo.json (+ DB)"
+PYTHONPATH="${IMPORT_ROOT}:${ROOT}:${PYTHONPATH:-}" python -m testbed.harness.capture_baseline \
   --namespace otel-demo \
   --window-minutes "$WINDOW_MIN" \
-  --out baselines/otel-demo.json \
+  --out eval/baselines/otel-demo.json \
   --write-db \
   --prometheus-url http://127.0.0.1:9090 \
   --tempo-url http://127.0.0.1:3200 \

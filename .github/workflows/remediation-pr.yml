@@ -5,8 +5,8 @@ on:
     branches: [main, master]
     paths:
       - "src/**"
-      - "incident-detection/remediation/**"
-      - "demo-bugs/**"
+      - "remediation/**"
+      - "testbed/demo-bugs/**"
       - ".github/workflows/remediation-*.yml"
   push:
     branches: ["causa/fix-*"]
@@ -20,20 +20,20 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile remediation modules
-        run: python -m compileall incident-detection/remediation -q
+        run: python -m compileall remediation -q
       - name: Unit tests (plan schema + propose)
-        working-directory: incident-detection
+        working-directory: .
         env:
           CAUSA_NIM_ENABLED: "0"
-          PYTHONPATH: "."
+          PYTHONPATH: ".import:."
         run: |
           pip install -q pytest httpx
           pytest -q tests/test_remediation_service.py tests/test_dev_c.py -k "typed_plan or propose or apply_plan_v1_disabled" --maxfail=5
       - name: Rules-only propose smoke
-        working-directory: incident-detection
+        working-directory: .
         env:
           CAUSA_NIM_ENABLED: "0"
-          PYTHONPATH: "."
+          PYTHONPATH: ".import:."
         run: |
           python - <<'PY'
           from remediation.service import propose_for_report, apply_plan_v1
