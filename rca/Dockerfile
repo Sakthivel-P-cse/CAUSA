@@ -22,7 +22,6 @@ COPY rca/adapters/ ./rca/adapters/
 COPY rca/classify/ ./rca/classify/
 COPY eval/ ./eval/
 COPY remediation/ ./remediation/
-COPY testbed/ ./testbed/
 COPY dashboard/backend/ /app/dashboard/backend/
 COPY dashboard/__init__.py /app/dashboard/__init__.py
 

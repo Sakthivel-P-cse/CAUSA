@@ -11,27 +11,21 @@ from remediation.plan_schema import ExactTarget, PlanChange, SLOGate, TypedPlanS
 from remediation.policy import risk_tier_for
 from runtime import profile as runtime_profile
 
-# Prefer Causa demo-bugs overlays, then OpenTelemetry demo tree.
 SERVICE_SOURCE_MAP = {
     "payment": [
-        ("testbed/demo-bugs/payment/charge.js", "fix TypeError on amount.nano — guard optional nano"),
         ("src/payment/charge.js", "guard amount.units / amount.nano before use"),
     ],
     "cart": [
-        ("testbed/demo-bugs/cart/CartService.cs", "fix NullReferenceException on empty cart"),
         ("src/cart/src/services/CartService.cs", "null-check cart items before mutate"),
         ("services/cart/handler.py", "normalize cart user id before uppercase"),
     ],
     "checkout": [
-        ("testbed/demo-bugs/checkout/main.go", "fix divide-by-zero in PlaceOrder"),
         ("src/checkout/main.go", "guard zero quantity / money divide"),
     ],
     "product-catalog": [
-        ("testbed/demo-bugs/product-catalog/main.go", "fix nil Money panic"),
         ("src/product-catalog/main.go", "nil-check Money before format"),
     ],
     "recommendation": [
-        ("testbed/demo-bugs/recommendation/recommendation_server.py", "fix IndexError off-by-one"),
         ("src/recommendation/recommendation_server.py", "clamp index into product list"),
     ],
     "frontend": [("src/frontend/", "frontend error boundary / API client timeout")],
@@ -47,11 +41,8 @@ def _search_roots() -> list[Path]:
         if p.is_dir():
             return [p]
     causa = Path(__file__).resolve().parents[2]
-    if (causa / "testbed" / "demo-bugs").is_dir():
+    if causa.is_dir():
         roots.append(causa)
-    demo = Path("/home/bhuvi/PROJECTS/opentelemetry-demo")
-    if demo.is_dir():
-        roots.append(demo)
     return roots or [causa]
 
 
@@ -93,45 +84,12 @@ def _suggested_diff(path: Path | None, rel: str, node: str, hint: str, explanati
 
 def _patch_ops(node: str, rel: str) -> list[dict[str, str]]:
     fixes = {
-        "payment": [
-            {
-                "path": "testbed/demo-bugs/payment/charge.js",
-                "search": "const feeNanos = Math.floor(Number(request.amount.nano) / units);",
-                "replace": "const feeNanos = Math.floor(Number(request.amount.nanos ?? 0) / Math.max(1, Number(units || 0)));",
-            }
-        ],
         "cart": [
-            {
-                "path": "testbed/demo-bugs/cart/CartService.cs",
-                "search": "CartItem ghost = null;\n            activity?.SetTag(\"demo.cart.first_product\", ghost.ProductId);",
-                "replace": "var firstProduct = cart.Items.Count > 0 ? cart.Items[0].ProductId : \"empty\";\n            activity?.SetTag(\"demo.cart.first_product\", firstProduct);",
-            },
             {
                 "path": "services/cart/handler.py",
                 "search": "    return {\"user\": user_id.upper(), \"items\": []}",
                 "replace": "    return {\"user\": str(user_id).strip().upper(), \"items\": []}",
             },
-        ],
-        "checkout": [
-            {
-                "path": "testbed/demo-bugs/checkout/main.go",
-                "search": "\t\tqty := it.GetItem().GetQuantity()\n\t\t_ = it.Cost.GetUnits() / int64(qty-qty)",
-                "replace": "\t\tqty := it.GetItem().GetQuantity()\n\t\tden := int64(qty)\n\t\tif den < 1 {\n\t\t\tden = 1\n\t\t}\n\t\t_ = it.Cost.GetUnits() / den",
-            }
-        ],
-        "product-catalog": [
-            {
-                "path": "testbed/demo-bugs/product-catalog/main.go",
-                "search": "\tvar price *pb.Money\n\tspan.SetAttributes(\n\t\tattribute.Int64(\"demo.product.price.units\", price.Units),\n\t)",
-                "replace": "\tprice := found.GetPriceUsd()\n\tif price != nil {\n\t\tspan.SetAttributes(attribute.Int64(\"demo.product.price.units\", price.Units))\n\t}",
-            }
-        ],
-        "recommendation": [
-            {
-                "path": "testbed/demo-bugs/recommendation/recommendation_server.py",
-                "search": "        if num_products > 0:\n            _ = filtered_products[num_products]",
-                "replace": "        if num_products > 0:\n            _ = filtered_products[num_products - 1]",
-            }
         ],
     }
     all_ops = fixes.get(node, [])

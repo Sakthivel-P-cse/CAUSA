@@ -6,7 +6,6 @@ on:
     paths:
       - "src/**"
       - "remediation/**"
-      - "testbed/demo-bugs/**"
       - ".github/workflows/remediation-*.yml"
   push:
     branches: ["causa/fix-*"]

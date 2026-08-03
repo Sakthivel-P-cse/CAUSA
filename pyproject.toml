@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "causa-ingest"
 version = "0.1.0"
-description = "Causa Dev-A lane — telemetry ingestion (C1), anomaly primitives (C2), and testbed ground truth (C5)."
+description = "Causa — telemetry ingestion, RCA, and remediation for Kubernetes microservices."
 readme = "incidents/ingest/README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -28,8 +28,6 @@ packages = [
     "rca",
     "rca.trigger",
     "scoring",
-    "testbed",
-    "testbed.harness",
     "adapters",
     "classify",
     "eval",
@@ -52,11 +50,7 @@ rca = "rca/engine"
 remediation = "remediation"
 runtime = "shared/runtime"
 eval = "eval"
-testbed = "testbed"
 fixtures = "eval/fixtures"
-
-[tool.setuptools.package-data]
-testbed = ["chaos/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

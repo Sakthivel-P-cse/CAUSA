@@ -17,7 +17,6 @@ COPY rca/adapters/ ./rca/adapters/
 COPY rca/classify/ ./rca/classify/
 COPY eval/ ./eval/
 COPY remediation/ ./remediation/
-COPY testbed/ ./testbed/
 
 RUN pip install --no-cache-dir ".[trigger]"
 

@@ -261,7 +261,7 @@ def test_abstention_propagates_through_c_consumers():
 #    breaks the seam even if every other test still passes.                    #
 # --------------------------------------------------------------------------- #
 FORBIDDEN_TOP_LEVEL = {
-    "graphs", "scoring", "isolation", "ingest", "rca", "anomaly", "testbed",
+    "graphs", "scoring", "isolation", "ingest", "rca", "anomaly",
 }
 DEV_C_PACKAGE_DIRS = {
     "classify": ROOT / "rca" / "classify",

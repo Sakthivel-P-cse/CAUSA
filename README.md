@@ -33,10 +33,8 @@ subdirectory.
 
 1. Copy `.env.example` to `.env` and configure the integrations you use.
 2. Start the Causa stack with `./causa-startup.sh`.
-3. Start the OpenTelemetry demo with `./microservice-startup.sh`.
-
-Normal demo startup no longer deletes the application namespace. Set
-`RECREATE_DEMO_NAMESPACE=1` only when a destructive clean reinstall is intended.
+3. Point your application’s OTLP exporter at the Causa collector (or ensure the
+   monitored cluster already scrapes into this stack).
 
 ## Verification
 

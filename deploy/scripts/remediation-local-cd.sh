@@ -15,12 +15,10 @@ fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT}"
 
-if [[ -f "testbed/demo-bugs/${SERVICE}/Dockerfile" ]]; then
-  BUILD_CTX="testbed/demo-bugs/${SERVICE}"
-elif [[ -f "src/${SERVICE}/Dockerfile" ]]; then
+if [[ -f "src/${SERVICE}/Dockerfile" ]]; then
   BUILD_CTX="src/${SERVICE}"
 else
-  echo "no Dockerfile found for service=${SERVICE}"
+  echo "no Dockerfile found for service=${SERVICE} under src/"
   exit 1
 fi
 
@@ -28,12 +26,4 @@ IMAGE="${REGISTRY_PREFIX}/causa-${SERVICE}:${IMAGE_TAG}"
 docker build -t "${IMAGE}" "${BUILD_CTX}"
 kind load docker-image "${IMAGE}" --name "${KIND_CLUSTER#kind-}"
 
-if kubectl --context "${KIND_CLUSTER}" -n "${NS}" get rollout "${SERVICE}" >/dev/null 2>&1; then
-  kubectl --context "${KIND_CLUSTER}" -n "${NS}" set image "rollout/${SERVICE}" "${SERVICE}=${IMAGE}"
-  kubectl --context "${KIND_CLUSTER}" -n "${NS}" rollout status "rollout/${SERVICE}" --timeout=10m
-else
-  kubectl --context "${KIND_CLUSTER}" -n "${NS}" set image "deploy/${SERVICE}" "${SERVICE}=${IMAGE}"
-  kubectl --context "${KIND_CLUSTER}" -n "${NS}" rollout status "deploy/${SERVICE}" --timeout=10m
-fi
-
-echo "deployed ${SERVICE} image=${IMAGE}"
+echo "Built and loaded ${IMAGE} (ns hint: ${NS})"

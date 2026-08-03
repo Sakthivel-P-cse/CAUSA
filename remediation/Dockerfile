@@ -12,7 +12,6 @@ COPY incidents /app/incidents
 COPY rca /app/rca
 COPY remediation /app/remediation
 COPY eval /app/eval
-COPY testbed /app/testbed
 COPY dashboard /app/dashboard
 ENV PYTHONPATH=/app/.import:/app
 USER 1000

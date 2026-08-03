@@ -208,7 +208,7 @@ main() {
   )"
   if [[ "${baseline_n}" == "0" || -z "${baseline_n}" ]]; then
     log "WARNING: anomaly_baseline is empty — RCA will abstain until baselines exist"
-    log "Run after demo is healthy: SETTLE_SEC=30 WINDOW_MIN=20 ./scripts/recapture-baselines.sh"
+    log "Capture baselines from a healthy monitored app before expecting diagnoses"
   else
     log "anomaly_baseline rows: ${baseline_n}"
   fi
@@ -224,7 +224,6 @@ main() {
   [[ "${START_LOCAL_REMEDIATION_WORKER:-0}" == "1" ]] && echo "  Worker remediation (claims approved plans)"
   echo ""
   echo "PIDs under ${PID_DIR}/  logs under ${LOG_DIR}/"
-  echo "Demo apps: ./microservice-startup.sh"
   echo "Argo canary: ./deploy/scripts/install-argo-rollouts.sh"
   echo "Stop local processes: pkill -f 'dashboard.backend.main|remediation.worker|causa/dashboard/frontend.*vite|kubectl -n (prometheus|loki|tempo|postgres|stage2-rca) port-forward'"
 }
