@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useFetch } from '../hooks/useFetch.js'
 import { apiFetch } from '../api/client.js'
 import { Spinner, ErrorMsg } from '../components/Common.jsx'
-import { Button, Dialog, Input } from '../components/ui/index.js'
 
 const ACTIVE = new Set(['approved', 'claimed', 'executing', 'observing'])
 const PROMPT_MAX = 4096
@@ -72,8 +71,6 @@ export default function RemediationReview() {
   const [manualPrompt, setManualPrompt] = useState('')
   const [promptMode, setPromptMode] = useState('constraints')
   const [regenReason, setRegenReason] = useState('')
-  const [pendingDecision, setPendingDecision] = useState('')
-  const confirmationRef = useRef(null)
   const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
@@ -101,7 +98,6 @@ export default function RemediationReview() {
       setSuccessMessage(kind === 'reject'
         ? 'Plan rejected and recorded in the audit timeline.'
         : 'Approval recorded. The worker may now claim this plan.')
-      setPendingDecision('')
     } catch (err) {
       setActionError(err?.message || String(err))
     } finally {
@@ -157,21 +153,9 @@ export default function RemediationReview() {
   const title = [plan.action, plan.candidate_node].filter(Boolean).join(' · ') || 'Remediation plan'
   const promptLen = manualPrompt.length
   const canRegenerate = Boolean(manualPrompt.trim()) && !regenBusy && !decideBusy
-  const targetName = String(plan.candidate_node || spec.target?.name || plan.id || '')
-  const requiresTypedConfirmation = pendingDecision === 'approve'
-
   function requestDecision(kind) {
     setSuccessMessage('')
-    setPendingDecision(kind)
-  }
-
-  function confirmDecision() {
-    if (requiresTypedConfirmation && confirmationRef.current?.value.trim() !== targetName) {
-      confirmationRef.current?.setCustomValidity(`Type ${targetName} exactly`)
-      confirmationRef.current?.reportValidity()
-      return
-    }
-    decide(pendingDecision)
+    decide(kind)
   }
 
   return (
@@ -407,53 +391,6 @@ export default function RemediationReview() {
           />
         </div>
       )}
-      <Dialog
-        open={Boolean(pendingDecision)}
-        onClose={() => !decideBusy && setPendingDecision('')}
-        title={pendingDecision === 'reject' ? 'Reject remediation plan' : 'Approve cluster mutation'}
-      >
-        <div className="remediation-confirm">
-          <p>
-            {pendingDecision === 'reject'
-              ? 'Rejecting keeps this plan from execution and records your decision.'
-              : 'Approval authorizes the remediation worker to mutate the target shown below.'}
-          </p>
-          <dl className="definition-grid">
-            <div><dt>Cluster / namespace</dt><dd>{details.cluster || 'kind-gcp-demo-test'} / {spec.target?.namespace || details.namespace || 'otel-demo'}</dd></div>
-            <div><dt>Target</dt><dd>{spec.target?.kind || 'workload'} / {targetName}</dd></div>
-            <div><dt>Action</dt><dd>{plan.action || 'unspecified'}</dd></div>
-            <div><dt>Risk</dt><dd>{plan.risk_tier || 'not classified'}</dd></div>
-            <div><dt>Policy</dt><dd>{policy?.allowed === false ? `Blocked: ${policy.reason || policy.code}` : 'Allowed'}</dd></div>
-            <div><dt>Approver</dt><dd>Operator</dd></div>
-            <div><dt>Rollback</dt><dd>{sol.rollback ? 'Defined' : 'No rollback details supplied'}</dd></div>
-            <div><dt>Verification</dt><dd>{sol.verify || details.observation_window || 'Worker observation policy'}</dd></div>
-          </dl>
-          {requiresTypedConfirmation && (
-            <Input
-              ref={confirmationRef}
-              label={`Type “${targetName}” to approve`}
-              defaultValue=""
-              autoComplete="off"
-              required
-              pattern={targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}
-              title={`Type ${targetName} exactly`}
-              onInput={event => event.currentTarget.setCustomValidity('')}
-            />
-          )}
-          <div className="ui-dialog-actions">
-            <Button variant="ghost" disabled={decideBusy} onClick={() => setPendingDecision('')}>Cancel</Button>
-            <Button
-              variant={pendingDecision === 'reject' ? 'danger' : 'primary'}
-              className={requiresTypedConfirmation ? 'confirmation-submit' : ''}
-              loading={decideBusy}
-              disabled={!pendingDecision || policy?.allowed === false}
-              onClick={confirmDecision}
-            >
-              {pendingDecision === 'reject' ? 'Confirm rejection' : 'Confirm approval'}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
     </div>
   )
 }

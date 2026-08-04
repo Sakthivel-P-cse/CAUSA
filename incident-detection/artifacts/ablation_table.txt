@@ -1,0 +1,10 @@
+method	top1	top3	mrr	subgraph_recall
+Full	1.000	1.000	1.000	1.000
+EarliestOnly	1.000	1.000	1.000	1.000
+CascadeOnly	1.000	1.000	1.000	1.000
+PropagationOnly	1.000	1.000	1.000	1.000
+NoT	1.000	1.000	1.000	1.000
+NoD	1.000	1.000	1.000	1.000
+NoP	1.000	1.000	1.000	1.000
+Random	0.000	0.000	0.125	1.000
+MostAnomalous	1.000	1.000	1.000	1.000

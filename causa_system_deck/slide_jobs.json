@@ -1,0 +1,323 @@
+{
+  "run_status": "slides_recorded",
+  "deck_name": "causa_system_deck",
+  "selected_backend": "built-in image tool",
+  "sample_generation_method": {
+    "backend_used": "built-in image tool",
+    "tool_name": "image_gen",
+    "mode": "generate",
+    "prompt_source": "parent-authored structured productivity-visual prompt for approved Slide 3",
+    "size": "built-in 16:9 landscape output; approved sample is 1672x941",
+    "quality": "built-in default",
+    "model_config": "built-in default, not exposed",
+    "approved_sample_path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+    "input_context_preparation": "For remaining slides, inspect the approved sample with view_image before built-in generation and include it as a style-only reference.",
+    "handoff_rule": "Subagents must use the same built-in image_gen backend in generate mode and return a blocker if that path is unavailable."
+  },
+  "max_concurrent_slides": 3,
+  "slides": [
+    {
+      "slide_id": "slide_01",
+      "number": 1,
+      "title": "Causa — From Alert to Explainable Action",
+      "job": "prompts/slide_01.json",
+      "out": "origin_image/slide_01.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_01",
+        "agent_nickname": "slide_01",
+        "prompt": "prompts/slide_01.json",
+        "prompt_sha256": "ac0ac88db4bf6fda734d8cf7f5784e4b47f4b5fc4fcbbbd3c7be0fb838a50acd",
+        "dispatched_at": "2026-07-29T14:37:35Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_01",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae4e-c36c-76c0-8339-3c6f2aa758ef/call_u5TSYU01rE7opcdL0xntZH6V.png",
+        "selected_source_sha256": "ef1ca75c9571fd54625e04c233ed8feefed729828012c0f1ffd4a75e00a2b5a9",
+        "final_image": "origin_image/slide_01.png",
+        "final_image_sha256": "ef1ca75c9571fd54625e04c233ed8feefed729828012c0f1ffd4a75e00a2b5a9",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Exact cover text is readable; spacious composition matches the approved sample and clearly connects observability, causal RCA, and guarded action.",
+        "recorded_at": "2026-07-29T14:39:03Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_02",
+      "number": 2,
+      "title": "The Operational Gap — Symptoms Arrive Faster Than Answers",
+      "job": "prompts/slide_02.json",
+      "out": "origin_image/slide_02.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_02",
+        "agent_nickname": "slide_02",
+        "prompt": "prompts/slide_02.json",
+        "prompt_sha256": "b3bbf77bc8a15a099b3b775b5fa47f538f57781ad2f8326e1f33ec97668a7e5e",
+        "dispatched_at": "2026-07-29T14:37:35Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_02",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae4e-eac0-7672-8f5e-d13f43e397ba/call_6qK6mtcF73oz46n3lfkLucIi.png",
+        "selected_source_sha256": "234a945a754c35d7ecb4d19706b50d3f15298bdd5ed3ed289eb3a6a5730259af",
+        "final_image": "origin_image/slide_02.png",
+        "final_image_sha256": "234a945a754c35d7ecb4d19706b50d3f15298bdd5ed3ed289eb3a6a5730259af",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Problem framing is readable and clearly distinguishes the upstream origin, downstream symptoms, fragmented evidence, and automation risk.",
+        "recorded_at": "2026-07-29T14:39:51Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_03",
+      "number": 3,
+      "title": "One Evidence Pipeline, From Alert to Decision",
+      "job": "prompts/slide_03.json",
+      "out": "origin_image/slide_03.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "accepted",
+      "dispatch": null,
+      "result": {
+        "final_image": "origin_image/slide_03.png",
+        "accepted_sample": true
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_04",
+      "number": 4,
+      "title": "Causal RCA — Rank Origins, Not the Loudest Symptoms",
+      "job": "prompts/slide_04.json",
+      "out": "origin_image/slide_04.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_04",
+        "agent_nickname": "slide_04",
+        "prompt": "prompts/slide_04.json",
+        "prompt_sha256": "524aa3eda7bd2bb224bc192348f3f1c7d9942b7f7f9b2659cf688719209dec3b",
+        "dispatched_at": "2026-07-29T14:37:35Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_04",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae4f-13a2-70a3-81f4-c7d97a5092ff/call_Ygb7PM4bsbVVSkJKkYjAgziv.png",
+        "selected_source_sha256": "e1a564238d1bc662e3faa41b1ec70d172f3d19b73fe40c53747c60579c0aad2e",
+        "final_image": "origin_image/slide_04.png",
+        "final_image_sha256": "e1a564238d1bc662e3faa41b1ec70d172f3d19b73fe40c53747c60579c0aad2e",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Call direction versus failure influence is clear, the T/D/P equation is exact, and arbitration and abstention outcomes are readable.",
+        "recorded_at": "2026-07-29T14:39:52Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_05",
+      "number": 5,
+      "title": "The Investigation Workspace — Evidence You Can Challenge",
+      "job": "prompts/slide_05.json",
+      "out": "origin_image/slide_05.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_05",
+        "agent_nickname": "slide_05",
+        "prompt": "prompts/slide_05.json",
+        "prompt_sha256": "f5e8d7c04bf73b122ec5531b23c4dcad131826cf06d4954ff70970eb68e500dd",
+        "dispatched_at": "2026-07-29T14:39:26Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_05",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae50-b888-7060-b03c-5f7e15f0e14c/call_qF4Hx5dxFYaj4UWN4AwtCUUR.png",
+        "selected_source_sha256": "09fa4cca3d680c31d9b961d17bc30334f7977cda3ab67825ad3203b2c0d27810",
+        "final_image": "origin_image/slide_05.png",
+        "final_image_sha256": "09fa4cca3d680c31d9b961d17bc30334f7977cda3ab67825ad3203b2c0d27810",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Investigation workspace is readable and complete; confidence is explicitly conservative and not a probability, consistent with the calibration warning.",
+        "recorded_at": "2026-07-29T14:45:59Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_06",
+      "number": 6,
+      "title": "Guarded Remediation — Automation With a Brake Pedal",
+      "job": "prompts/slide_06.json",
+      "out": "origin_image/slide_06.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_06",
+        "agent_nickname": "slide_06",
+        "prompt": "prompts/slide_06.json",
+        "prompt_sha256": "12b6b5ebf5f51a07b880077e36e0b86a3cfef5e7bfae85d6d04d7d4489dc70b9",
+        "dispatched_at": "2026-07-29T14:40:24Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_06",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae51-78a4-7c10-acd0-fedfc2ab087d/call_BjavlUlIpaWuyNGLEyJRCcFV.png",
+        "selected_source_sha256": "752d7e45e576113ee5221549d5ae298fb188c425163b6d9a714f1d17645b3cc5",
+        "final_image": "origin_image/slide_06.png",
+        "final_image_sha256": "752d7e45e576113ee5221549d5ae298fb188c425163b6d9a714f1d17645b3cc5",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Typed plan, approval gate, leased worker, live SLO observation, conditional rollback, and proposal-only status are all clear and accurate.",
+        "recorded_at": "2026-07-29T14:45:02Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_07",
+      "number": 7,
+      "title": "What Is Proven — and What Is Deliberately Gated",
+      "job": "prompts/slide_07.json",
+      "out": "origin_image/slide_07.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_07",
+        "agent_nickname": "slide_07",
+        "prompt": "prompts/slide_07.json",
+        "prompt_sha256": "a6039babae53ac95882d88ebf52e623da3587c68f8132212e4cbe7e6551dfc28",
+        "dispatched_at": "2026-07-29T14:40:24Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_07",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae51-a368-7712-957e-8e5ec1692c5a/call_EFzWOKLJhd6ZHVIHG58BHMH2.png",
+        "selected_source_sha256": "658c6e0cfa0f78214bdaecf45b391e8168323918f94b13d27d206488fc68856d",
+        "final_image": "origin_image/slide_07.png",
+        "final_image_sha256": "658c6e0cfa0f78214bdaecf45b391e8168323918f94b13d27d206488fc68856d",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Validated-versus-gated evidence is accurate; rollback wording is conditional and the exact development, controlled-evaluation, proposal-only posture is preserved.",
+        "recorded_at": "2026-07-29T14:45:35Z"
+      },
+      "blocker": null
+    },
+    {
+      "slide_id": "slide_08",
+      "number": 8,
+      "title": "The Outcome — A Closed, Accountable Incident Loop",
+      "job": "prompts/slide_08.json",
+      "out": "origin_image/slide_08.png",
+      "input_images": [
+        {
+          "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+          "role": "approved sample slide style reference",
+          "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+        }
+      ],
+      "requires_context_images": true,
+      "status": "recorded",
+      "dispatch": {
+        "agent_id": "/root/slide_08",
+        "agent_nickname": "slide_08",
+        "prompt": "prompts/slide_08.json",
+        "prompt_sha256": "fb39a4812139a7d8112fcea0da9c2936b28fc0641698303bd54aba22f065e3f4",
+        "dispatched_at": "2026-07-29T14:45:21Z"
+      },
+      "result": {
+        "agent_id": "/root/slide_08",
+        "backend_used": "built-in image tool",
+        "selected_source": "/home/bhuvi/.codex/generated_images/019fae56-34fa-71a1-9b67-ebebad2ec0a9/call_VumgVdwm4AyNuU9nTLcHcd2q.png",
+        "selected_source_sha256": "8b3c712eb55a02e19e708f9b50d31bbc590a133ac963faef87bf52d9aec7d6dc",
+        "final_image": "origin_image/slide_08.png",
+        "final_image_sha256": "8b3c712eb55a02e19e708f9b50d31bbc590a133ac963faef87bf52d9aec7d6dc",
+        "expected_backend": "built-in image tool",
+        "expected_backend_labels": [
+          "built-in image tool",
+          "image_gen"
+        ],
+        "sample_generation_method_matched": true,
+        "qa_note": "Five-stage loop is in the correct order, exact closing claim and controlled-pilot CTA are readable, and the slide does not imply production autonomy.",
+        "recorded_at": "2026-07-29T14:47:14Z"
+      },
+      "blocker": null
+    }
+  ],
+  "updated_at": "2026-07-29T14:47:14Z"
+}

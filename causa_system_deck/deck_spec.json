@@ -1,0 +1,289 @@
+{
+  "deck_name": "causa_system_deck",
+  "language": "English",
+  "goal": "Explain Causa's product value, evidence pipeline, causal RCA method, investigation workspace, guarded remediation model, and current production-readiness posture to engineering leaders, SRE teams, platform engineers, and technical evaluators.",
+  "deck_context": {
+    "source_summary": "Causa is an observability-driven root-cause analysis system for Kubernetes microservices. Alertmanager triggers a durable ingestion stage that scopes and snapshots Prometheus metrics, Tempo traces, Loki logs, topology, and infrastructure context. Stage 2 builds incident graphs, detects anomalies, isolates possible multi-fault incidents, ranks root-cause candidates, and persists explainable reports in Postgres. A React/FastAPI dashboard connects the RCA story to evidence, timelines, topology, related telemetry, feedback, and durable incident history. Remediation is proposal-first: typed plans pass through policy, human approval, leased workers, SLO observation, and rollback handling. Automatic execution remains blocked until calibration and operational readiness gates pass.",
+    "core_claim": "Causa compresses the path from alert to accountable action by connecting cross-signal evidence, influence-aware causal ranking, an operator investigation workspace, and guarded remediation without hiding uncertainty.",
+    "canonical_terms": [
+      "Causa",
+      "Alertmanager",
+      "causa-ingest",
+      "Stage 2 RCA",
+      "Influence Graph",
+      "Prometheus",
+      "Tempo",
+      "Loki",
+      "Postgres",
+      "Guarded Remediation",
+      "proposal-only"
+    ]
+  },
+  "selected_image_backend": "built-in image tool",
+  "max_concurrent_slides": 3,
+  "sample_generation_method": {
+    "backend_used": "built-in image tool",
+    "tool_name": "image_gen",
+    "mode": "generate",
+    "prompt_source": "parent-authored structured productivity-visual prompt for approved Slide 3",
+    "size": "built-in 16:9 landscape output; approved sample is 1672x941",
+    "quality": "built-in default",
+    "model_config": "built-in default, not exposed",
+    "approved_sample_path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+    "input_context_preparation": "For remaining slides, inspect the approved sample with view_image before built-in generation and include it as a style-only reference.",
+    "handoff_rule": "Subagents must use the same built-in image_gen backend in generate mode and return a blocker if that path is unavailable."
+  },
+  "style": {
+    "name": "Clean technical product",
+    "visual_direction": "Clean modern technical-product presentation, calm and evidence-driven, polished vector-like diagrams and UI-inspired infographics, suitable for engineering leaders and SRE teams. Maintain a coherent visual identity while varying composition by slide role.",
+    "canvas": "16:9 full-slide image, warm white #FBFCFE or very pale blue-gray architecture field, generous outer margins, no full-page border",
+    "color_palette": "Deep navy #0F2744 text, professional blue #2563EB primary, teal #0F8A83 secondary, restrained amber #E9A23B for risk/approval/safety emphasis, pale slate borders #D9E2EC, limited soft red only for faults",
+    "typography": "Bold geometric sans-serif titles, crisp readable sans-serif labels, strong hierarchy, left alignment for explanations, exact English spelling",
+    "texture_and_finish": "Bright clean canvas, precise line icons, subtle shadows, rounded technical cards, faint node-link motifs used sparingly",
+    "deck_consistency": "Match the approved Slide 3 palette, typography mood, density, icon language, line weight, restrained shadows, and overall technical-product polish. Do not copy Slide 3's exact architecture layout."
+  },
+  "approved_style_reference": {
+    "path": "/home/bhuvi/PROJECTS/causa/causa_system_deck/origin_image/slide_03.png",
+    "role": "approved sample slide style reference",
+    "fidelity": "Match style only: palette, typography mood, density, icon language, line weight, and finish. Do not copy the sample layout or content."
+  },
+  "slides": [
+    {
+      "number": 1,
+      "title": "Causa — From Alert to Explainable Action",
+      "role": "cover",
+      "intent": "Establish the product identity and its full alert-to-action scope with a memorable, sparse opening.",
+      "key_points": [
+        "See the cascade. Find the origin. Act with guardrails."
+      ],
+      "local_context": {
+        "required_background": "Causa is an observability-driven root-cause analysis and guarded-remediation system for Kubernetes microservices. Its differentiator is connecting telemetry to an explainable causal graph and operator-controlled action."
+      },
+      "layout": {
+        "composition": "Large title block in the left third; a single elegant signal-to-causal-graph-to-shield visual flows across the center-right; one short tagline under the title; abundant whitespace.",
+        "content_zones": "Title and concise descriptor left; primary visual center-right; small product category label above title.",
+        "relationship_to_previous_slide": "Opening composition.",
+        "spacing": "Very spacious, cinematic but technical; no dense cards."
+      },
+      "visual_elements": {
+        "main_visual": "Three subtle telemetry streams converge into a highlighted origin node in a causal graph, then continue into a small amber shield/check gate.",
+        "supporting_elements": "Minimal labels: Observability, Causal RCA, Guarded action. Very faint node-link pattern in one corner."
+      },
+      "constraints": [
+        "Include the exact title and exact tagline.",
+        "Add one small descriptor: Observability-driven RCA for Kubernetes.",
+        "Keep visible text sparse.",
+        "No unrelated logos, page number, watermark, or literal screenshot."
+      ]
+    },
+    {
+      "number": 2,
+      "title": "The Operational Gap — Symptoms Arrive Faster Than Answers",
+      "role": "problem framing",
+      "intent": "Make fragmented incident investigation and symptom-versus-origin confusion tangible before presenting the solution.",
+      "key_points": [
+        "The alerted service is often a victim, not the origin.",
+        "Metrics, traces, logs, changes, and topology fragment the investigation.",
+        "Unchecked automation cannot safely act on opaque confidence."
+      ],
+      "local_context": {
+        "required_background": "Microservice failures propagate across synchronous calls, asynchronous dependencies, and infrastructure. A downstream symptom may be louder than the upstream cause. Operators must mentally connect separate telemetry tools while avoiding risky action based on weak or uncalibrated evidence."
+      },
+      "layout": {
+        "composition": "Split narrative: left two-thirds show a cascade graph with one hidden red origin upstream and several louder blue/amber victim alerts downstream; right third is a narrow operator burden column with five fragmented evidence panes converging on one warning decision.",
+        "content_zones": "Title top; cascade visual left; three concise problem statements right; bottom takeaway strip.",
+        "relationship_to_previous_slide": "New problem-framing layout, denser than the cover.",
+        "spacing": "Clear visual separation between causal cascade and fragmented investigation."
+      },
+      "visual_elements": {
+        "main_visual": "Before-state causal cascade diagram labeled Origin and Symptoms, with the alerted victim visually louder than the actual origin.",
+        "supporting_elements": "Five small evidence chips labeled Metrics, Traces, Logs, Changes, Topology; restrained red fault marker; amber risk gate."
+      },
+      "constraints": [
+        "Do not imply every alert is wrong.",
+        "Keep the three key points exact and readable.",
+        "Avoid a generic three-card layout.",
+        "No invented statistics, page number, watermark, or unrelated logo."
+      ]
+    },
+    {
+      "number": 3,
+      "title": "One Evidence Pipeline, From Alert to Decision",
+      "role": "architecture",
+      "intent": "Show the complete durable system pipeline from telemetry trigger through causal ranking, investigation, and guarded remediation.",
+      "key_points": [
+        "Durable context. Causal ranking. Guarded execution."
+      ],
+      "local_context": {
+        "required_background": "Approved sample slide. It shows Prometheus, Tempo, and Loki feeding Alertmanager and causa-ingest; Stage 2 RCA; Influence Graph; Postgres + Dashboard; and Guarded Remediation above a durable incident state and audit trail."
+      },
+      "layout": {
+        "composition": "Reuse the already approved sample image as the final slide.",
+        "content_zones": "Approved sample.",
+        "relationship_to_previous_slide": "Approved architecture pipeline.",
+        "spacing": "Approved sample."
+      },
+      "visual_elements": {
+        "main_visual": "Approved sample image.",
+        "supporting_elements": "Approved sample image."
+      },
+      "constraints": [
+        "This slide is already approved and must not be regenerated."
+      ],
+      "sample_approved": true
+    },
+    {
+      "number": 4,
+      "title": "Causal RCA — Rank Origins, Not the Loudest Symptoms",
+      "role": "technical concept",
+      "intent": "Explain how graph orientation, T/D/P scoring, arbitration, and isolation turn raw anomalies into explainable ranked origins.",
+      "key_points": [
+        "Orient edges by failure influence.",
+        "Score temporal precedence, outward influence, and path consistency.",
+        "Promote infrastructure origins; isolate or abstain on multi-fault ambiguity."
+      ],
+      "local_context": {
+        "required_background": "Causa combines four graph views: infrastructure, service dependency, trace execution, and incident subgraph. For synchronous HTTP/gRPC/DB calls, failure influence reverses callee-to-caller; asynchronous producer-to-consumer flow is preserved; infrastructure runs-on edges point infrastructure-to-service. Candidate score is S(N) = wT·T(N) + wD·D(N) + wP·P(N), where T is temporal precedence, D is outward versus inward influence, and P is causal path consistency. Layer arbitration can promote an infrastructure origin above a hosted victim. Multi-fault isolation may separate incidents or abstain when ambiguous."
+      },
+      "layout": {
+        "composition": "Technical before/after across the upper two-thirds: left is ordinary call direction, center is a bold transform arrow labeled failure influence, right is the oriented influence graph with one ranked origin. Along the bottom, a compact T/D/P score ribbon leads into arbitration and isolation outcomes.",
+        "content_zones": "Title top; before/after graph center; scoring ribbon and two outcome callouts bottom.",
+        "relationship_to_previous_slide": "Zoom-in from system architecture to the core reasoning mechanism.",
+        "spacing": "Moderate density with large readable graph labels and a compact equation."
+      },
+      "visual_elements": {
+        "main_visual": "Before/after graph demonstrating that a downstream database sink in the call graph becomes an outward origin in the influence graph.",
+        "supporting_elements": "Exact equation S(N) = wT·T(N) + wD·D(N) + wP·P(N); small labels Temporal, Influence, Path; outcome badges victim-of-infra and abstain if ambiguous."
+      },
+      "constraints": [
+        "Render the equation exactly and legibly.",
+        "Use only short labels, not paragraphs.",
+        "Do not depict a neural network or imply black-box AI ranking.",
+        "No page number, watermark, or unrelated logo."
+      ]
+    },
+    {
+      "number": 5,
+      "title": "The Investigation Workspace — Evidence You Can Challenge",
+      "role": "product experience",
+      "intent": "Demonstrate the operator journey from prioritized incident to hypotheses, evidence, topology, telemetry pivots, and feedback.",
+      "key_points": [
+        "Prioritize incidents and preserve durable history.",
+        "Compare causal hypotheses, confidence dimensions, and contradictory evidence.",
+        "Pivot directly into metrics, logs, traces, topology, and changes.",
+        "Capture operator feedback to improve evaluation."
+      ],
+      "local_context": {
+        "required_background": "The Causa dashboard has an overview, incident inbox, durable history, telemetry explorers, graph maps, analytics, remediation queue, and a seven-tab incident investigation. The investigation header separates confidence from probability and warns when calibration is not fitted. The main view includes an RCA story, two-hypothesis comparison, five confidence dimensions, telemetry coverage, impact, deployment changes, anomaly profile, historical analogs, supporting and contradicting evidence, timeline, topology comparison, telemetry deep-links, AI-generated synthesis marked non-authoritative, raw JSON, and feedback."
+      },
+      "layout": {
+        "composition": "A stylized but plausible application workspace, not a literal screenshot: left navigation rail, top incident header with conservative confidence gauge, center RCA story and two-column hypothesis comparison, right evidence rail, and a bottom row of telemetry pivot chips.",
+        "content_zones": "Title outside the mock workspace at top; product workspace fills most of slide; short takeaway callout at lower right.",
+        "relationship_to_previous_slide": "Shift from algorithm explanation to operator-facing proof.",
+        "spacing": "Medium-high product density but readable at presentation scale; prioritize large labels and hierarchy over tiny UI detail."
+      },
+      "visual_elements": {
+        "main_visual": "UI-inspired investigation workspace with tabs Overview, Evidence, Timeline, Topology and two hypothesis columns labeled Hypothesis A and Hypothesis B.",
+        "supporting_elements": "Five confidence bars labeled Root ranking, Failure type, Causal consistency, Evidence coverage, Automation safety; telemetry chips Metrics, Logs, Traces, Topology, Changes; small Feedback control."
+      },
+      "constraints": [
+        "Present this as a UI-inspired composition, not a claim of a pixel-perfect screenshot.",
+        "All major labels must be readable; avoid tiny filler text.",
+        "Show both supporting and contradicting evidence.",
+        "No invented incident metrics, page number, watermark, or unrelated logo."
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Guarded Remediation — Automation With a Brake Pedal",
+      "role": "governance process",
+      "intent": "Communicate that remediation is typed, policy-controlled, human-approved, observable, reversible where possible, and blocked from autonomy without evidence.",
+      "key_points": [
+        "Typed immutable plan with exact target, fingerprint, risk, approvals, and SLO gates.",
+        "Human approval before a leased worker executes.",
+        "Observe live SLOs; succeed, fail safely, or roll back.",
+        "Automatic execution stays blocked until calibration gates pass."
+      ],
+      "local_context": {
+        "required_background": "Causa routes classified fault types into typed remediation plans. Supported actions include configuration patch, dependency rollback to a recorded last-good revision, scale/restart actions, data-path recovery, and draft code-fix PR. Plans carry exact targets, immutable fingerprints, risk tiers, required approvals, and SLO gates. Human approval precedes execution. Durable workers claim approved plans with leases and heartbeats, reject stale ownership, record an audit lifecycle, observe Prometheus SLOs, and trigger rollback handling. Automatic execution remains disabled without a validated non-constant calibration artifact and sufficient labeled incidents."
+      },
+      "layout": {
+        "composition": "A large gated circular process: Propose → Policy → Human approval → Leased worker → Observe SLOs, then branch to Success or Rollback. A vertical safety ledger on the right lists plan invariants and the autonomy lock.",
+        "content_zones": "Title top; process loop left/center; safety ledger right; strong bottom status bar.",
+        "relationship_to_previous_slide": "Continue the operator journey from investigation into controlled action.",
+        "spacing": "Moderate density with a clear process path and one prominent amber approval gate."
+      },
+      "visual_elements": {
+        "main_visual": "Guarded execution loop with shield gate, lease/heartbeat icon, SLO gauge, success check, and rollback arrow.",
+        "supporting_elements": "Plan invariant chips Exact target, Fingerprint, Risk tier, Required approvals, SLO gates; bottom status exactly Proposal-only by default."
+      },
+      "constraints": [
+        "Do not imply autonomous remediation is production-enabled.",
+        "Keep the bottom status text exact: Proposal-only by default.",
+        "Show rollback as conditional, not guaranteed for every action.",
+        "No page number, watermark, or unrelated logo."
+      ]
+    },
+    {
+      "number": 7,
+      "title": "What Is Proven — and What Is Deliberately Gated",
+      "role": "evidence and maturity",
+      "intent": "Balance demonstrated capability with an honest, decision-ready view of evaluation and production-readiness requirements.",
+      "key_points": [
+        "Validated now",
+        "Required before autonomy"
+      ],
+      "local_context": {
+        "required_background": "Validated in a controlled OpenTelemetry demo: the full path Prometheus → Alertmanager → causa-ingest → Stage 2 RCA → Postgres → dashboard API → UI; deterministic fixtures for a clear database cascade, infrastructure-rooted origin, disjoint dual faults, shared downstream dependency, and ambiguous near-simultaneous faults; durable remediation lease and rollback safety tests exist. Required before autonomy: a versioned labeled corpus spanning supported fault classes, alerts, and representative topology; disjoint training, calibration, and holdout incidents; at least 30 calibration incidents per automatically remediable action and holdout evidence; published top-1, top-3, MRR, abstention precision/recall, ECE, and time-to-diagnosis; clean baselines, representative alerts, fitted weights, validated calibration; operational controls including trusted-network restriction, dedicated roles, immutable images, backup/restore, lease-expiry drills, and surfaced rollback failure."
+      },
+      "layout": {
+        "composition": "Two asymmetric evidence columns separated by a vertical gate: left blue/teal column titled Validated now with an end-to-end chain and five fixture badges; right amber/slate column titled Required before autonomy with Corpus, Calibration, Holdout metrics, and Operational controls. Bottom full-width status conclusion.",
+        "content_zones": "Title top; validated evidence left; readiness gates right; bottom posture bar.",
+        "relationship_to_previous_slide": "Move from remediation mechanism to current maturity and decision boundaries.",
+        "spacing": "Executive scorecard density; no tiny tables."
+      },
+      "visual_elements": {
+        "main_visual": "Validated-versus-gated comparison with a strong central lock/gate motif.",
+        "supporting_elements": "Fixture badges Clear cascade, Infra origin, Disjoint faults, Shared dependency, Ambiguous → abstain; readiness icons for corpus, calibration curve, holdout report, access controls."
+      },
+      "constraints": [
+        "Do not invent success rates or readiness percentages.",
+        "Show the exact posture statement: Development and controlled evaluation — proposal-only.",
+        "Keep evaluation metric abbreviations readable: Top-1, Top-3, MRR, ECE, Time-to-diagnosis.",
+        "No page number, watermark, or unrelated logo."
+      ]
+    },
+    {
+      "number": 8,
+      "title": "The Outcome — A Closed, Accountable Incident Loop",
+      "role": "summary and closing",
+      "intent": "Conclude with a memorable five-stage value loop and invite a controlled pilot rather than overclaiming autonomy.",
+      "key_points": [
+        "Detect",
+        "Explain",
+        "Investigate",
+        "Act",
+        "Learn"
+      ],
+      "local_context": {
+        "required_background": "The five-stage outcome is: Detect with cross-signal observability; Explain with influence-aware ranked causal evidence; Investigate through one connected operator workspace; Act through typed plans, approval, SLO checks, and rollback handling; Learn from operator feedback and calibrated evaluation before expanding autonomy. Closing claim: Causa compresses the path from alert to accountable action without hiding uncertainty. Recommended next action is a controlled pilot with labeled incidents."
+      },
+      "layout": {
+        "composition": "A large elegant circular loop centered on the slide with five distinct stages and small meaningful icons. The core contains the Causa name and the phrase Accountable action. A concise closing claim sits left-bottom; a restrained pilot invitation sits right-bottom.",
+        "content_zones": "Title top; five-stage loop center; closing claim and next action at bottom.",
+        "relationship_to_previous_slide": "Synthesize the system after the maturity gate and end on a controlled next step.",
+        "spacing": "Spacious summary with strong visual rhythm and minimal prose."
+      },
+      "visual_elements": {
+        "main_visual": "Circular Detect → Explain → Investigate → Act → Learn loop with telemetry, causal graph, evidence lens, shield/check, and feedback/calibration icons.",
+        "supporting_elements": "Exact closing claim: From alert to accountable action — without hiding uncertainty. Small CTA: Next: run a controlled pilot with labeled incidents."
+      },
+      "constraints": [
+        "Keep the five stage labels exact and in the stated order.",
+        "Avoid repeating the Slide 3 left-to-right architecture composition.",
+        "Do not imply production autonomy.",
+        "No page number, watermark, or unrelated logo."
+      ]
+    }
+  ]
+}

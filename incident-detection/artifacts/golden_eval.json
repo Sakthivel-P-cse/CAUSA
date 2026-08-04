@@ -1,0 +1,122 @@
+{
+  "Random": {
+    "method": "Random",
+    "metrics": {
+      "n": 1,
+      "top1": 0.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 0.3333333333333333,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 0,
+      "hits_at_3": 1,
+      "hits_at_5": 1,
+      "recall_hits": 1,
+      "per_scenario": {
+        "S0": {
+          "n": 1,
+          "top1": 0.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 0.3333333333333333,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 0,
+          "hits_at_3": 1,
+          "hits_at_5": 1,
+          "recall_hits": 1,
+          "per_scenario": {}
+        }
+      }
+    }
+  },
+  "MostAnomalous": {
+    "method": "MostAnomalous",
+    "metrics": {
+      "n": 1,
+      "top1": 1.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 1,
+      "hits_at_3": 1,
+      "hits_at_5": 1,
+      "recall_hits": 1,
+      "per_scenario": {
+        "S0": {
+          "n": 1,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 1,
+          "hits_at_3": 1,
+          "hits_at_5": 1,
+          "recall_hits": 1,
+          "per_scenario": {}
+        }
+      }
+    }
+  },
+  "FixtureFull": {
+    "method": "FixtureFull",
+    "metrics": {
+      "n": 1,
+      "top1": 1.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 1,
+      "hits_at_3": 1,
+      "hits_at_5": 1,
+      "recall_hits": 1,
+      "per_scenario": {
+        "S0": {
+          "n": 1,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 1,
+          "hits_at_3": 1,
+          "hits_at_5": 1,
+          "recall_hits": 1,
+          "per_scenario": {}
+        }
+      }
+    }
+  },
+  "ABFull": {
+    "method": "ABFull",
+    "metrics": {
+      "n": 1,
+      "top1": 1.0,
+      "top3": 1.0,
+      "top5": 1.0,
+      "mrr": 1.0,
+      "subgraph_recall": 1.0,
+      "hits_at_1": 1,
+      "hits_at_3": 1,
+      "hits_at_5": 1,
+      "recall_hits": 1,
+      "per_scenario": {
+        "S0": {
+          "n": 1,
+          "top1": 1.0,
+          "top3": 1.0,
+          "top5": 1.0,
+          "mrr": 1.0,
+          "subgraph_recall": 1.0,
+          "hits_at_1": 1,
+          "hits_at_3": 1,
+          "hits_at_5": 1,
+          "recall_hits": 1,
+          "per_scenario": {}
+        }
+      }
+    }
+  }
+}
