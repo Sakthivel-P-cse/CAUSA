@@ -10,6 +10,63 @@ from dashboard.backend.errors import api_error, raise_upstream_error
 
 router = APIRouter()
 
+SYSTEM_NAMESPACES = {
+    "alertmanager",
+    "causa-dashboard",
+    "causa-ingest",
+    "causa-remediation",
+    "kube-node-lease",
+    "kube-public",
+    "kube-state-metrics",
+    "kube-system",
+    "local-path-storage",
+    "loki",
+    "mimir",
+    "minio-loki",
+    "minio-mimir",
+    "minio-tempo",
+    "node-exporter",
+    "otel-agent",
+    "otel-collector",
+    "otel-lb",
+    "postgres",
+    "prometheus",
+    "stage2-rca",
+    "tempo",
+}
+
+
+def _infra_health(
+    *,
+    kind: str,
+    namespace: str | None,
+    condition: str | None,
+    restart_count: int,
+    cpu: float,
+    memory: float,
+    service_name: str | None,
+    active_services: set[str] | None,
+) -> tuple[str, str, str]:
+    if condition and condition not in {"Ready", "Running"}:
+        return "error", "disconnected", f"Condition: {condition}"
+    if restart_count >= 3:
+        return "error", "fault", f"{restart_count} container restarts"
+    if cpu > 90 or memory > 90:
+        resource = "CPU" if cpu > 90 else "memory"
+        return "error", "fault", f"{resource} usage above 90%"
+    if kind != "pod" or namespace in SYSTEM_NAMESPACES:
+        return "infra", "infrastructure", "Platform telemetry only"
+    if restart_count > 0:
+        return "warn", "degraded", f"{restart_count} container restart"
+    if cpu > 70 or memory > 80:
+        resource = "CPU" if cpu > 70 else "memory"
+        return "warn", "degraded", f"High {resource} usage"
+    if active_services is None:
+        return "unknown", "unknown", "Telemetry check unavailable"
+    if service_name not in active_services:
+        return "error", "no_telemetry", "No active application telemetry"
+    return "ok", "telemetry_active", "Application telemetry active"
+
 
 def _edge_to_dict(e: Any) -> dict[str, Any]:
     return {
@@ -71,6 +128,10 @@ def infrastructure(
         infra = prom.get_infra_nodes()
     except Exception as exc:
         raise_upstream_error("prometheus", "infrastructure", exc)
+    try:
+        active_services: set[str] | None = prom.get_active_service_names()
+    except Exception:
+        active_services = None
     nodes = []
     for n in infra:
         name = getattr(n, "name", None) or getattr(n, "node", None) or str(n)
@@ -78,20 +139,49 @@ def infrastructure(
             continue
         kind = getattr(n, "kind", None) or "node"
         cpu = float(getattr(n, "cpu_usage_pct", 0) or 0)
-        status = "error" if cpu > 90 else "warn" if cpu > 70 else "ok"
+        memory = float(getattr(n, "memory_usage_pct", 0) or 0)
+        namespace = getattr(n, "namespace", None)
+        condition = getattr(n, "condition", None)
+        restart_count = int(getattr(n, "restart_count", 0) or 0)
+        service_name = getattr(n, "service_name", None)
+        status, health_reason, status_detail = _infra_health(
+            kind=kind,
+            namespace=namespace,
+            condition=condition,
+            restart_count=restart_count,
+            cpu=cpu,
+            memory=memory,
+            service_name=service_name,
+            active_services=active_services,
+        )
         nodes.append(
             {
                 "id": name,
                 "label": name,
                 "kind": kind,
                 "status": status,
+                "health_reason": health_reason,
+                "status_detail": status_detail,
                 "cpu_pct": cpu,
-                "memory_pct": float(getattr(n, "memory_usage_pct", 0) or 0),
-                "condition": getattr(n, "condition", None),
-                "namespace": getattr(n, "namespace", None),
+                "memory_pct": memory,
+                "condition": condition,
+                "restart_count": restart_count,
+                "namespace": namespace,
+                "service_name": service_name,
+                "host_node": getattr(n, "host_node", None),
             }
         )
-    return {"nodes": nodes, "edges": []}
+    return {
+        "nodes": nodes,
+        "edges": [],
+        "status_legend": [
+            {"status": "error", "label": "Fault / disconnected / no telemetry"},
+            {"status": "warn", "label": "Degraded"},
+            {"status": "ok", "label": "Telemetry active"},
+            {"status": "infra", "label": "Platform infrastructure"},
+            {"status": "unknown", "label": "Telemetry unknown"},
+        ],
+    }
 
 
 @router.get("/trace-execution")

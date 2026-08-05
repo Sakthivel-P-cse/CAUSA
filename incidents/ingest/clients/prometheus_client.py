@@ -68,6 +68,14 @@ class PrometheusClient:
         resp = self._http.get(f"{self._base}/-/ready", timeout=5.0)
         resp.raise_for_status()
 
+    def get_active_service_names(self) -> set[str]:
+        rows = self._instant('count by (service_name) ({service_name!=""})')
+        return {
+            row["metric"]["service_name"]
+            for row in rows
+            if row.get("metric", {}).get("service_name")
+        }
+
     # ── Low-level helpers ─────────────────────────────────────────────
 
     def _instant(self, query: str, at: datetime | None = None) -> list[dict[str, Any]]:
@@ -247,8 +255,16 @@ class PrometheusClient:
             if pod:
                 restart_map[(ns, pod)] = int(float(r["value"][1]))
 
-        # Pods (phase Running)
-        for r in self._instant_safe("kube_pod_status_phase{phase='Running'} == 1"):
+        for (ns, pod), host_node in pod_host_map.items():
+            upsert(
+                ("pod", ns, pod),
+                restart_count=restart_map.get((ns, pod), 0),
+                condition="Unknown",
+                host_node=host_node,
+                service_name=infer_service_name_from_pod(pod),
+            )
+
+        for r in self._instant_safe("kube_pod_status_phase == 1"):
             ns = r["metric"].get("namespace", "")
             pod = r["metric"].get("pod", "")
             if not pod:
@@ -256,7 +272,7 @@ class PrometheusClient:
             upsert(
                 ("pod", ns, pod),
                 restart_count=restart_map.get((ns, pod), 0),
-                condition="Running",
+                condition=r["metric"].get("phase", "Unknown"),
                 host_node=pod_host_map.get((ns, pod)),
                 service_name=infer_service_name_from_pod(pod),
             )

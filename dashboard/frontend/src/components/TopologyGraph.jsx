@@ -55,12 +55,26 @@ function nodeSubtitle(node) {
   return null;
 }
 
+function nodeHoverText(node) {
+  const lines = []
+  if (node.condition) lines.push(`Condition: ${node.condition}`)
+  if (node.status_detail) lines.push(node.status_detail)
+  else if (node.health_reason) lines.push(String(node.health_reason).replaceAll('_', ' '))
+  if (node.namespace) lines.push(`Namespace: ${node.namespace}`)
+  if (node.restart_count != null && Number(node.restart_count) > 0) {
+    lines.push(`Restarts: ${node.restart_count}`)
+  }
+  return lines.join('\n')
+}
+
 function nodeTone(node) {
   if (node.status === 'origin' || node.role === 'origin') return 'purple'
   if (node.status === 'amplifier' || node.role === 'amplifier') return 'yellow'
   if (node.status === 'blast') return 'orange'
   if (node.status === 'error') return 'red'
   if (node.status === 'warn') return 'yellow'
+  if (node.status === 'infra') return 'blue'
+  if (node.status === 'unknown') return 'grey'
   const kind = nodeKind(node);
   if (kind === 'node' || kind === 'infra') {
     if (node.condition && !['Ready', 'Running'].includes(node.condition)) return 'red';
@@ -109,7 +123,8 @@ const getToneStyles = (tone, selected, overlay) => {
   else if (tone === 'green') result = { ...base, background: 'rgba(30, 180, 130, 0.85)', borderColor: selected ? '#ffffff' : '#27d4a0' }
   else if (tone === 'purple') result = { ...base, background: 'rgba(140, 90, 220, 0.9)', borderColor: selected ? '#ffffff' : '#c79cff' }
   else if (tone === 'orange') result = { ...base, background: 'rgba(255, 140, 70, 0.85)', borderColor: selected ? '#ffffff' : '#ff9d66' }
-  else result = { ...base, background: 'rgba(40, 140, 210, 0.85)', borderColor: selected ? '#ffffff' : '#39b8ff' }
+  else if (tone === 'blue') result = { ...base, background: 'rgba(40, 115, 180, 0.88)', borderColor: selected ? '#ffffff' : '#55b7ff' }
+  else result = { ...base, background: 'rgba(88, 101, 118, 0.9)', borderColor: selected ? '#ffffff' : '#9aa9ba' }
   if (overlay?.root) return { ...result, borderColor: '#c79cff', boxShadow: '0 0 0 4px rgba(199,156,255,0.35)' }
   if (overlay?.contradiction) return { ...result, borderColor: '#ff9d66', borderStyle: 'dashed' }
   if (overlay?.residual) return { ...result, borderColor: '#f8b84a', borderStyle: 'dotted' }
@@ -121,9 +136,10 @@ const CustomNode = ({ data, selected }) => {
   const tone = nodeTone(data.raw);
   const styles = getToneStyles(tone, selected, data.overlay);
   const subtitle = nodeSubtitle(data.raw);
+  const hoverText = nodeHoverText(data.raw);
 
   return (
-    <div style={styles}>
+    <div className="topology-node" style={{ ...styles, position: 'relative' }} title={hoverText || undefined}>
       <Handle type="target" position={Position.Top} style={{ background: '#fff', width: 8, height: 8 }} />
       <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: subtitle ? '4px' : '0', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
         {nodeLabel(data.raw).slice(0, 22)}
@@ -133,9 +149,21 @@ const CustomNode = ({ data, selected }) => {
           {String(subtitle).slice(0, 26)}
         </div>
       )}
+      {data.raw.status_detail && (
+        <div style={{ fontSize: 10, fontWeight: 700, marginTop: 7, color: '#fff' }}>
+          {String(data.raw.status_detail).slice(0, 34)}
+        </div>
+      )}
       {data.overlay?.labels?.length > 0 && (
         <div aria-label={`Causal overlay: ${data.overlay.labels.join(', ')}`} style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
           {data.overlay.labels.map(item => <span key={item} style={{ fontSize: 9, textTransform: 'uppercase' }}>{item}</span>)}
+        </div>
+      )}
+      {hoverText && (
+        <div className="topology-node-tooltip" role="tooltip">
+          {hoverText.split('\n').map(line => (
+            <div key={line}>{line}</div>
+          ))}
         </div>
       )}
       <Handle type="source" position={Position.Bottom} style={{ background: '#fff', width: 8, height: 8 }} />
@@ -189,9 +217,11 @@ function Inspector({ node, degree }) {
     ['Type', nodeKind(raw)],
     ['Namespace', raw.namespace],
     ['Condition', raw.condition],
+    ['Health reason', raw.health_reason?.replaceAll('_', ' ')],
+    ['Status detail', raw.status_detail],
     ['Restarts', raw.restart_count],
-    ['CPU %', raw.cpu_usage_pct],
-    ['Memory %', raw.memory_usage_pct],
+    ['CPU %', raw.cpu_usage_pct ?? raw.cpu_pct],
+    ['Memory %', raw.memory_usage_pct ?? raw.memory_pct],
     ['Service', raw.service_name],
     ['Host Node', raw.host_node],
     ['Operation', raw.operation],
@@ -356,6 +386,16 @@ export default function TopologyGraph({ graph, focusId = null, height = 540, hyp
             {graph.trace_id && <span style={{ color: 'var(--muted-2)' }}> · trace {String(graph.trace_id).slice(0, 16)}...</span>}
             {graph.report_id && <span style={{ color: 'var(--muted-2)' }}> · incident {String(graph.report_id).slice(0, 8)}</span>}
           </Panel>
+          {graph.status_legend?.length > 0 && (
+            <Panel position="top-right" style={{ background: 'var(--bg-1)', padding: 10, borderRadius: 8, border: '1px solid var(--line)', display: 'grid', gap: 6 }}>
+              {graph.status_legend.map(item => (
+                <div key={item.status} style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--muted)', fontSize: 10 }}>
+                  <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 2, background: getToneStyles(nodeTone({ status: item.status }), false).background }} />
+                  {item.label}
+                </div>
+              ))}
+            </Panel>
+          )}
         </ReactFlow>
       </div>
 
