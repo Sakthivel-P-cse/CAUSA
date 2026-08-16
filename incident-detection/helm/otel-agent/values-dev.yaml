@@ -1,0 +1,21 @@
+# ============================================================
+# OTel Agent — Development environment overrides
+# Smaller batches/resources; plaintext to gateway.
+# ============================================================
+
+config:
+  processors:
+    batch:
+      sendBatchSize: 512
+      timeout: 2s
+    memoryLimiter:
+      limitMib: 150
+      spikeLimitMib: 48
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

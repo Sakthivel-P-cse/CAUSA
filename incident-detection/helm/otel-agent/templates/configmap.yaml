@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-agent.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otel-agent.labels" . | nindent 4 }}
+data:
+  otel-agent-config.yaml: |
+    # =================================================================
+    # OpenTelemetry Collector — AGENT pipeline (DaemonSet, per node)
+    #
+    # Flow:
+    #   Local pods ─OTLP─→ ┐
+    #   Node log files ───→ ├─→ [memory_limiter → k8sattributes
+    #   Node host metrics ─→ ┘                     → resource → batch]
+    #                                                     │
+    #                                              OTLP → GATEWAY
+    #                                          (otel-collector Deployment)
+    #
+    # The agent does NOT write to Tempo/Prometheus/Loki. It only
+    # collects node-local signals and forwards to the gateway, which
+    # owns tail sampling and the storage exporters.
+    # =================================================================
+
+    extensions:
+      health_check:
+        endpoint: "0.0.0.0:{{ .Values.service.ports.healthCheck }}"
+
+    receivers:
+      # ── OTLP in from local pods ──────────────────────────────────
+      otlp:
+        protocols:
+          grpc:
+            endpoint: {{ .Values.config.receivers.otlp.grpcEndpoint }}
+          http:
+            endpoint: {{ .Values.config.receivers.otlp.httpEndpoint }}
+
+      # ── Node container logs (per-node, DaemonSet-only) ───────────
+      filelog:
+        include:
+          {{- range .Values.config.receivers.filelog.include }}
+          - {{ . }}
+          {{- end }}
+        exclude:
+          {{- range .Values.config.receivers.filelog.exclude }}
+          - {{ . }}
+          {{- end }}
+        start_at: {{ .Values.config.receivers.filelog.startAt }}
+        include_file_name: {{ .Values.config.receivers.filelog.includeFileName }}
+        include_file_path: {{ .Values.config.receivers.filelog.includeFilePath }}
+
+      # ── Node hardware metrics (per-node, DaemonSet-only) ─────────
+      hostmetrics:
+        collection_interval: {{ .Values.config.receivers.hostmetrics.collectionInterval }}
+        scrapers:
+          {{- if .Values.config.receivers.hostmetrics.scrapers.cpu }}
+          cpu:
+          {{- end }}
+          {{- if .Values.config.receivers.hostmetrics.scrapers.memory }}
+          memory:
+          {{- end }}
+          {{- if .Values.config.receivers.hostmetrics.scrapers.disk }}
+          disk:
+          {{- end }}
+          {{- if .Values.config.receivers.hostmetrics.scrapers.filesystem }}
+          filesystem:
+          {{- end }}
+          {{- if .Values.config.receivers.hostmetrics.scrapers.network }}
+          network:
+          {{- end }}
+          {{- if .Values.config.receivers.hostmetrics.scrapers.load }}
+          load:
+          {{- end }}
+
+    processors:
+      memory_limiter:
+        check_interval: {{ .Values.config.processors.memoryLimiter.checkInterval }}
+        limit_mib: {{ .Values.config.processors.memoryLimiter.limitMib }}
+        spike_limit_mib: {{ .Values.config.processors.memoryLimiter.spikeLimitMib }}
+
+      # Enrich every signal with Kubernetes metadata (pod, namespace,
+      # node, labels, owner). This is Causa' unified tagging — it
+      # lets Stage 2 correlate a trace, its logs, and its pod metrics.
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.node.name
+            - k8s.deployment.name
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+          - sources:
+              - from: connection
+
+      # Tag which node/environment this agent runs on.
+      resource:
+        attributes:
+          - action: insert
+            key: deployment.environment
+            value: {{ .Release.Namespace }}
+          - action: insert
+            key: k8s.node.name
+            value: "${env:NODE_NAME}"
+
+      batch:
+        send_batch_size: {{ .Values.config.processors.batch.sendBatchSize }}
+        timeout: {{ .Values.config.processors.batch.timeout }}
+
+    exporters:
+      # ── Traces → LB tier (routes by trace ID to one gateway pod) ─
+      otlp/lb:
+        endpoint: {{ .Values.traceLoadBalancer.endpoint }}
+        tls:
+          insecure: {{ .Values.traceLoadBalancer.tls.insecure }}
+
+      # ── Metrics + logs → GATEWAY directly (no trace affinity) ────
+      otlp/gateway:
+        endpoint: {{ .Values.gateway.endpoint }}
+        tls:
+          insecure: {{ .Values.gateway.tls.insecure }}
+
+      debug:
+        verbosity: {{ .Values.config.exporters.debug.verbosity }}
+
+    service:
+      extensions: [health_check]
+      pipelines:
+        # Traces: OTLP → enrich → LB tier (→ gateway pod → tail sampling)
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resource, batch]
+          exporters: [otlp/lb, debug]
+
+        # Metrics: OTLP (app) + hostmetrics (node) → enrich → gateway
+        metrics:
+          receivers: [otlp, hostmetrics]
+          processors: [memory_limiter, k8sattributes, resource, batch]
+          exporters: [otlp/gateway, debug]
+
+        # Logs: OTLP (app) + filelog (node stdout/stderr) → enrich → gateway
+        logs:
+          receivers: [otlp, filelog]
+          processors: [memory_limiter, k8sattributes, resource, batch]
+          exporters: [otlp/gateway, debug]
+
+      telemetry:
+        metrics:
+          address: "0.0.0.0:{{ .Values.service.ports.metrics }}"
+        logs:
+          level: info

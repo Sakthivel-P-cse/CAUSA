@@ -1,0 +1,30 @@
+# ============================================================
+# MinIO (for Mimir) — Production overrides
+# Persistent storage, larger footprint, credentials from a Secret.
+#
+# Pre-create the credentials Secret before deploying prod:
+#   kubectl create namespace minio-mimir --dry-run=client -o yaml | kubectl apply -f -
+#   kubectl -n minio-mimir create secret generic minio-mimir-secret \
+#     --from-literal=root-user='<ACCESS_KEY>' \
+#     --from-literal=root-password='<SECRET_KEY>'
+# ============================================================
+
+auth:
+  existingSecret: "minio-mimir-secret"
+  rootUserKey: "root-user"
+  rootPasswordKey: "root-password"
+
+persistence:
+  enabled: true
+  storageClassName: "standard"   # Override: STORAGE_CLASS=<name> ./scripts/deploy.sh prod
+  size: 100Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

@@ -1,0 +1,216 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgres.fullname" . }}-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+data:
+  # This SQL runs once when the Postgres container starts for the first time.
+  # It creates the rca_reports table used by the Stage 2 RCA engine and
+  # queries used by the Causa custom dashboard.
+  init.sql: |
+    -- Enable pgcrypto for gen_random_uuid()
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+    -- --------------------------------------------------------
+    -- rca_reports: one row per RCA run
+    -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS rca_reports (
+        id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+
+        -- When the Alertmanager webhook triggered Stage 2
+        triggered_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+        -- The alert that woke Stage 2 (e.g. "ServiceHighErrorRate")
+        alert_name          TEXT        NOT NULL,
+
+        -- The service mentioned in the alert labels
+        alerted_service     TEXT,
+
+        -- Stage 2 conclusion: the actual root cause
+        root_cause_service  TEXT,
+
+        -- The engine's classified fault class. Use the SAME tokens as the C5
+        -- contract's FaultClass enum (contracts/ground_truth.py) so rca_reports
+        -- joins cleanly to groundtruth.ground_truth.fault_class:
+        --   AppLogic / Config / Infra / Dependency / Resource / Data
+        -- (Timing is a ground-truth-only S3 marker, excluded from classification.)
+        failure_type        TEXT,
+
+        -- Routing decision from failure classification
+        routing             TEXT,
+
+        -- Incident-isolation identifier
+        incident_id         TEXT,
+
+        -- Human-readable RCA summary
+        root_cause_summary  TEXT,
+
+        -- Ranked origin candidates + related RCA expansion fields
+        origin_candidates   JSONB,
+        amplifier_nodes     JSONB,
+        blast_radius        JSONB,
+        anomaly_scores      JSONB,
+        first_error_span    JSONB,
+        retry_amplification JSONB,
+        incident_scope      JSONB,
+        inference_evidence  JSONB,
+
+        -- 0.0 – 1.0 confidence in the conclusion
+        confidence_score    FLOAT,
+
+        -- Full evidence blob: anomalous metrics, graph edge weights, etc.
+        -- JSON array of { metric, value, threshold, anomaly_type }
+        evidence            JSONB,
+
+        -- Ordered list of events that Stage 2 observed
+        -- JSON array of { timestamp, service, event }
+        timeline            JSONB,
+
+        -- Trace ID that Stage 2 used for Graph 3 construction
+        -- Links back to Tempo: GET /api/traces/{trace_id}
+        trace_id            TEXT,
+
+        -- When the incident was resolved (NULL if still open)
+        resolved_at         TIMESTAMPTZ,
+
+        -- Human feedback loop fields
+        feedback_verdict    TEXT,
+        feedback_notes      TEXT,
+        feedback_updated_at TIMESTAMPTZ,
+
+        -- Row creation time (same as triggered_at by default)
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    -- --------------------------------------------------------
+    -- Indexes for the dashboard query patterns
+    -- --------------------------------------------------------
+
+    -- Most recent incidents first
+    CREATE INDEX IF NOT EXISTS idx_rca_triggered_at
+        ON rca_reports (triggered_at DESC);
+
+    -- Filter / group by failure type (pie chart, trend analysis)
+    CREATE INDEX IF NOT EXISTS idx_rca_failure_type
+        ON rca_reports (failure_type);
+
+    -- Filter / rank by root cause service (top offenders panel)
+    CREATE INDEX IF NOT EXISTS idx_rca_root_cause_service
+        ON rca_reports (root_cause_service);
+
+    -- Alert name lookup
+    CREATE INDEX IF NOT EXISTS idx_rca_alert_name
+        ON rca_reports (alert_name);
+
+    -- --------------------------------------------------------
+    -- incidents: ingestion-owned incident WINDOW state (PRD2 §9).
+    -- Written by the Dev-A trigger service (ingest.trigger) when an
+    -- Alertmanager webhook opens a window; resolved on send_resolved.
+    -- Distinct from rca_reports (which holds the engine's conclusions).
+    -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS incidents (
+        incident_id     TEXT        PRIMARY KEY,
+        alert_name      TEXT        NOT NULL,
+        alerted_service TEXT,
+        namespace       TEXT,
+        node            TEXT,
+        severity        TEXT,
+        window_start    TIMESTAMPTZ,
+        window_end      TIMESTAMPTZ,
+        trace_id        TEXT,
+        telemetry_refs  JSONB,
+        status          TEXT        NOT NULL DEFAULT 'open',   -- open | resolved
+        triggered_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        resolved_at     TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_incidents_triggered_at
+        ON incidents (triggered_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_incidents_status
+        ON incidents (status);
+
+    -- --------------------------------------------------------
+    -- anomaly_baseline: shared robust warmup baselines (contract C2), so the
+    -- trigger service and the eval harness load identical median/MAD numbers.
+    -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS anomaly_baseline (
+        node        TEXT,
+        metric      TEXT,
+        median      DOUBLE PRECISION,
+        mad         DOUBLE PRECISION,
+        n           INTEGER,
+        captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (node, metric)
+    );
+
+    -- --------------------------------------------------------
+    -- groundtruth.ground_truth: chaos ground truth (contract C5).
+    -- INVARIANT: the RCA engine must NEVER read this before scoring. We enforce
+    -- that at the grant level, not by convention: the `rca_engine` role (which
+    -- the Stage-2 engine connects as) has NO privileges on this schema. The
+    -- Dev-A harness writes it; Dev C's eval reads it only when scoring.
+    -- --------------------------------------------------------
+    CREATE SCHEMA IF NOT EXISTS groundtruth;
+    CREATE TABLE IF NOT EXISTS groundtruth.ground_truth (
+        incident_id    TEXT        PRIMARY KEY,
+        true_root_node TEXT        NOT NULL,
+        fault_class    TEXT        NOT NULL,
+        inject_start   TIMESTAMPTZ,
+        inject_end     TIMESTAMPTZ
+    );
+
+    -- --------------------------------------------------------
+    -- stage2_outbox: durable buffer for Alertmanager webhooks the trigger
+    -- service could not forward to Stage-2 (retry after an outage, so an
+    -- incident is never silently dropped). Written + drained by ingest.trigger.
+    -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS stage2_outbox (
+        id          BIGSERIAL   PRIMARY KEY,
+        payload     JSONB       NOT NULL,
+        attempts    INTEGER     NOT NULL DEFAULT 0,
+        last_error  TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        sent_at     TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_stage2_outbox_pending
+        ON stage2_outbox (id) WHERE sent_at IS NULL;
+
+    -- Role isolation for the ground-truth invariant. Created if absent; the
+    -- engine/dashboard deployments must connect as `rca_engine` (NOT the owner
+    -- `causa`, a superuser that bypasses every grant) so they physically cannot
+    -- SELECT injected truth. The groundtruth objects above are owned by `causa`
+    -- (this script's runner), never by rca_engine.
+    --
+    -- NOTE: this init script runs ONCE, on an empty data volume. On an existing
+    -- cluster these REVOKE/GRANT/role statements must be applied by hand.
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
+            CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
+        END IF;
+        -- Read-only role for Dev C's post-hoc accuracy eval: it MAY read ground
+        -- truth (scoring already happened), so it is separate from rca_engine.
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'causa_eval') THEN
+            CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
+        END IF;
+    END
+    $$;
+
+    -- Lock the groundtruth schema: no access for PUBLIC (rca_engine inherits
+    -- from PUBLIC) and an explicit belt-and-suspenders revoke for rca_engine.
+    REVOKE ALL ON SCHEMA groundtruth FROM PUBLIC;
+    REVOKE ALL ON ALL TABLES IN SCHEMA groundtruth FROM PUBLIC;
+    REVOKE USAGE ON SCHEMA groundtruth FROM rca_engine;
+    REVOKE ALL ON ALL TABLES IN SCHEMA groundtruth FROM rca_engine;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA groundtruth REVOKE ALL ON TABLES FROM rca_engine;
+
+    -- The engine only ever touches the read-side tables it legitimately uses.
+    GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
+    GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
+
+    -- The eval role: read-only across reports/incidents/baselines AND ground
+    -- truth (the sanctioned post-scoring read path).
+    GRANT USAGE ON SCHEMA groundtruth TO causa_eval;
+    GRANT SELECT ON groundtruth.ground_truth TO causa_eval;
+    GRANT SELECT ON rca_reports, incidents, anomaly_baseline TO causa_eval;

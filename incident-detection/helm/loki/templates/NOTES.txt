@@ -1,0 +1,24 @@
+Loki has been deployed successfully!
+
+Component: Grafana Loki (Log Aggregation Backend)
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+Service Endpoint (ClusterIP — internal only):
+  HTTP API:  loki.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}
+
+Verify deployment:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs deploy/loki
+
+Grafana Datasource URL (use this in Grafana):
+  http://loki.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}
+
+Port-forward for local access:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/loki {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }}
+  curl http://localhost:{{ .Values.service.ports.http }}/ready
+
+Send a test log (push API):
+  curl -X POST http://localhost:{{ .Values.service.ports.http }}/loki/api/v1/push \
+    -H 'Content-Type: application/json' \
+    -d '{"streams":[{"stream":{"app":"test"},"values":[["'"$(date +%s%N)"'","hello from causa"]]}]}'

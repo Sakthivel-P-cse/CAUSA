@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prometheus.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "prometheus.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval:     {{ .Values.config.globalScrapeInterval }}
+      evaluation_interval: {{ .Values.config.globalEvaluationInterval }}
+      {{- with .Values.config.externalLabels }}
+      # Identify this Prometheus to the remote store. cluster + replica
+      # let Thanos/Mimir deduplicate samples from HA Prometheus pairs.
+      external_labels:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+    # Tell Prometheus where to find alert rule files
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    # Tell Prometheus where Alertmanager is
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - {{ .Values.config.alertmanagerUrl }}
+
+    {{- if .Values.config.remoteWrite.enabled }}
+    # Ship all scraped samples to a horizontally scalable long-term store
+    # (Mimir/Thanos/Cortex). A single Prometheus cannot hold large-fleet
+    # cardinality; it stays the scrape+alert engine while the remote store
+    # owns retention and query fan-out.
+    remote_write:
+      - url: {{ required "config.remoteWrite.url is required when remoteWrite.enabled=true" .Values.config.remoteWrite.url }}
+        {{- with .Values.config.remoteWrite.headers }}
+        # e.g. X-Scope-OrgID for Mimir/Cortex multi-tenancy
+        headers:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.config.remoteWrite.basicAuth.enabled }}
+        basic_auth:
+          username: {{ .Values.config.remoteWrite.basicAuth.username | quote }}
+          password_file: /etc/prometheus/secrets/remote-write/password
+        {{- end }}
+        queue_config:
+          max_samples_per_send: {{ .Values.config.remoteWrite.queueConfig.maxSamplesPerSend }}
+          max_shards: {{ .Values.config.remoteWrite.queueConfig.maxShards }}
+          min_shards: {{ .Values.config.remoteWrite.queueConfig.minShards }}
+          capacity: {{ .Values.config.remoteWrite.queueConfig.capacity }}
+          batch_send_deadline: {{ .Values.config.remoteWrite.queueConfig.batchSendDeadline }}
+        {{- with .Values.config.remoteWrite.writeRelabelConfigs }}
+        # Drop noisy/high-cardinality series before they leave the cluster.
+        write_relabel_configs:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+    {{- end }}
+
+    scrape_configs:
+      {{- range .Values.config.scrapeConfigs }}
+      - job_name: {{ .jobName }}
+        static_configs:
+          {{- range .staticConfigs }}
+          - targets:
+              {{- range .targets }}
+              - {{ . }}
+              {{- end }}
+          {{- end }}
+      {{- end }}
+
+      # Self-scraping — monitor Prometheus itself
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:{{ .Values.service.ports.http }}']
+
+      {{- if .Values.config.extraScrapeConfigs }}
+      {{ tpl .Values.config.extraScrapeConfigs . | nindent 6 }}
+      {{- end }}

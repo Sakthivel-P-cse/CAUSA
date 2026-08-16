@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "otel-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otel-agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "otel-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "otel-agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "otel-agent.serviceAccountName" . }}
+      containers:
+        - name: otel-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config=/etc/otel-agent/otel-agent-config.yaml
+          env:
+            # Surfaced into resource attributes and k8sattributes.
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            # OTLP gRPC — local pods push telemetry here (via host IP)
+            - name: otlp-grpc
+              containerPort: {{ .Values.service.ports.otlpGrpc }}
+              hostPort: {{ .Values.service.ports.otlpGrpc }}
+              protocol: TCP
+            # OTLP HTTP — local pods push telemetry here (via host IP)
+            - name: otlp-http
+              containerPort: {{ .Values.service.ports.otlpHttp }}
+              hostPort: {{ .Values.service.ports.otlpHttp }}
+              protocol: TCP
+            # Agent's own Prometheus metrics — scraped by Prometheus
+            - name: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
+              protocol: TCP
+            # Health check endpoint
+            - name: health
+              containerPort: {{ .Values.service.ports.healthCheck }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otel-agent
+            # Node log files for the filelog receiver (read-only).
+            - name: varlogpods
+              mountPath: {{ .Values.logsHostPath.varLogPods }}
+              readOnly: true
+            - name: varlogcontainers
+              mountPath: {{ .Values.logsHostPath.varLogContainers }}
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: {{ .Values.logsHostPath.varLibDockerContainers }}
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "otel-agent.fullname" . }}-config
+        - name: varlogpods
+          hostPath:
+            path: {{ .Values.logsHostPath.varLogPods }}
+        - name: varlogcontainers
+          hostPath:
+            path: {{ .Values.logsHostPath.varLogContainers }}
+        - name: varlibdockercontainers
+          hostPath:
+            path: {{ .Values.logsHostPath.varLibDockerContainers }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

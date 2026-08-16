@@ -1,0 +1,35 @@
+# ============================================================
+# S1 — Slow-burn leaf. Stresses: T (origin deviates LATE) + leaf.
+# True root: valkey-cart (the cart cache; formerly "redis-cart" in older OTel
+# Demo releases — hence the historical "redis" naming). Fault class: Resource.
+# Expected weak signal: leans on D's self-term + arbitration.
+#
+# A memory ramp on the cart cache. The origin (valkey) may never individually
+# cross theta_fire — that null FirstDeviationTime is EXPECTED (spec §1.1 known
+# gap) and is measured downstream as subgraph recall.
+# ------------------------------------------------------------
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: s1-valkey-memory-slowburn
+  namespace: otel-demo
+  labels:
+    causa/scenario: S1
+    causa/true-root: valkey-cart
+    causa/fault-class: Resource
+spec:
+  mode: all
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/name: valkey-cart
+  stressors:
+    memory:
+      workers: 1
+      # Sustained MODERATE pressure, deliberately kept below the level that would
+      # sharply cross theta_fire: S1's origin should deviate weakly/late (the null
+      # FirstDeviationTime is the expected, graded outcome). A 90% step read as an
+      # abrupt fault and risked crossing theta_fire, breaking the "null is
+      # expected" grading. A true stepped ramp needs a Chaos-Mesh Schedule that
+      # increases `size` over time (kept out of this single-CRD form on purpose).
+      size: "70%"

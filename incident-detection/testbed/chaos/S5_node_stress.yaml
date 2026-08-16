@@ -1,0 +1,33 @@
+# ============================================================
+# S5 — Infra-rooted. Stresses: cross-layer arbitration (spec §2.4). True root:
+# the k8s node. Fault class: Infra.
+#
+# CPU/mem stress on the node hosting a service → the infra node deviated first
+# and harder than the service it hosts. The layer-arbitration pass must promote
+# the node above the service. Targets ALL pods on one node via a node selector;
+# in the harness, pick the node hosting a chosen service and record it as the
+# true root.
+# ------------------------------------------------------------
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: s5-node-stress
+  namespace: otel-demo
+  labels:
+    causa/scenario: S5
+    causa/true-root: "NODE"          # harness fills the concrete node name
+    causa/fault-class: Infra
+spec:
+  mode: all
+  selector:
+    namespaces: [otel-demo]
+    # Restrict to pods on one node — the harness sets the node name.
+    nodes:
+      - "kind-worker"
+  stressors:
+    cpu:
+      workers: 4
+      load: 100
+    memory:
+      workers: 2
+      size: "60%"

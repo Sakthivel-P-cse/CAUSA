@@ -1,0 +1,15 @@
+# ============================================================
+# MinIO (for Tempo) — Development overrides
+# Ephemeral storage, small footprint, inline dev credentials.
+# ============================================================
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

@@ -1,0 +1,3 @@
+# Dev overlay for the mock Stage-2 receiver. Defaults in values.yaml are already
+# dev-appropriate; this file exists so `deploy.sh` (which passes
+# -f values.yaml -f values-dev.yaml) lints/installs cleanly.

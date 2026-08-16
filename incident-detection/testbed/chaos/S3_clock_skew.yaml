@@ -1,0 +1,57 @@
+# ============================================================
+# S3 — Clock skew. Stresses: T / causality ordering. True root: checkout.
+# Fault class: Timing — ordering robustness, NOT a classification target
+# (see contracts/ground_truth.py FaultClass.TIMING; Dev C excludes it from
+# classifier grading).
+#
+# Tests robustness of FirstDeviationTime against a skewed pod clock: the
+# trace-DAG ordering tier (ingest/ordering.py) must keep causal order correct
+# even though checkout's wall-clock is shifted out from under it.
+#
+# TWO chaos objects, BOTH `mode: all` on checkout so the same pod is hit by each
+# (checkout is single-replica in the OTel Demo, so `all` == that one pod):
+#   1. StressChaos — a real fault that makes checkout genuinely deviate, so there
+#      IS an anomaly for the ordering tier to order. Clock skew alone corrupts
+#      nothing and the scenario would test nothing (audit H3); the skew must sit
+#      on top of an actual deviation.
+#   2. TimeChaos — shifts that same pod's clock: the skew whose effect on
+#      FirstDeviationTime we are actually testing.
+# Applying this file injects BOTH; the harness polls AllInjected on each object
+# and records ONE incident (checkout / Timing) from the catalog.
+# ------------------------------------------------------------
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: s3-checkout-stress
+  namespace: otel-demo
+  labels:
+    causa/scenario: S3
+    causa/true-root: checkout
+    causa/fault-class: Timing
+spec:
+  mode: all
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/name: checkout
+  stressors:
+    cpu:
+      workers: 2
+      load: 100
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: s3-clock-skew
+  namespace: otel-demo
+  labels:
+    causa/scenario: S3
+    causa/true-root: checkout
+    causa/fault-class: Timing
+spec:
+  mode: all
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/name: checkout
+  timeOffset: "-500ms"

@@ -1,0 +1,3 @@
+# Dev overrides — single replica, plain-text password (fine for kind).
+env:
+  PGPASSWORD: "causa"

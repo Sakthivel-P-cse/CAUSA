@@ -1,0 +1,8 @@
+{
+  "_comment": "C5 GroundTruth — the chaos experiment's known root. The engine must NEVER read this before its output is scored (enforced by Postgres role grants on the live path).",
+  "incident_id": "golden-0001",
+  "true_root_node": "product-catalog",
+  "fault_class": "AppLogic",
+  "inject_start": "2026-07-16T12:03:30+00:00",
+  "inject_end": "2026-07-16T12:10:00+00:00"
+}

@@ -1,0 +1,22 @@
+# Chart.yaml file defines metadata about a Helm chart, such as its name, version, description, and dependencies. These files are essential for packaging, deploying, and managing applications and services (like Grafana, Loki, Prometheus, etc.) on Kubernetes clusters using Helm.
+apiVersion: v2
+name: minio-loki
+description: >
+  MinIO — S3-compatible object storage, DEDICATED to Grafana Loki.
+  Holds Loki's long-term metric blocks (the loki-chunks bucket).
+  This is the object-storage tier that lets Loki scale metrics
+  horizontally instead of relying on a single Prometheus TSDB.
+type: application
+version: 0.1.0
+appVersion: "RELEASE.2024-06-13"
+keywords:
+  - minio
+  - object-storage
+  - s3
+  - loki
+  - metrics
+home: https://min.io/docs/minio/kubernetes/upstream/
+sources:
+  - https://github.com/minio/minio
+maintainers:
+  - name: causa-team

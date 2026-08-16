@@ -1,0 +1,142 @@
+# ============================================================
+# OPTIONAL — Logstash + Elasticsearch side-car stack
+#
+# This manifest is NOT part of the core Causa OTLP stack
+# (Tempo / Loki / Prometheus / OTel Collector / Grafana).
+# It is kept here as an optional Elasticsearch-backed log
+# forwarder for teams that already operate an ES cluster.
+#
+# Prerequisites before applying:
+#   1. A running Elasticsearch cluster reachable at ELASTIC_HOST:ELASTIC_PORT
+#   2. Apply this file separately — it is NOT called by deploy.sh
+#
+# To deploy (standalone):
+#   kubectl apply -f k8s/extras/logstash.yaml
+#
+# To tear down:
+#   kubectl delete -f k8s/extras/logstash.yaml
+#   kubectl delete namespace monitoring
+# ============================================================
+
+# ── Namespace ───────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: causa-extras
+    causa/component: logstash
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: logstash
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      hostNetwork: false
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:8.11.0
+        securityContext:
+          runAsUser: 0
+          privileged: false
+        ports:
+          - containerPort: 8080
+            name: http
+        env:
+          - name: ELASTIC_HOST
+            value: elasticsearch
+          - name: ELASTIC_PORT
+            value: "9200"
+          - name: LOGSTASH_HTTP_PORT
+            value: "8080"
+          - name: ES_INDEX_NAME
+            value: logs
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+          - name: logstash-config
+            mountPath: /usr/share/logstash/pipeline/logstash.conf
+            subPath: logstash.conf
+          - name: container-logs
+            mountPath: /var/log/containers
+            readOnly: true
+          - name: pod-logs
+            mountPath: /var/log/pods
+            readOnly: true
+      volumes:
+        - name: logstash-config
+          configMap:
+            name: logstash-config
+        - name: container-logs
+          hostPath:
+            path: /var/log/containers
+            type: Directory
+        - name: pod-logs
+          hostPath:
+            path: /var/log/pods
+            type: Directory
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: monitoring
+data:
+  logstash.conf: |
+    input {
+      file {
+        path => "/var/log/containers/*.log"
+        start_position => "beginning"
+        codec => multiline {
+          pattern => "^\d{4}-\d{2}-\d{2}"
+          negate => true
+          what => "previous"
+        }
+      }
+
+      http {
+        port => ${LOGSTASH_HTTP_PORT}
+        codec => json
+      }
+    }
+
+    filter {
+      if [message] {
+        json {
+          source => "message"
+          target => "log_data"
+          skip_on_invalid_json => true
+        }
+      }
+
+      mutate {
+        add_field => { "node" => "${NODE_NAME}" }
+        add_field => { "source_type" => "container_logs" }
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => ["${ELASTIC_HOST}:${ELASTIC_PORT}"]
+        index => "${ES_INDEX_NAME}-%{+YYYY.MM.dd}"
+      }
+    }
+

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: causa-ingest
+description: Causa Dev-A ingestion trigger — Alertmanager webhook receiver that opens incident windows and records incident state (runs in front of Stage-2 RCA)
+type: application
+version: 1.0.0
+appVersion: "0.1.0"

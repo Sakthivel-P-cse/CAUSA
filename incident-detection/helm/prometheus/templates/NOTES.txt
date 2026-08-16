@@ -1,0 +1,22 @@
+Prometheus has been deployed successfully!
+
+Component: Prometheus (Metrics Backend)
+Namespace:  {{ .Release.Namespace }}
+Version:    {{ .Values.image.tag }}
+
+Service Endpoint (ClusterIP — internal only):
+  HTTP API:  prometheus.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}
+
+Verify deployment:
+  kubectl -n {{ .Release.Namespace }} get pods
+  kubectl -n {{ .Release.Namespace }} logs deploy/prometheus
+
+Grafana Datasource URL (use this in Grafana):
+  http://prometheus.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.ports.http }}
+
+Port-forward for local UI access:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/prometheus {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }}
+  Open http://localhost:{{ .Values.service.ports.http }} in your browser
+
+Reload config without restart:
+  curl -X POST http://localhost:{{ .Values.service.ports.http }}/-/reload

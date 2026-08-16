@@ -1,0 +1,12 @@
+# ============================================================
+# kube-state-metrics — Development overrides
+# Minimal resources for local/dev cluster
+# ============================================================
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

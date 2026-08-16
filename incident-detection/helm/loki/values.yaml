@@ -1,0 +1,84 @@
+# ============================================================
+# Loki — Default values (shared across all environments)
+# Override with values-dev.yaml or values-prod.yaml
+# ============================================================
+
+replicaCount: 1
+
+image:
+  repository: grafana/loki
+  tag: "2.9.4"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "loki"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 3100     # Loki HTTP API (push + query)
+    grpc: 9096     # Loki gRPC (internal)
+
+config:
+  # Auth disabled for simplicity; enable in prod with a reverse proxy
+  auth_enabled: false
+
+  # Storage backend: 'filesystem' | 's3' | 'gcs'
+  # dev default is filesystem. prod overrides to s3 (see values-prod.yaml).
+  backend: filesystem
+
+  # ── Object storage (S3 → MinIO-Loki) — used when backend: s3 ──────
+  # Points at the dedicated minio-loki instance and its bucket.
+  # dev  → plain access/secret keys below (only used when backend: s3).
+  # prod → existingSecret (see values-prod.yaml).
+  storage:
+    bucket: "loki-chunks"
+    endpoint: "minio-loki.minio-loki.svc.cluster.local:9000"
+    region: "us-east-1"     # arbitrary for MinIO; must be non-empty
+    insecure: true          # in-cluster plain HTTP to MinIO
+    accessKey: "minio"
+    secretKey: "minio_dev_pass"
+    existingSecret: ""      # prod: set to pre-created Secret name
+    accessKeyKey: "root-user"
+    secretKeyKey: "root-password"
+
+  # How long to retain log chunks
+  retention: 24h
+
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9096
+
+  # Limits applied across all tenants
+  limits_config:
+    retention_period: 24h
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+    max_query_length: 0h
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: false
+  storageClassName: ""
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

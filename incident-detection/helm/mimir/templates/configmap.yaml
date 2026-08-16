@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mimir.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mimir.labels" . | nindent 4 }}
+data:
+  mimir.yaml: |
+    # =================================================================
+    # Grafana Mimir — monolithic (single-binary) configuration
+    #
+    # Prometheus ─remote_write─→ :8080 (distributor)
+    #                                 │
+    #                            [ingester → compactor]
+    #                                 │
+    #                      blocks_storage: S3 → MinIO (minio-mimir)
+    #
+    # Credentials come from env vars (S3_ACCESS_KEY / S3_SECRET_KEY),
+    # expanded at load time via -config.expand-env=true.
+    # =================================================================
+
+    # Multi-tenancy: require X-Scope-OrgID on every request.
+    multitenancy_enabled: {{ .Values.config.multitenancyEnabled }}
+
+    server:
+      http_listen_port: {{ .Values.service.ports.http }}
+      grpc_listen_port: {{ .Values.service.ports.grpc }}
+      log_level: info
+
+    # Single-node ring: everything lives in one process.
+    common:
+      storage:
+        backend: s3
+        s3:
+          endpoint: {{ .Values.config.storage.endpoint }}
+          bucket_name: {{ .Values.config.storage.bucket }}
+          region: {{ .Values.config.storage.region }}
+          insecure: {{ .Values.config.storage.insecure }}
+          access_key_id: "${S3_ACCESS_KEY}"
+          secret_access_key: "${S3_SECRET_KEY}"
+
+    blocks_storage:
+      s3:
+        bucket_name: {{ .Values.config.storage.bucket }}
+      tsdb:
+        dir: {{ .Values.config.dataDir }}/tsdb
+      bucket_store:
+        sync_dir: {{ .Values.config.dataDir }}/tsdb-sync
+
+    compactor:
+      data_dir: {{ .Values.config.dataDir }}/compactor
+      sharding_ring:
+        kvstore:
+          store: memberlist
+
+    ingester:
+      ring:
+        replication_factor: 1
+        kvstore:
+          store: memberlist
+
+    distributor:
+      ring:
+        kvstore:
+          store: memberlist
+
+    ruler_storage:
+      backend: s3
+      s3:
+        bucket_name: {{ .Values.config.storage.bucket }}
+
+    # Ingestion guardrails.
+    limits:
+      max_label_names_per_series: {{ .Values.config.limits.maxLabelNamesPerSeries }}
+      ingestion_rate: {{ .Values.config.limits.ingestionRate }}
+      ingestion_burst_size: {{ .Values.config.limits.ingestionBurstSize }}
+      max_global_series_per_user: {{ .Values.config.limits.maxGlobalSeriesPerUser }}
+      compactor_blocks_retention_period: {{ .Values.config.limits.compactorBlocksRetentionPeriod | quote }}

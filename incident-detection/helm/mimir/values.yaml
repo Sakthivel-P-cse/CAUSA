@@ -1,0 +1,85 @@
+# ============================================================
+# Grafana Mimir (monolithic) — Default values
+# Override with values-dev.yaml or values-prod.yaml
+#
+# Runs all Mimir components in one process (-target=all). Receives
+# Prometheus remote_write on :8080 and persists metric blocks to
+# MinIO via the S3 API.
+# ============================================================
+
+replicaCount: 1
+
+image:
+  repository: grafana/mimir
+  tag: "2.12.0"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: "mimir"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 8080      # HTTP: remote_write push, query API, /ready, /metrics
+    grpc: 9095      # gRPC (internal component comms)
+
+config:
+  # Local disk paths (ingester WAL, compactor scratch, tsdb cache).
+  # Blocks are flushed to object storage; this is transient working set.
+  dataDir: /data
+
+  # ── Object storage (S3 → MinIO) ─────────────────────────────────
+  # Points at the dedicated minio-mimir instance and its bucket.
+  storage:
+    bucket: "mimir-blocks"
+    endpoint: "minio-mimir.minio-mimir.svc.cluster.local:9000"
+    region: "us-east-1"     # arbitrary for MinIO; must be non-empty
+    insecure: true          # in-cluster plain HTTP to MinIO
+    # S3 access/secret key = MinIO root creds.
+    #   dev  → plain values below.
+    #   prod → existingSecret (see values-prod.yaml).
+    accessKey: "minio"
+    secretKey: "minio_dev_pass"
+    existingSecret: ""
+    accessKeyKey: "root-user"
+    secretKeyKey: "root-password"
+
+  # ── Multi-tenancy ───────────────────────────────────────────────
+  # When enabled, every request must carry X-Scope-OrgID. Prometheus
+  # remote_write sends "causa" (see prometheus/values-prod.yaml).
+  multitenancyEnabled: true
+
+  # ── Limits (guardrails for ingestion) ───────────────────────────
+  limits:
+    maxLabelNamesPerSeries: 30
+    ingestionRate: 100000
+    ingestionBurstSize: 200000
+    maxGlobalSeriesPerUser: 1000000
+    compactorBlocksRetentionPeriod: "0s"   # 0 = keep forever (dev)
+
+persistence:
+  enabled: false
+  storageClassName: ""
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

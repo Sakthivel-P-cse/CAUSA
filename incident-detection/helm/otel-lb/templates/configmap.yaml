@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "otel-lb.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "otel-lb.labels" . | nindent 4 }}
+data:
+  otel-lb-config.yaml: |
+    # =================================================================
+    # OpenTelemetry Collector — LOAD-BALANCER pipeline
+    #
+    # Flow (traces only):
+    #   agents ─OTLP─→ [otel-lb] ─loadbalancing(traceID)─→ gateway pods
+    #
+    # The loadbalancingexporter hashes each span's trace ID onto a ring
+    # of gateway pod IPs (discovered live via the k8s resolver). Every
+    # span with the same trace ID therefore lands on the SAME gateway
+    # pod, which is the precondition for tail_sampling to see whole
+    # traces when the gateway runs >1 replica.
+    #
+    # Metrics and logs do NOT flow through here — agents send those
+    # straight to the gateway Service (round-robin is fine for them).
+    # =================================================================
+
+    extensions:
+      health_check:
+        endpoint: "0.0.0.0:{{ .Values.service.ports.healthCheck }}"
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: {{ .Values.config.receivers.otlp.grpcEndpoint }}
+          http:
+            endpoint: {{ .Values.config.receivers.otlp.httpEndpoint }}
+
+    processors:
+      memory_limiter:
+        check_interval: {{ .Values.config.processors.memoryLimiter.checkInterval }}
+        limit_mib: {{ .Values.config.processors.memoryLimiter.limitMib }}
+        spike_limit_mib: {{ .Values.config.processors.memoryLimiter.spikeLimitMib }}
+
+      batch:
+        send_batch_size: {{ .Values.config.processors.batch.sendBatchSize }}
+        timeout: {{ .Values.config.processors.batch.timeout }}
+
+    exporters:
+      # Route spans to gateway pods by trace ID. The k8s resolver watches
+      # the gateway Service's Endpoints and rebuilds the ring as pods
+      # scale under the HPA — no restart needed.
+      loadbalancing:
+        routing_key: traceID
+        protocol:
+          otlp:
+            tls:
+              insecure: {{ .Values.gateway.tls.insecure }}
+        resolver:
+          k8s:
+            service: {{ .Values.gateway.service }}.{{ .Values.gateway.namespace }}
+            ports:
+              - {{ .Values.gateway.port }}
+
+      debug:
+        verbosity: {{ .Values.config.exporters.debug.verbosity }}
+
+    service:
+      extensions: [health_check]
+      pipelines:
+        # Traces only: OTLP → memory guard → batch → trace-ID load balance
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [loadbalancing, debug]
+
+      telemetry:
+        metrics:
+          address: "0.0.0.0:{{ .Values.service.ports.metrics }}"
+        logs:
+          level: info

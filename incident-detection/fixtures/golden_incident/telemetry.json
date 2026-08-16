@@ -1,0 +1,27 @@
+{
+  "incident_id": "golden-0001",
+  "alerted_service": "frontend",
+  "window_start": "2026-07-16T12:00:00+00:00",
+  "window_end": "2026-07-16T12:11:00+00:00",
+  "trace_id": "0af7651916cd43dd8448eb211c80319c",
+  "services": [
+    "frontend",
+    "checkout",
+    "product-catalog",
+    "currency",
+    "cart",
+    "valkey-cart"
+  ],
+  "edges": [
+    { "src": "frontend",        "dst": "checkout",        "call_type": "sync"  },
+    { "src": "frontend",        "dst": "product-catalog", "call_type": "sync"  },
+    { "src": "frontend",        "dst": "cart",            "call_type": "sync"  },
+    { "src": "checkout",        "dst": "product-catalog", "call_type": "sync"  },
+    { "src": "checkout",        "dst": "currency",        "call_type": "sync"  },
+    { "src": "cart",            "dst": "valkey-cart",     "call_type": "sync"  },
+    { "src": "checkout",        "dst": "cart",            "call_type": "async" },
+    { "src": "node-worker-1",   "dst": "product-catalog", "call_type": "runs-on" },
+    { "src": "node-worker-1",   "dst": "cart",            "call_type": "runs-on" },
+    { "src": "node-worker-2",   "dst": "valkey-cart",     "call_type": "runs-on" }
+  ]
+}

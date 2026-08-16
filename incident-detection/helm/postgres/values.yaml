@@ -1,0 +1,44 @@
+# ============================================================
+# postgres/values.yaml — Default (dev) values
+# ============================================================
+
+image:
+  repository: postgres
+  tag: "16-alpine"
+  pullPolicy: IfNotPresent
+
+# Database credentials — override per environment
+auth:
+  database: causa
+  username: causa
+  # Plain-text password used only in dev.
+  # In prod this field is ignored; secret must be pre-created.
+  password: "causa_dev_pass"
+  # Name of a pre-existing Kubernetes Secret that carries
+  # POSTGRES_PASSWORD (optional — used in prod).
+  existingSecret: ""
+  existingSecretKey: "postgres-password"
+
+service:
+  type: ClusterIP
+  port: 5432
+
+persistence:
+  enabled: false         # disabled by default in dev
+  size: 5Gi
+  storageClassName: ""   # uses cluster default StorageClass
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Liveness / readiness probe settings
+probes:
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6

@@ -1,0 +1,11 @@
+# ============================================================
+# node-exporter — Development overrides
+# ============================================================
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 20Mi
+  limits:
+    cpu: 100m
+    memory: 50Mi

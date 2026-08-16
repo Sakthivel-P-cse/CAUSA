@@ -1,0 +1,23 @@
+# ============================================================
+# OTel LB — Development environment overrides
+# Single replica, smaller resources, plaintext to gateway.
+# ============================================================
+
+replicaCount: 1
+
+config:
+  processors:
+    batch:
+      sendBatchSize: 512
+      timeout: 2s
+    memoryLimiter:
+      limitMib: 150
+      spikeLimitMib: 48
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

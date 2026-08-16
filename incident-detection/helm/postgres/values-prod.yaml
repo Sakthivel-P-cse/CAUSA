@@ -1,0 +1,24 @@
+# ============================================================
+# postgres/values-prod.yaml — Production overrides
+# ============================================================
+
+auth:
+  password: ""             # Must NOT be set here in prod.
+  # Pre-create the Secret before deploying:
+  #   kubectl -n postgres create secret generic postgres-secret \
+  #     --from-literal=postgres-password='<STRONG_PASSWORD>'
+  existingSecret: "postgres-secret"
+  existingSecretKey: "postgres-password"
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClassName: ""     # set STORAGE_CLASS env or override here
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
