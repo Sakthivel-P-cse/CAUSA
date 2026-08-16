@@ -1,3 +1,0 @@
-# values-dev.yaml — development overrides for stage2-rca
-env:
-  POSTGRES_PASSWORD: "causa_dev_pass"
