@@ -49,10 +49,16 @@ jobs:
               break
             fi
           done
+          if [ ! -f "demo-bugs/$SVC/Dockerfile" ] && [ ! -f "src/$SVC/Dockerfile" ]; then
+            echo "::notice::Skipping automatic image build for $SVC (no Dockerfile build context)"
+            echo "service=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "service=$SVC" >> "$GITHUB_OUTPUT"
 
   build-push:
     needs: detect
+    if: needs.detect.outputs.service != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
