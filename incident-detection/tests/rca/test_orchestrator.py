@@ -99,8 +99,8 @@ def test_orchestrator_loads_exact_window_scores_and_persists():
     assert result.candidates
     assert store.saved[0][3] is result
     assert {output.node for output in store.saved[0][2]} == {"checkout", "database"}
-    assert reader.calls[0]["around"] == NOW + timedelta(minutes=10)
-    assert reader.calls[0]["lookback_minutes"] == 10
+    assert reader.calls[0]["window_start"] == state.window_start
+    assert reader.calls[0]["window_end"] == state.window_end
     assert reader.calls[0]["preferred_trace_id"] == "trace-1"
     assert reader.closed
     assert result.fault_class is not None or result.candidates
@@ -140,3 +140,38 @@ def test_orchestrator_empty_baselines_loud_abstain():
     assert result.candidates == []
     assert store.saved
     assert not reader.calls
+
+
+def test_load_telemetry_preserves_short_and_fractional_windows_and_closes():
+    from types import SimpleNamespace
+
+    for duration in (timedelta(seconds=30), timedelta(seconds=90), timedelta(minutes=11)):
+        state = SimpleNamespace(incident_id='i', alerted_service='svc', namespace=None,
+                                window_start=NOW, window_end=NOW + duration, trace_id=None)
+        reader = _Reader(None)
+        RCAOrchestrator(_Store(None, {}), reader_factory=lambda: reader)._load_telemetry(state)
+        assert reader.calls[0]['window_start'] == NOW
+        assert reader.calls[0]['window_end'] == NOW + duration
+        assert reader.closed
+
+
+def test_load_telemetry_rejects_invalid_window_and_closes_on_reader_failure():
+    from types import SimpleNamespace
+    import pytest
+
+    state = SimpleNamespace(incident_id='i', alerted_service='svc', namespace=None,
+                            window_start=NOW, window_end=NOW, trace_id=None)
+    reader = _Reader(None)
+    orchestrator = RCAOrchestrator(_Store(None, {}), reader_factory=lambda: reader)
+    for start, end in ((None, NOW), (NOW, NOW), (NOW, NOW - timedelta(seconds=1))):
+        state.window_start, state.window_end = start, end
+        with pytest.raises(ValueError):
+            orchestrator._load_telemetry(state)
+    assert not reader.calls
+    state.window_start, state.window_end = NOW, NOW + timedelta(seconds=30)
+    def fail(**kwargs):
+        raise RuntimeError('read failed')
+    reader.read_incident_window = fail
+    with pytest.raises(RuntimeError, match='read failed'):
+        orchestrator._load_telemetry(state)
+    assert reader.closed

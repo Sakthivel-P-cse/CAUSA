@@ -23,6 +23,10 @@ Production startup intentionally fails when remediation Postgres persistence is
 unavailable. The JSON remediation store is permitted only for explicit
 single-process development via `CAUSA_REMEDIATION_ALLOW_FILE_STORE=1`.
 
+Dashboard acknowledgment state also requires its schema/grants migration before
+rollout. Preserve legacy state and use the checked import procedure in
+[`docs/operator-state-upgrade.md`](docs/operator-state-upgrade.md).
+
 ## Reporting vulnerabilities
 
 Report vulnerabilities privately to the repository owners. Include affected

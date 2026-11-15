@@ -124,6 +124,13 @@ spec:
               CREATE INDEX IF NOT EXISTS idx_incidents_status
                   ON incidents (status);
 
+              CREATE TABLE IF NOT EXISTS dashboard_incident_state (
+                  incident_key TEXT PRIMARY KEY,
+                  acked_at TIMESTAMPTZ NOT NULL,
+                  acked_by TEXT NOT NULL,
+                  snoozed_until TIMESTAMPTZ
+              );
+
               CREATE TABLE IF NOT EXISTS anomaly_baseline (
                   node        TEXT,
                   metric      TEXT,

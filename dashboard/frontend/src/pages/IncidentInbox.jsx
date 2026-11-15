@@ -36,9 +36,21 @@ export default function IncidentInbox() {
   const [selected, setSelected] = useState(() => new Set())
   const [cursor, setCursor] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [now] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
   const limit = 25
   const streamStatus = useIncidentStream(true)
+  const relativeWindowActive = !(filters.from && filters.to) && Boolean(filters.minutes)
+
+  useEffect(() => {
+    if (!relativeWindowActive) return undefined
+    let timeout
+    const tick = () => {
+      setNow(Date.now())
+      timeout = window.setTimeout(tick, 60_000 - Date.now() % 60_000)
+    }
+    tick()
+    return () => window.clearTimeout(timeout)
+  }, [relativeWindowActive])
 
   const timeWindow = useMemo(() => {
     if (filters.from && filters.to) {

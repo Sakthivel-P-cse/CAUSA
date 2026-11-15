@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from dashboard.backend.ack_store import (
     ack_incident,
+    get_acks,
     lifecycle_for,
     merge_ack_fields,
     snooze_incident,
@@ -18,7 +19,7 @@ from dashboard.backend.ack_store import (
 from dashboard.backend.app_scope import is_app_scope_incident
 from dashboard.backend.dependencies import get_store
 from dashboard.backend.db import DashboardStore
-from dashboard.backend.errors import api_error
+from dashboard.backend.errors import api_error, raise_database_error
 
 router = APIRouter()
 
@@ -99,8 +100,8 @@ def _facets(items: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     }
 
 
-def _list_item(item: dict[str, Any]) -> dict[str, Any]:
-    merged = merge_ack_fields(item)
+def _list_item(item: dict[str, Any], acks: dict[str, Any] | None = None) -> dict[str, Any]:
+    merged = merge_ack_fields(item, acks)
     return {
         "id": merged.get("id"),
         "incident_id": merged.get("incident_id"),
@@ -174,7 +175,8 @@ def list_incidents(
     else:
         filtered.sort(key=lambda x: x.get("triggered_at") or "", reverse=True)
     page = filtered[offset : offset + limit]
-    return {"items": [_list_item(i) for i in page], "total": len(filtered), "facets": facets}
+    acks = get_acks()
+    return {"items": [_list_item(i, acks) for i in page], "total": len(filtered), "facets": facets}
 
 
 @router.get("/history")
@@ -205,10 +207,11 @@ def list_history(
         )
     ]
     page = filtered[offset : offset + limit]
+    acks = get_acks()
     return {
         "items": [
             {
-                **_list_item(i),
+                **_list_item(i, acks),
                 "window_start": i.get("window_start"),
                 "window_end": i.get("window_end"),
             }
@@ -249,7 +252,8 @@ async def stream_incidents(request: Request, store: DashboardStore = Depends(get
         while True:
             if await request.is_disconnected():
                 break
-            items = [_list_item(i) for i in store.list_incidents_joined()[:50]]
+            acks = get_acks()
+            items = [_list_item(i, acks) for i in store.list_incidents_joined()[:50]]
             active = [i for i in items if i.get("lifecycle") in {"active", "investigating"}]
             payload = json.dumps({"active": len(active), "items": active[:20]})
             if payload != last:
@@ -302,7 +306,10 @@ def post_ack(
         raise api_error(404, "not_found", "Report not found")
     key = str(item.get("incident_id") or item.get("id") or report_id)
     by = str((body or {}).get("acked_by") or "operator")
-    row = ack_incident(key, by=by)
+    try:
+        row = ack_incident(key, by=by)
+    except Exception as exc:
+        raise_database_error("acknowledge incident", exc)
     return {"status": "ok", "incident_id": key, "lifecycle": "investigating", **row}
 
 
@@ -318,7 +325,10 @@ def post_snooze(
     key = str(item.get("incident_id") or item.get("id") or report_id)
     minutes = int((body or {}).get("minutes") or 60)
     by = str((body or {}).get("acked_by") or "operator")
-    row = snooze_incident(key, minutes=minutes, by=by)
+    try:
+        row = snooze_incident(key, minutes=minutes, by=by)
+    except Exception as exc:
+        raise_database_error("snooze incident", exc)
     return {"status": "ok", "incident_id": key, "lifecycle": "investigating", **row}
 
 
@@ -332,7 +342,12 @@ def post_feedback(
     if verdict not in {"accepted", "rejected"}:
         raise api_error(422, "invalid_verdict", "verdict must be accepted or rejected")
     notes = body.get("notes")
-    updated = store.update_feedback(report_id, verdict=verdict, notes=notes)
+    try:
+        updated = store.update_feedback(report_id, verdict=verdict, notes=notes)
+    except Exception as exc:
+        raise_database_error("write feedback", exc)
+    if updated is None:
+        raise api_error(404, "not_found", "Report not found")
     return {
         "status": "ok",
         "report_id": report_id,

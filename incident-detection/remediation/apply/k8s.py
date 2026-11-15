@@ -50,7 +50,14 @@ def _plan_spec(plan_row: dict[str, Any]) -> TypedPlanSpec | None:
     if not isinstance(raw, dict):
         return None
     try:
-        return TypedPlanSpec.from_dict(raw)
+        spec = TypedPlanSpec.from_dict(raw)
+        context = os.getenv("CONTEXT") or os.getenv("KUBECTL_CONTEXT")
+        if not context:
+            code, out, _ = _kubectl(["config", "current-context"])
+            context = out.strip() if code == 0 else ""
+        if not context or context != spec.target.cluster:
+            raise ValueError("execution context differs from approved target; re-propose plan")
+        return spec
     except Exception as exc:  # noqa: BLE001
         logger.warning("invalid plan_spec: %s", exc)
         return None
@@ -154,7 +161,7 @@ def apply_exact_flagd_patch(plan_row: dict[str, Any], *, use_inverse: bool = Fal
     flag_key = str(change.get("flag_key") or "")
     desired = change.get("defaultVariant")
     expected_rv = str(change.get("resource_version") or spec.change.patch.get("resource_version") or "")
-    if not flag_key or desired is None:
+    if not flag_key or desired is None or not expected_rv or spec.target.name != FLAGD_CM or spec.target.kind != "ConfigMap":
         return {"attempted": False, "reason": "plan does not name exact flag_key/defaultVariant"}
     ns = spec.target.namespace or DEFAULT_NS
     live = read_flagd_config(ns)
@@ -172,8 +179,11 @@ def apply_exact_flagd_patch(plan_row: dict[str, Any], *, use_inverse: bool = Fal
     flags = doc.setdefault("flags", {})
     if flag_key not in flags or not isinstance(flags[flag_key], dict):
         return {"attempted": True, "mode": "flagd_config_patch", "status": "failed", "error": "flag missing"}
+    if use_inverse and flags[flag_key].get("defaultVariant") != spec.change.patch.get("defaultVariant"):
+        return {"attempted": False, "status": "failed", "error": "flag changed after apply; inverse refused"}
     flags[flag_key]["defaultVariant"] = desired
     patch_body = {
+        "metadata": {"resourceVersion": live["resource_version"]},
         "data": {FLAGD_KEY: json.dumps(doc, indent=2)},
     }
     code, out, err = _kubectl(
@@ -279,7 +289,9 @@ def read_workload_revision(name: str, namespace: str = DEFAULT_NS) -> dict[str, 
 
 def apply_dependency_rollback(plan_row: dict[str, Any]) -> dict[str, Any]:
     spec = _plan_spec(plan_row)
-    node = (spec.candidate_node if spec else None) or str(plan_row.get("candidate_node") or "")
+    if not spec or spec.action != "rollback_to_last_good":
+        return {"attempted": False, "status": "failed", "error": "missing or invalid rollback plan; re-propose"}
+    node = spec.candidate_node
     allowed = allowlist()
     if not node or (allowed and node not in allowed):
         return {"attempted": False, "reason": f"{node or 'missing'} not in allowlist"}
@@ -334,28 +346,28 @@ def apply_resource_patch(plan_row: dict[str, Any], *, use_inverse: bool = False)
     if not spec or spec.action != "scale_up":
         return {"attempted": False, "reason": "missing scale_up plan_spec"}
     change = spec.change.inverse if use_inverse else spec.change.patch
-    ns = spec.target.namespace
-    name = spec.target.name
     replicas = change.get("replicas")
-    resources = change.get("resources")
-    results: list[dict[str, Any]] = []
-    if replicas is not None:
-        code, out, err = _kubectl(["scale", f"deploy/{name}", f"--replicas={int(replicas)}", "-n", ns])
-        results.append({"op": "scale", "ok": code == 0, "stderr": err[:200]})
-    if resources:
-        patch = {"spec": {"template": {"spec": {"containers": [{"name": spec.target.container or name, "resources": resources}]}}}}
-        code, out, err = _kubectl(
-            ["patch", "deploy", name, "-n", ns, "--type", "strategic", "-p", json.dumps(patch)]
-        )
-        results.append({"op": "resources", "ok": code == 0, "stderr": err[:200]})
-    ok = all(r.get("ok") for r in results) if results else False
-    return {
-        "attempted": True,
-        "mode": "resource_patch",
-        "status": "succeeded" if ok else "failed",
-        "inverse": use_inverse,
-        "results": results,
-    }
+    expected = spec.change.patch.get("replicas") if use_inverse else spec.change.inverse.get("replicas")
+    expected_rv = ((plan_row.get("apply_result") or {}).get("resource_version_after")
+                   if use_inverse else spec.change.patch.get("resource_version"))
+    if (spec.target.kind != "Deployment" or not expected_rv
+            or type(replicas) is not int or replicas < 0 or type(expected) is not int
+            or (not use_inverse and (replicas <= expected or replicas > int(os.getenv("REMEDIATION_MAX_REPLICAS", "5"))))
+            or spec.change.patch.get("resources") != spec.change.inverse.get("resources")):
+        return {"attempted": False, "status": "failed", "error": "unsafe or legacy scale plan; re-propose"}
+    live = read_workload_revision(spec.target.name, spec.target.namespace)
+    if live.get("kind") != "Deployment" or live.get("replicas") != expected or live.get("resource_version") != expected_rv:
+        return {"attempted": False, "status": "failed", "error": "workload changed; stale scale plan refused"}
+    patch = {"metadata": {"resourceVersion": expected_rv}, "spec": {"replicas": replicas}}
+    code, out, err = _kubectl(["patch", "deploy", spec.target.name, "-n", spec.target.namespace,
+                              "--type", "merge", "-p", json.dumps(patch), "-o", "json"])
+    try:
+        after_rv = (json.loads(out).get("metadata") or {}).get("resourceVersion") if code == 0 else None
+    except (ValueError, TypeError):
+        after_rv = None
+    return {"attempted": True, "mode": "resource_patch", "status": "succeeded" if code == 0 else "failed",
+            "inverse": use_inverse, "resource_version_after": after_rv,
+            "results": [{"op": "scale", "ok": code == 0, "stderr": err[:200]}]}
 
 
 def apply_restart_workload(plan_row: dict[str, Any]) -> dict[str, Any]:

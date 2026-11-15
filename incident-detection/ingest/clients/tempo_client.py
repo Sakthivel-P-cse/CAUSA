@@ -114,6 +114,9 @@ class TempoClient:
         service: str | None,
         lookback_minutes: int = 10,
         limit: int = 5,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
     ) -> list[str]:
         """Search Tempo for recent ERROR trace IDs from a service (most recent first).
 
@@ -121,8 +124,13 @@ class TempoClient:
         span intrinsic, not a searchable attribute, so `tags=status=error` matches
         nothing and the "error trace" search silently degrades to empty (audit M7).
         """
-        end = _utcnow()
-        start = end - timedelta(minutes=lookback_minutes)
+        if (start is None) != (end is None):
+            raise ValueError("start and end must be supplied together")
+        if start is None:
+            end = _utcnow()
+            start = end - timedelta(minutes=lookback_minutes)
+        if end <= start:
+            raise ValueError("invalid search window")
         selectors = ["status = error"]
         if service:
             selectors.append(f'resource.service.name = "{_traceql_string(service)}"')

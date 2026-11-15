@@ -38,7 +38,7 @@ export default function Statistics() {
     x: Number(p.predicted),
     y: Number(p.correct),
   })), [data])
-  const remRate = data?.auto_remediation_rate
+  const remRate = data?.remediation_success_rate
 
   return (
     <div className="explorer-page">
@@ -49,7 +49,7 @@ export default function Statistics() {
           <div className="explorer-stat-grid">
             <div className="explorer-stat"><span>MTTA</span><strong>{formatDuration(data?.mtta_seconds)}</strong></div>
             <div className="explorer-stat"><span>MTTR</span><strong>{formatDuration(data?.mttr_seconds)}</strong></div>
-            <div className="explorer-stat"><span>Auto-rem success</span><strong>{remRate == null ? '—' : `${Math.round(remRate * 100)}%`}</strong></div>
+            <div className="explorer-stat"><span>Remediation success</span><strong>{remRate == null ? '—' : `${Math.round(remRate * 100)}%`}</strong></div>
             <div className="explorer-stat">
               <span>Mean ranking confidence</span>
               <strong>{data?.avg_confidence != null ? Number(data.avg_confidence).toFixed(3) : '—'}</strong>

@@ -155,7 +155,7 @@ export default function Overview() {
   const alertList = alerts.data || []
   const degraded = heatServices.filter(s => s.health && s.health !== 'green').length
   const critical = activeItems.filter(i => incidentSeverity(i) === 'critical').length
-  const remRate = stats.data?.auto_remediation_rate
+  const remRate = stats.data?.remediation_success_rate
   const awaiting = remStats.data?.awaiting_review || 0
 
   return (
@@ -176,7 +176,7 @@ export default function Overview() {
           <strong>{formatDuration(stats.data?.mttr_seconds)}</strong>
         </div>
         <div className="kpi-tile">
-          <span>Auto-rem rate</span>
+          <span>Remediation success</span>
           <strong>{remRate == null ? '—' : `${Math.round(remRate * 100)}%`}</strong>
         </div>
         <div className="kpi-tile">

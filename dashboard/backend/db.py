@@ -115,10 +115,7 @@ class DashboardStore:
 
     def list_incidents_joined(self) -> list[dict[str, Any]]:
         if self._use_pg:
-            try:
-                return self._pg_list_joined()
-            except Exception as exc:
-                logger.warning("postgres unavailable, falling back to files: %s", exc)
+            return self._pg_list_joined()
         return self._file_list_joined()
 
     def _file_list_joined(self) -> list[dict[str, Any]]:
@@ -212,26 +209,19 @@ class DashboardStore:
         *,
         verdict: str,
         notes: str | None,
-    ) -> dict[str, Any]:
-        now = datetime.utcnow().isoformat() + "Z"
-        if self._use_pg:
-            try:
-                with self._connect() as conn:
-                    conn.execute(
-                        """
-                        UPDATE rca_reports
-                        SET feedback_verdict = %s,
-                            feedback_notes = %s,
-                            feedback_updated_at = NOW()
-                        WHERE id::text = %s OR incident_id = %s
-                        """,
-                        (verdict, notes, report_id, report_id),
-                    )
-            except Exception as exc:
-                logger.warning("feedback write failed: %s", exc)
-        item = self.get_report(report_id) or {"id": report_id}
-        item["feedback"] = {"verdict": verdict, "notes": notes, "updated_at": now}
-        return item
+    ) -> dict[str, Any] | None:
+        if not self._use_pg:
+            raise RuntimeError("Feedback requires PostgreSQL")
+        with self._connect() as conn:
+            row = conn.execute(
+                """UPDATE rca_reports SET feedback_verdict = %s, feedback_notes = %s,
+                   feedback_updated_at = NOW() WHERE id::text = %s OR incident_id = %s
+                   RETURNING feedback_updated_at""",
+                (verdict, notes, report_id, report_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return {"feedback": {"verdict": verdict, "notes": notes, "updated_at": _iso(row[0])}}
 
     def _normalize_incident_only(self, inc: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -303,7 +293,7 @@ class DashboardStore:
             "layer": refs.get("layer"),
             "slo_target": refs.get("slo_target"),
             "severity": (report.get("severity") or inc.get("severity") or "info").lower(),
-            "incident_status": inc.get("status") or ("resolved" if report.get("resolved_at") else "open"),
+            "incident_status": inc.get("status") or report.get("status") or ("resolved" if report.get("resolved_at") else "open"),
             "confidence_score": report.get("confidence_score"),
             "root_cause_summary": report.get("root_cause_summary"),
             "trace_id": report.get("trace_id") or inc.get("trace_id"),

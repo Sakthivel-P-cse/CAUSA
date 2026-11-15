@@ -114,6 +114,8 @@ def execute_plan(
 
     try:
         spec = TypedPlanSpec.from_dict(raw_spec)
+        if not 0 < spec.slo_gates.window_seconds <= spec.timeout_seconds:
+            raise ValueError("observation window must be positive and within plan timeout")
     except Exception as exc:  # noqa: BLE001
         result = {"attempted": False, "status": "failed", "error": f"invalid plan_spec: {exc}"}
         set_status("failed", result)
@@ -137,7 +139,7 @@ def execute_plan(
         success_rate_min=max(0.0, spec.slo_gates.success_rate_min - 0.5),
         require_fresh=spec.slo_gates.require_fresh,
     )
-    if not pre_eval["pass"] and spec.slo_gates.require_fresh and not pre.fresh:
+    if spec.slo_gates.require_fresh and pre_eval.get("verified") is False:
         result = {
             "attempted": False,
             "status": "failed",
@@ -152,6 +154,7 @@ def execute_plan(
         raise RuntimeError(f"worker {worker_id} lost lease before executing {plan_id}")
     apply_result = _dispatch_execute(plan_row, spec)
     store.add_event(plan_id, "execute", apply_result)
+    plan_row["apply_result"] = apply_result
     if not apply_result.get("attempted"):
         set_status("failed", apply_result)
         return apply_result
@@ -178,6 +181,12 @@ def execute_plan(
         plan_row["details"] = details
         set_status("succeeded", apply_result)
         store.add_event(plan_id, "succeeded", apply_result)
+        return apply_result
+
+    if observe.get("verified") is False:
+        apply_result["status"] = "failed"
+        apply_result["error"] = "remediation outcome unverified; operator review required"
+        set_status("failed", apply_result)
         return apply_result
 
     rb = _dispatch_rollback(plan_row, spec)
@@ -239,14 +248,15 @@ def _observe(spec, plan_row: dict[str, Any]) -> dict[str, Any]:
         watched = watch_rollout(target.name, target.namespace, timeout_s=min(spec.timeout_seconds, 300))
         if not watched.get("ok"):
             return {"pass": False, "reason": "argo rollout not healthy", "watch": watched}
-    time.sleep(int(os.getenv("REMEDIATION_OBSERVE_SLEEP_S", "15")))
-    snap = snapshot_service(spec.candidate_node)
+    # A full post-action window keeps pre-action samples out of the success decision.
+    time.sleep(max(spec.slo_gates.window_seconds, int(os.getenv("REMEDIATION_OBSERVE_SLEEP_S", "15"))))
+    snap = snapshot_service(spec.candidate_node, window=f"{spec.slo_gates.window_seconds}s")
     return evaluate_gates(
         snap,
         error_rate_max=spec.slo_gates.error_rate_max,
         latency_p99_ms_max=spec.slo_gates.latency_p99_ms_max,
         success_rate_min=spec.slo_gates.success_rate_min,
-        require_fresh=spec.slo_gates.require_fresh,
+        require_fresh=True,
     )
 
 

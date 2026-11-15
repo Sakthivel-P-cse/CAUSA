@@ -92,7 +92,7 @@ spec:
               ALTER DEFAULT PRIVILEGES IN SCHEMA groundtruth
                   REVOKE ALL ON TABLES FROM rca_engine;
 
-              GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
+              GRANT SELECT, INSERT, UPDATE ON rca_reports, dashboard_incident_state TO rca_engine;
               GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
 
               REVOKE ALL ON SCHEMA groundtruth FROM causa_remediator;

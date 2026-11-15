@@ -156,6 +156,13 @@ data:
     -- anomaly_baseline: shared robust warmup baselines (contract C2), so the
     -- trigger service and the eval harness load identical median/MAD numbers.
     -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS dashboard_incident_state (
+        incident_key TEXT PRIMARY KEY,
+        acked_at TIMESTAMPTZ NOT NULL,
+        acked_by TEXT NOT NULL,
+        snoozed_until TIMESTAMPTZ
+    );
+
     CREATE TABLE IF NOT EXISTS anomaly_baseline (
         node        TEXT,
         metric      TEXT,
@@ -228,7 +235,7 @@ data:
     ALTER DEFAULT PRIVILEGES IN SCHEMA groundtruth REVOKE ALL ON TABLES FROM rca_engine;
 
     -- The engine only ever touches the read-side tables it legitimately uses.
-    GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
+    GRANT SELECT, INSERT, UPDATE ON rca_reports, dashboard_incident_state TO rca_engine;
     GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
 
     -- The eval role: read-only across reports/incidents/baselines AND ground

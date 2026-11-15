@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -25,7 +26,8 @@ class SLOSnapshot:
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {key: None if isinstance(value, float) and not math.isfinite(value) else value
+                for key, value in asdict(self).items()}
 
 
 def _prom_url() -> str:
@@ -56,11 +58,7 @@ def snapshot_service(service: str, *, window: str = "5m") -> SLOSnapshot:
     now = datetime.now(timezone.utc).isoformat()
     svc = service.replace('"', "")
     try:
-        # `or vector(0)` on the numerator: a service with traffic but ZERO errors
-        # matches no series, so bare sum() yields an empty vector and the whole
-        # division collapses to empty — indistinguishable from "no data". That
-        # made error_rate None instead of 0.0, and evaluate_gates skips a None
-        # gate, so the error-rate check silently never ran on a healthy service.
+        # Zero-error traffic has no error series; retain a zero numerator.
         err_q = (
             f'(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
             f'status_code="STATUS_CODE_ERROR"}}[{window}])) or vector(0)) '
@@ -70,10 +68,7 @@ def snapshot_service(service: str, *, window: str = "5m") -> SLOSnapshot:
             f'histogram_quantile(0.99, sum by (le) (rate('
             f'traces_span_metrics_duration_milliseconds_bucket{{service_name="{svc}"}}[{window}])))'
         )
-        # Same guard, and here it matters more: a service that is failing EVERY
-        # request matches no non-error series, so without `or vector(0)` the
-        # success rate reads None and its gate is skipped at exactly the moment
-        # it should fail closed.
+        # All-error traffic has no success series; retain a zero numerator.
         ok_q = (
             f'(sum(rate(traces_span_metrics_calls_total{{service_name="{svc}",'
             f'status_code!="STATUS_CODE_ERROR"}}[{window}])) or vector(0)) '
@@ -89,24 +84,24 @@ def snapshot_service(service: str, *, window: str = "5m") -> SLOSnapshot:
             error_rate = _scalar(_instant(fallback_err))
         latency = _scalar(_instant(lat_q))
         success = _scalar(_instant(ok_q))
-        fresh = error_rate is not None or latency is not None or success is not None
-        if not fresh:
-            return SLOSnapshot(
-                service=service,
-                error_rate=None,
-                latency_p99_ms=None,
-                success_rate=None,
-                fresh=False,
-                queried_at=now,
-                error="no prometheus samples for service",
-            )
+        # Match the chart's 30s scrape interval; rate() can outlive its source samples.
+        source_ages = []
+        for metric in ("traces_span_metrics_calls_total", "traces_span_metrics_duration_milliseconds_bucket"):
+            selector = f'{metric}{{service_name="{svc}"}}'
+            contributors = f'rate({selector}[{window}])'
+            timestamps = f'timestamp({selector}) and {contributors}'
+            # A disappeared series can still contribute to rate(); require every contributor.
+            query = f'(time() - min({timestamps})) and (count({contributors}) == count({timestamps}))'
+            source_ages.append(_scalar(_instant(query)))
+        fresh = all(age is not None and math.isfinite(age) and 0 <= age <= 30 for age in source_ages)
         return SLOSnapshot(
             service=service,
             error_rate=error_rate,
             latency_p99_ms=latency,
             success_rate=success,
-            fresh=True,
+            fresh=fresh,
             queried_at=now,
+            error=None if fresh else "prometheus source samples missing or older than 30s",
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("slo snapshot failed for %s: %s", service, exc)
@@ -129,24 +124,28 @@ def evaluate_gates(
     success_rate_min: float,
     require_fresh: bool = True,
 ) -> dict[str, Any]:
-    if require_fresh and not snap.fresh:
-        return {"pass": False, "reason": snap.error or "metrics missing or stale", "snapshot": snap.to_dict()}
+    values = (snap.error_rate, snap.latency_p99_ms, snap.success_rate)
+    if any(value is None or not math.isfinite(value) for value in values) or (require_fresh and not snap.fresh):
+        return {"pass": False, "verified": False, "reason": snap.error or "metrics missing, stale or non-finite", "snapshot": snap.to_dict()}
     if snap.error_rate is not None and snap.error_rate > error_rate_max:
         return {
             "pass": False,
+            "verified": True,
             "reason": f"error_rate {snap.error_rate:.4f} > {error_rate_max}",
             "snapshot": snap.to_dict(),
         }
     if snap.latency_p99_ms is not None and snap.latency_p99_ms > latency_p99_ms_max:
         return {
             "pass": False,
+            "verified": True,
             "reason": f"latency_p99 {snap.latency_p99_ms:.1f}ms > {latency_p99_ms_max}",
             "snapshot": snap.to_dict(),
         }
     if snap.success_rate is not None and snap.success_rate < success_rate_min:
         return {
             "pass": False,
+            "verified": True,
             "reason": f"success_rate {snap.success_rate:.4f} < {success_rate_min}",
             "snapshot": snap.to_dict(),
         }
-    return {"pass": True, "reason": "gates ok", "snapshot": snap.to_dict()}
+    return {"pass": True, "verified": True, "reason": "gates ok", "snapshot": snap.to_dict()}

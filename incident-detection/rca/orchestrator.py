@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 from collections import defaultdict
-from datetime import timedelta
 from typing import Callable, Mapping
 
 from anomaly import first_deviation_from_scores, score_values
@@ -224,17 +223,11 @@ class RCAOrchestrator:
         namespace = state.namespace or os.getenv("CAUSA_APP_NAMESPACE") or None
         reader = self.reader_factory()
         try:
-            around = state.window_end - timedelta(minutes=1)
-            lookback = int(
-                (state.window_end - state.window_start - timedelta(minutes=1))
-                .total_seconds()
-                // 60
-            )
             return reader.read_incident_window(
                 incident_id=state.incident_id,
                 alerted_service=state.alerted_service or "unknown",
-                around=around,
-                lookback_minutes=max(0, lookback),
+                window_start=state.window_start,
+                window_end=state.window_end,
                 namespace=namespace,
                 preferred_trace_id=state.trace_id,
             )

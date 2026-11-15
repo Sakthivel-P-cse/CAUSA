@@ -83,17 +83,22 @@ class TelemetryReader:
         service: str | None,
         preferred: str | None = None,
         lookback_minutes: int = 10,
+        window: Window | None = None,
     ) -> str | None:
         if preferred:
             return preferred
+        bounds = {"start": window.start, "end": window.end} if window else {}
         ids = self._tempo.search_error_traces(
-            service=service, lookback_minutes=lookback_minutes, limit=1
+            service=service, lookback_minutes=lookback_minutes, limit=1, **bounds
         )
         if ids:
             return ids[0]
-        ids = self._tempo.search_traces(
-            service=service, lookback_minutes=lookback_minutes, limit=1
-        )
+        if window:
+            ids = self._tempo.search_traces_in_window(service=service, limit=1, **bounds)
+        else:
+            ids = self._tempo.search_traces(
+                service=service, lookback_minutes=lookback_minutes, limit=1
+            )
         return ids[0] if ids else None
 
     def read_incident_window(
@@ -101,12 +106,14 @@ class TelemetryReader:
         *,
         incident_id: str,
         alerted_service: str,
-        around: datetime,
+        around: datetime | None = None,
         lookback_minutes: int = 10,
         namespace: str | None = None,
         preferred_trace_id: str | None = None,
         include_logs: bool = True,
         include_metrics: bool = True,
+        window_start: datetime | None = None,
+        window_end: datetime | None = None,
     ) -> IncidentTelemetry:
         """
         Load typed envelopes for one incident window from Tempo/Prom/Loki.
@@ -114,10 +121,16 @@ class TelemetryReader:
         This is the normalization boundary: every consumer downstream reads the
         returned IncidentTelemetry, not raw backend responses.
         """
-        window = Window(
-            start=around - timedelta(minutes=lookback_minutes),
-            end=around + timedelta(minutes=1),
-        )
+        if (window_start is None) != (window_end is None):
+            raise ValueError("window bounds must be supplied together")
+        if window_start is None:
+            if around is None:
+                raise ValueError("around or window bounds are required")
+            window_start = around - timedelta(minutes=lookback_minutes)
+            window_end = around + timedelta(minutes=1)
+        if window_end <= window_start:
+            raise ValueError("invalid incident window")
+        window = Window(start=window_start, end=window_end)
         adapter = TelemetryAdapter(self._prom, self._tempo, self._loki, namespace=namespace)
 
         telemetry = IncidentTelemetry(
@@ -132,6 +145,7 @@ class TelemetryReader:
             service=alerted_service,
             preferred=preferred_trace_id,
             lookback_minutes=lookback_minutes,
+            window=window,
         )
         telemetry.spans = adapter.traces(window, service=alerted_service)
         # traces() samples up to `limit` recent traces and may NOT include the

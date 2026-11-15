@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
-from dashboard.backend.ack_store import lifecycle_for, merge_ack_fields
+from dashboard.backend.ack_store import get_acks, lifecycle_for, merge_ack_fields
 from dashboard.backend.dependencies import get_store
 from dashboard.backend.db import DashboardStore
 from dashboard.backend.remediation_store import RemediationStore
@@ -37,7 +37,8 @@ def get_stats(
     end: datetime | None = Query(None),
     store: DashboardStore = Depends(get_store),
 ) -> dict[str, Any]:
-    items = [merge_ack_fields(i) for i in store.list_incidents_joined() if i.get("has_rca")]
+    acks = get_acks()
+    items = [merge_ack_fields(i, acks) for i in store.list_incidents_joined() if i.get("has_rca")]
     end_dt = end or datetime.now(timezone.utc)
     start_dt = start or (end_dt - timedelta(minutes=minutes))
     if start_dt > end_dt:
@@ -105,8 +106,9 @@ def get_stats(
             )
 
     rem = RemediationStore().stats()
-    decided = int(rem.get("succeeded", 0)) + int(rem.get("failed", 0)) + int(rem.get("rolled_back", 0))
-    auto_rate = (int(rem.get("succeeded", 0)) / decided) if decided else None
+    counts = rem.get("by_status", {})
+    decided = sum(int(counts.get(status, 0)) for status in ("succeeded", "failed", "rolled_back"))
+    rate = (int(counts.get("succeeded", 0)) / decided) if decided else None
 
     lifecycle = Counter(lifecycle_for(i) for i in items)
 
@@ -126,7 +128,8 @@ def get_stats(
         "mttr_seconds": _mean_seconds(mttr),
         "mtta_n": len(mtta),
         "mttr_n": len(mttr),
-        "auto_remediation_rate": auto_rate,
+        "auto_remediation_rate": None,
+        "remediation_success_rate": rate,
         "analyses_complete": complete,
         "analyses_degraded": degraded,
         "analyses_inconclusive": inconclusive,

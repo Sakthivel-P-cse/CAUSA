@@ -62,20 +62,21 @@ def propose_resource_scale(
         from remediation.apply.k8s import read_workload_revision
 
         live = read_workload_revision(candidate.node_id, ns)
-        current = int(live.get("replicas") or 1)
-        desired = min(MAX_REPLICAS, max(current + 1, current))
-        if desired == current and current < MAX_REPLICAS:
-            desired = current + 1
-        if desired > MAX_REPLICAS:
-            raise ValueError(f"desired replicas {desired} exceeds max {MAX_REPLICAS}")
+        current = live.get("replicas")
+        if live.get("kind") != "Deployment" or type(current) is not int or current < 0:
+            raise ValueError("a Deployment with a known nonnegative replica count is required")
+        if current >= MAX_REPLICAS:
+            raise ValueError(f"replicas already at or above max {MAX_REPLICAS}")
+        if not live.get("resource_version"):
+            raise ValueError("missing workload resourceVersion")
+        desired = current + 1
         before_fp = fingerprint_payload(live)
         risk, approvals = risk_tier_for("scale_up", conf)
-        resources = live.get("resources") or {}
         spec = TypedPlanSpec(
             action="scale_up",
             fault_class="Resource",
             target=ExactTarget(
-                cluster=os.getenv("CONTEXT") or "kind-gcp-demo-test",
+                cluster=os.getenv("CONTEXT") or os.getenv("KUBECTL_CONTEXT") or "kind-gcp-demo-test",
                 namespace=ns,
                 kind=str(live.get("kind") or "Deployment"),
                 name=candidate.node_id,
@@ -84,8 +85,8 @@ def propose_resource_scale(
             before_fingerprint=before_fp,
             change=PlanChange(
                 description=f"Scale {candidate.node_id} {current} → {desired}",
-                patch={"replicas": desired, "resources": resources},
-                inverse={"replicas": current, "resources": resources},
+                patch={"replicas": desired, "resource_version": live["resource_version"]},
+                inverse={"replicas": current},
             ),
             risk_tier=risk,
             required_approvals=approvals,
@@ -147,7 +148,7 @@ def propose_infra_recovery(
             action="scale_restart_cordon",
             fault_class="Infra",
             target=ExactTarget(
-                cluster=os.getenv("CONTEXT") or "kind-gcp-demo-test",
+                cluster=os.getenv("CONTEXT") or os.getenv("KUBECTL_CONTEXT") or "kind-gcp-demo-test",
                 namespace=ns,
                 kind=str(live.get("kind") or "Deployment"),
                 name=candidate.node_id,
@@ -219,7 +220,7 @@ def propose_data_recovery(
             action="restart_data_path",
             fault_class="Data",
             target=ExactTarget(
-                cluster=os.getenv("CONTEXT") or "kind-gcp-demo-test",
+                cluster=os.getenv("CONTEXT") or os.getenv("KUBECTL_CONTEXT") or "kind-gcp-demo-test",
                 namespace=ns,
                 kind=str(live.get("kind") or "Deployment"),
                 name=candidate.node_id,
