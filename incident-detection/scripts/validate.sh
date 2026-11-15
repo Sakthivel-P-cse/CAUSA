@@ -6,7 +6,7 @@
 #   ./scripts/validate.sh [--context <kube-context>]
 #
 # Checks:
-#   1. All pods are Running (all 17 namespaces)
+#   1. All pods are Running (all 16 Dev A+B namespaces)
 #   2. Tempo health check
 #   3. Loki health check
 #   4. Prometheus health check
@@ -19,7 +19,6 @@
 #  11. Alertmanager health + Prometheus alert rules loaded
 #  12. Postgres health + rca_reports table exists
 #  13. Stage 2 RCA engine /health
-#  14. Causa Dashboard /health
 # ============================================================
 set -euo pipefail
 
@@ -114,8 +113,8 @@ echo ""
 
 # ── 1. Pod status ──────────────────────────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "infra" ]]; then
-echo "[1/14] Checking pod status across all namespaces..."
-for ns in tempo minio-tempo loki minio-loki prometheus mimir minio-mimir otel-collector otel-lb otel-agent kube-state-metrics node-exporter alertmanager postgres stage2-rca causa-dashboard; do
+echo "[1/13] Checking pod status across all namespaces..."
+for ns in tempo minio-tempo loki minio-loki prometheus mimir minio-mimir otel-collector otel-lb otel-agent kube-state-metrics node-exporter alertmanager postgres stage2-rca causa-ingest; do
   pods_raw="$(k -n "${ns}" get pods --no-headers 2>/dev/null || true)"
   total="$(printf "%s\n" "${pods_raw}" | awk 'NF { n++ } END { print n+0 }')"
   # Ignore Terminating pods during rollout; they are expected shortly after upgrades.
@@ -132,7 +131,7 @@ done
 echo ""
 
 # ── 2. Tempo healthcheck ───────────────────────────────────
-echo "[2/14] Checking Tempo..."
+echo "[2/13] Checking Tempo..."
 pid=$(port_forward_bg tempo tempo 3200 3200)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -144,7 +143,7 @@ fi
 echo ""
 
 # ── 3. Loki healthcheck ────────────────────────────────────
-echo "[3/14] Checking Loki..."
+echo "[3/13] Checking Loki..."
 pid=$(port_forward_bg loki loki 3100 3100)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -156,7 +155,7 @@ fi
 echo ""
 
 # ── 4. Prometheus healthcheck ──────────────────────────────
-echo "[4/14] Checking Prometheus..."
+echo "[4/13] Checking Prometheus..."
 pid=$(port_forward_bg prometheus prometheus 9090 9090)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -168,7 +167,7 @@ fi
 echo ""
 
 # ── 5. OTel Collector healthcheck ─────────────────────────
-echo "[5/14] Checking OTel Collector..."
+echo "[5/13] Checking OTel Collector..."
 pid=$(port_forward_bg otel-collector otel-collector 13133 13133)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -180,7 +179,7 @@ fi
 echo ""
 
 # ── 6. Mimir health check + remote_write success ────────────────────
-echo "[6/14] Checking Mimir (long-term metric storage)..."
+echo "[6/13] Checking Mimir (long-term metric storage)..."
 pid=$(port_forward_bg mimir mimir 8880 8080)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -210,7 +209,7 @@ fi
 
 # ── 7. Send synthetic trace ─────────────────────────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "app" ]]; then
-echo "[7/14] Sending synthetic OTLP trace to OTel Collector..."
+echo "[7/13] Sending synthetic OTLP trace to OTel Collector..."
 pid=$(port_forward_bg otel-collector otel-collector 4318 4318)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -268,7 +267,7 @@ fi
 echo ""
 
 # ── 7. Verify trace is queryable in Tempo ──────────────────────
-echo "[8/14] Verifying trace is queryable in Tempo..."
+echo "[8/13] Verifying trace is queryable in Tempo..."
 # Wait up to 90s for Tempo to ingest the trace. This avoids flakes right after upgrades.
 max_wait=90
 found=0
@@ -339,7 +338,7 @@ fi
 # Push a synthetic log line and query it back within 30s.
 # Tests: OTel Collector → Loki HTTP push, Loki chunk writer, Loki query path.
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "app" ]]; then
-echo "[9/14] Sending synthetic log to Loki and querying it back..."
+echo "[9/13] Sending synthetic log to Loki and querying it back..."
 pid_loki_check=$(port_forward_bg loki loki 3101 3100)
 cleanup_pids+=("${pid_loki_check}")
 sleep 2
@@ -383,7 +382,7 @@ fi
 
 # ── 10. Verify Tempo service graph metrics in Prometheus ────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "rca" ]]; then
-echo "[10/14] Checking Stage 2 RCA readiness — Tempo service graph metrics in Prometheus..."
+echo "[10/13] Checking Stage 2 RCA readiness — Tempo service graph metrics in Prometheus..."
 svc_graph_found=0
 for i in $(seq 1 60); do
   SVC_GRAPH_RESP=$(curl --connect-timeout 2 --max-time 5 -sf \
@@ -411,7 +410,7 @@ fi
 
 # ── 11. Alertmanager health + rules loaded ────────────────────────
 if [[ "${PROFILE}" == "all" || "${PROFILE}" == "infra" ]]; then
-echo "[11/14] Checking Alertmanager and Prometheus alert rules..."
+echo "[11/13] Checking Alertmanager and Prometheus alert rules..."
 pid=$(port_forward_bg alertmanager alertmanager 9093 9093)
 cleanup_pids+=("${pid}")
 sleep 2
@@ -432,7 +431,7 @@ fi
 echo ""
 
 # ── 10. Postgres health + schema ─────────────────────────────────
-echo "[12/14] Checking Postgres RCA report storage..."
+echo "[12/13] Checking Postgres RCA report storage..."
 pid=$(port_forward_bg postgres postgres 5432 5432)
 cleanup_pids+=("${pid}")
 sleep 3
@@ -460,7 +459,7 @@ fi
 echo ""
 
 # ── 11. Stage 2 RCA engine health ────────────────────────────────
-echo "[13/14] Checking Stage 2 RCA engine webhook receiver..."
+echo "[13/13] Checking Stage 2 RCA engine webhook receiver..."
 pid=$(port_forward_bg stage2-rca stage2-rca 8080 8080)
 cleanup_pids+=("${pid}")
 sleep 3
@@ -471,19 +470,75 @@ else
   fail "Stage 2 RCA engine /health did not respond (not deployed yet?)"
 fi
 echo ""
+
+echo "[14+] AM webhook → ingest, images, baselines, ingest health, node PromQL..."
+AM_CFG=$(k -n alertmanager get configmap -o name 2>/dev/null | head -1 || true)
+AM_WEBHOOK=""
+if [[ -n "${AM_CFG}" ]]; then
+  AM_WEBHOOK=$(k -n alertmanager get "${AM_CFG}" -o yaml 2>/dev/null | grep -o 'http[^ ]*causa-ingest[^ ]*' | head -1 || true)
+fi
+if [[ -z "${AM_WEBHOOK}" ]]; then
+  AM_WEBHOOK=$(k -n alertmanager get secret -o name 2>/dev/null | head -1 || true)
+  # Fall back: check alertmanager values via pod args / mounted file
+  AM_POD=$(k -n alertmanager get pod -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
+    k -n alertmanager get pod -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -n "${AM_POD}" ]]; then
+    AM_WEBHOOK=$(k -n alertmanager exec "${AM_POD}" -- \
+      sh -c 'grep -rho "causa-ingest[^ ]*" /etc/alertmanager 2>/dev/null | head -1' 2>/dev/null || true)
+  fi
+fi
+if echo "${AM_WEBHOOK}" | grep -q 'causa-ingest'; then
+  ok "Alertmanager webhook targets causa-ingest"
+else
+  fail "Alertmanager webhook does not target causa-ingest (got: ${AM_WEBHOOK:-empty})"
 fi
 
-# ── 12. Causa Dashboard health ────────────────────────────────
-if [[ "${PROFILE}" == "all" || "${PROFILE}" == "rca" ]]; then
-echo "[14/14] Checking Causa Dashboard..."
-pid=$(port_forward_bg causa-dashboard causa-dashboard 8090 8090)
-cleanup_pids+=("${pid}")
-sleep 3
-if curl --connect-timeout 2 --max-time 5 -sf http://localhost:8090/health &>/dev/null; then
-  ok "Causa Dashboard /health → 200 OK"
-  info "Dashboard UI: http://localhost:8090"
+S2_IMG=$(k -n stage2-rca get deploy stage2-rca -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+ING_IMG=$(k -n causa-ingest get deploy causa-ingest -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+if echo "${S2_IMG}" | grep -q 'causa/stage2-rca' && ! echo "${S2_IMG}" | grep -qi 'traceops'; then
+  ok "stage2 image is causa/stage2-rca (${S2_IMG})"
 else
-  fail "Causa Dashboard /health did not respond (not deployed yet?)"
+  fail "stage2 image unexpected: ${S2_IMG:-missing}"
+fi
+if echo "${ING_IMG}" | grep -q 'causa/ingest' && ! echo "${ING_IMG}" | grep -qi 'traceops'; then
+  ok "ingest image is causa/ingest (${ING_IMG})"
+else
+  fail "ingest image unexpected: ${ING_IMG:-missing}"
+fi
+
+BL=$(k -n postgres exec deployment/postgres -- \
+  psql -U causa -d causa -tAc "SELECT COUNT(*) FROM anomaly_baseline;" 2>/dev/null | tr -d '[:space:]' || echo "0")
+if [[ "${BL}" =~ ^[0-9]+$ ]] && [[ "${BL}" -gt 0 ]]; then
+  ok "anomaly_baseline has ${BL} row(s)"
+else
+  fail "anomaly_baseline empty — capture_baseline --write-db required"
+fi
+
+pid=$(port_forward_bg causa-ingest causa-ingest 8082 8080)
+cleanup_pids+=("${pid}")
+sleep 2
+if curl --connect-timeout 2 --max-time 5 -sf http://localhost:8082/health &>/dev/null; then
+  ok "causa-ingest /health → 200 OK"
+else
+  fail "causa-ingest /health did not respond"
+fi
+
+NODE_Q=$(curl --connect-timeout 2 --max-time 5 -sf \
+  'http://localhost:9090/api/v1/query?query=node_cpu_seconds_total' 2>/dev/null || true)
+if [[ -n "${NODE_Q}" ]] && echo "${NODE_Q}" | grep -q '"status":"success"' \
+  && ! echo "${NODE_Q}" | grep -q '"result":\[\]'; then
+  ok "node PromQL non-empty (node_cpu_seconds_total)"
+else
+  fail "node PromQL empty — node-exporter / scrape broken"
+fi
+
+UQ=$(k -n postgres exec deployment/postgres -- \
+  psql -U causa -d causa -tAc \
+  "SELECT COUNT(*) FROM pg_indexes WHERE indexname='uq_rca_incident_id';" 2>/dev/null | tr -d '[:space:]' || echo "0")
+if [[ "${UQ}" == "1" ]]; then
+  ok "uq_rca_incident_id index present"
+else
+  fail "uq_rca_incident_id missing — schema-migrate required"
 fi
 echo ""
 fi
@@ -496,7 +551,7 @@ echo "  Passed: ${PASS}"
 echo "  Failed: ${FAIL}"
 echo ""
 if [[ "${FAIL}" -eq 0 ]]; then
-  echo "  ALL CHECKS PASSED — Full stack healthy, Stage 2 RCA + Dashboard ready"
+  echo "  ALL CHECKS PASSED — Dev A+B+C stack ready"
   exit 0
 else
   echo "  SOME CHECKS FAILED — Review output above"

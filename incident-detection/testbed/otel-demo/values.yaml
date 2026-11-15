@@ -1,34 +1,17 @@
-# ============================================================
 # OpenTelemetry Demo — Helm values for the Causa testbed.
+# Chart pin: open-telemetry/opentelemetry-demo 0.40.10
 #
-# The demo is the PRIMARY testbed (RCA_Engine_Spec §4): ~15 services, mixed
-# sync/async, shared Redis/Kafka/Postgres — Kafka is what makes scenario S4
-# (shared-dependency confound) possible.
-#
-# Two things matter here:
-#   1. DISABLE the demo's bundled observability (its own collector, Jaeger,
-#      Prometheus, Grafana, OpenSearch) so it does not fight the Stage-1 stack.
-#   2. Point every service's OTLP export at the Causa AGENT tier
-#      (otel-agent DaemonSet) — the same seam patch_gcp_demo_telemetry.sh uses
-#      for Boutique — so telemetry flows agent → LB/gateway → Tempo/Loki/Mimir.
-#
-# Install:  see install.md. Values keys follow the open-telemetry/opentelemetry-demo
-# chart; verify against the chart version you pin (this pattern targets ≥0.30).
-# ============================================================
+# Use envOverrides (not default.env) so chart defaults like OTEL_SERVICE_NAME stay.
 
 default:
-  # Route ALL demo services to the Causa agent tier instead of the demo's collector.
-  env:
+  envOverrides:
     - name: OTEL_EXPORTER_OTLP_ENDPOINT
       value: "http://otel-agent.otel-agent.svc.cluster.local:4317"
     - name: OTEL_EXPORTER_OTLP_PROTOCOL
       value: "grpc"
-    # The demo templates many endpoints off this name; override it too so nothing
-    # falls back to the (disabled) in-chart collector.
     - name: OTEL_COLLECTOR_NAME
       value: "otel-agent.otel-agent.svc.cluster.local"
 
-# ── Disable the demo's bundled observability stack ──────────
 opentelemetry-collector:
   enabled: false
 jaeger:
@@ -40,9 +23,78 @@ grafana:
 opensearch:
   enabled: false
 
-# Keep the app components + the load generator (emergent traffic → emergent
-# telemetry; PRD2 §6 anti-circularity). The load generator drives requests so
-# the service graph and RED metrics populate without hand-authoring anything.
 components:
   load-generator:
     enabled: true
+    env:
+      - name: LOCUST_WEB_HOST
+        value: "0.0.0.0"
+      - name: LOCUST_WEB_PORT
+        value: "8089"
+      - name: LOCUST_USERS
+        value: "5"
+      - name: LOCUST_SPAWN_RATE
+        value: "1"
+      - name: LOCUST_HOST
+        value: "http://frontend-proxy:8080"
+      - name: LOCUST_HEADLESS
+        value: "true"
+      - name: LOCUST_BROWSER_TRAFFIC_ENABLED
+        value: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  accounting:
+    resources:
+      requests:
+        memory: 256Mi
+      limits:
+        memory: 768Mi
+
+  ad:
+    resources:
+      requests:
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+  fraud-detection:
+    resources:
+      requests:
+        memory: 256Mi
+      limits:
+        memory: 768Mi
+
+  flagd:
+    resources:
+      requests:
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+    sidecarContainers: []
+
+  image-provider:
+    resources:
+      requests:
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+  product-reviews:
+    resources:
+      requests:
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+  recommendation:
+    resources:
+      requests:
+        memory: 128Mi
+      limits:
+        memory: 512Mi

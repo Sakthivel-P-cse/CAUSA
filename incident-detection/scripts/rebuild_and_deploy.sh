@@ -1,48 +1,61 @@
 #!/usr/bin/env bash
 # ============================================================
-# rebuild_and_deploy.sh — Rebuild images and redeploy after
-#                          source-code changes.
-#
-# Rebuilds:
-#   causa/dashboard:latest   — backend bug-fixes + new frontend UI
-#   causa/stage2-rca:latest  — Loki/Tempo/CPU-memory scorer fixes
-#
-# Then loads them into the kind cluster and rolls the pods.
+# rebuild_and_deploy.sh — Rebuild and redeploy Stage-2 RCA.
 #
 # Usage:
-#   ./scripts/rebuild_and_deploy.sh [--context <kube-context>] [--env dev|prod]
+#   ./scripts/rebuild_and_deploy.sh \
+#     [--context <kube-context>] [--kind-cluster <name>] \
+#     [--env dev|prod] [--stage2 real|mock]
 #
-# Defaults:
-#   --context  kind-gcp-demo-test
-#   --env      dev
+# The real engine is the default. `--stage2 mock` explicitly installs the
+# development receiver without building or loading an RCA image.
+# Dev C components are intentionally outside this script.
 # ============================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"      # incident-detection/
-PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"    # causa/
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 CONTEXT="kind-gcp-demo-test"
 KIND_CLUSTER="gcp-demo-test"
 ENV="dev"
+STAGE2_PROFILE="real"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --context)      CONTEXT="$2";      shift 2 ;;
-    --kind-cluster) KIND_CLUSTER="$2"; shift 2 ;;
-    --env)          ENV="$2";          shift 2 ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
+    --context)      CONTEXT="${2:?--context requires a value}";           shift 2 ;;
+    --kind-cluster) KIND_CLUSTER="${2:?--kind-cluster requires a value}"; shift 2 ;;
+    --env)          ENV="${2:?--env requires dev or prod}";               shift 2 ;;
+    --stage2)       STAGE2_PROFILE="${2:?--stage2 requires real or mock}"; shift 2 ;;
+    *) echo "ERROR: unknown option '$1'."; exit 1 ;;
   esac
 done
 
+if [[ "${ENV}" != "dev" && "${ENV}" != "prod" ]]; then
+  echo "ERROR: --env must be 'dev' or 'prod'. Got: '${ENV}'"
+  exit 1
+fi
+if [[ "${STAGE2_PROFILE}" != "real" && "${STAGE2_PROFILE}" != "mock" ]]; then
+  echo "ERROR: --stage2 must be 'real' or 'mock'. Got: '${STAGE2_PROFILE}'"
+  exit 1
+fi
+if [[ "${STAGE2_PROFILE}" == "mock" && "${ENV}" != "dev" ]]; then
+  echo "ERROR: the Stage-2 mock is an explicit development-only profile."
+  exit 1
+fi
+
 echo "========================================================"
-echo "  Causa — Rebuild & Redeploy"
-echo "  context: ${CONTEXT}   env: ${ENV}"
+echo "  Causa — Rebuild & Redeploy Stage-2"
+echo "  context: ${CONTEXT}   env: ${ENV}   profile: ${STAGE2_PROFILE}"
 echo "========================================================"
 echo ""
 
 # ── Pre-flight ─────────────────────────────────────────────
-for tool in kubectl docker kind node npm; do
+TOOLS=(kubectl helm)
+if [[ "${STAGE2_PROFILE}" == "real" ]]; then
+  TOOLS+=(docker kind)
+fi
+for tool in "${TOOLS[@]}"; do
   if ! command -v "${tool}" &>/dev/null; then
     echo "ERROR: '${tool}' not found in PATH."
     exit 1
@@ -56,81 +69,69 @@ fi
 echo "✓ Cluster reachable: ${CONTEXT}"
 echo ""
 
-# ── Step 1: Build React frontend ────────────────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[1/6] Building React frontend (npm run build)"
-echo "──────────────────────────────────────────────────────"
-cd "${PROJECT_ROOT}/dashboard/frontend"
-npm install --silent
-npm run build
-echo "✓ Frontend built → dashboard/frontend/dist/"
-echo ""
+if [[ "${STAGE2_PROFILE}" == "real" ]]; then
+  echo "──────────────────────────────────────────────────────"
+  echo "[1/3] Building Docker images (ingest + stage2-rca)"
+  echo "──────────────────────────────────────────────────────"
+  "${SCRIPT_DIR}/build_images.sh" --kind-cluster "${KIND_CLUSTER}"
+  echo ""
+else
+  echo "Using explicit development mock; image build and load skipped."
+  echo ""
+fi
 
-# ── Step 2: Build stage2-rca Docker image ───────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[2/6] Building Docker image: causa/stage2-rca:latest"
-echo "──────────────────────────────────────────────────────"
-cd "${PROJECT_ROOT}"
-docker build --no-cache -f Dockerfile.stage2-rca -t causa/stage2-rca:latest .
-echo "✓ causa/stage2-rca:latest built"
-echo ""
+# Retire the legacy mock release name. Both current profiles share the
+# `stage2-rca` release, so profile switches are clean Helm upgrades.
+if helm --kube-context "${CONTEXT}" status stage2-mock \
+  --namespace stage2-rca &>/dev/null; then
+  helm --kube-context "${CONTEXT}" uninstall stage2-mock \
+    --namespace stage2-rca \
+    --wait
+fi
 
-# ── Step 3: Build dashboard Docker image ────────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[3/6] Building Docker image: causa/dashboard:latest"
-echo "──────────────────────────────────────────────────────"
-docker build -f Dockerfile.dashboard -t causa/dashboard:latest .
-echo "✓ causa/dashboard:latest built"
-echo ""
+if [[ "${STAGE2_PROFILE}" == "real" ]]; then
+  CHART_DIR="${ROOT_DIR}/helm/stage2-rca"
+else
+  CHART_DIR="${ROOT_DIR}/helm/stage2-mock"
+fi
 
-# ── Step 4: Load images into kind cluster ───────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[4/6] Loading images into kind cluster '${KIND_CLUSTER}'"
-echo "──────────────────────────────────────────────────────"
-kind load docker-image causa/stage2-rca:latest  --name "${KIND_CLUSTER}"
-kind load docker-image causa/dashboard:latest   --name "${KIND_CLUSTER}"
-echo "✓ Images loaded"
-echo ""
+if [[ "${STAGE2_PROFILE}" == "real" ]]; then
+  echo "──────────────────────────────────────────────────────"
+  echo "[3/4] Deploying Stage-2 ${STAGE2_PROFILE} + causa-ingest"
+  echo "──────────────────────────────────────────────────────"
+  helm upgrade --install stage2-rca "${CHART_DIR}" \
+    --kube-context "${CONTEXT}" \
+    --namespace stage2-rca \
+    --create-namespace \
+    -f "${CHART_DIR}/values.yaml" \
+    -f "${CHART_DIR}/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+  helm upgrade --install causa-ingest "${ROOT_DIR}/helm/causa-ingest" \
+    --kube-context "${CONTEXT}" \
+    --namespace causa-ingest \
+    --create-namespace \
+    -f "${ROOT_DIR}/helm/causa-ingest/values.yaml" \
+    -f "${ROOT_DIR}/helm/causa-ingest/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+else
+  echo "──────────────────────────────────────────────────────"
+  echo "[3/3] Deploying Stage-2 ${STAGE2_PROFILE}"
+  echo "──────────────────────────────────────────────────────"
+  helm upgrade --install stage2-rca "${CHART_DIR}" \
+    --kube-context "${CONTEXT}" \
+    --namespace stage2-rca \
+    --create-namespace \
+    -f "${CHART_DIR}/values.yaml" \
+    -f "${CHART_DIR}/values-${ENV}.yaml" \
+    --wait \
+    --timeout 3m
+fi
 
-# ── Step 5: Rolling restart of pods ─────────────────────────
-echo "──────────────────────────────────────────────────────"
-echo "[5/6] Rolling restart: stage2-rca"
-echo "──────────────────────────────────────────────────────"
-helm upgrade --install stage2-rca "${ROOT_DIR}/helm/stage2-rca" \
-  --kube-context "${CONTEXT}" \
-  --namespace stage2-rca \
-  --create-namespace \
-  -f "${ROOT_DIR}/helm/stage2-rca/values.yaml" \
-  -f "${ROOT_DIR}/helm/stage2-rca/values-${ENV}.yaml" \
-  --wait \
-  --timeout 3m
-echo "✓ stage2-rca restarted"
 echo ""
-
-echo "──────────────────────────────────────────────────────"
-echo "[6/6] Rolling restart: causa-dashboard"
-echo "──────────────────────────────────────────────────────"
-helm upgrade --install causa-dashboard "${ROOT_DIR}/helm/causa-dashboard" \
-  --kube-context "${CONTEXT}" \
-  --namespace causa-dashboard \
-  --create-namespace \
-  -f "${ROOT_DIR}/helm/causa-dashboard/values.yaml" \
-  -f "${ROOT_DIR}/helm/causa-dashboard/values-${ENV}.yaml" \
-  --wait \
-  --timeout 3m
-echo "✓ causa-dashboard restarted"
-echo ""
-
-# ── Done ────────────────────────────────────────────────────
 echo "========================================================"
-echo "  All images rebuilt and pods restarted successfully!"
+echo "  Stage-2 ${STAGE2_PROFILE} (+ ingest if real) deployed"
 echo "========================================================"
-echo ""
-echo "  Access the dashboard:"
-echo "    kubectl --context ${CONTEXT} -n causa-dashboard \\"
-echo "      port-forward svc/causa-dashboard 8090:8090"
-echo "    → http://localhost:8090"
-echo ""
-echo "  Verify:"
-echo "    curl -s http://localhost:8090/health"
-echo ""
+echo "  kubectl --context ${CONTEXT} -n stage2-rca \\"
+echo "    port-forward svc/stage2-rca 8081:8080"

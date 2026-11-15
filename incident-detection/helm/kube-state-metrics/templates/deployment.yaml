@@ -42,13 +42,13 @@ spec:
             httpGet:
               path: /healthz
               port: metrics
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: telemetry
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

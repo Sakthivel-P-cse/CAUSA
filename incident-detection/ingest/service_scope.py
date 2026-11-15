@@ -19,6 +19,8 @@ import os
 import re
 from functools import lru_cache
 
+from runtime import profile as runtime_profile
+
 _INTERNAL_NAMESPACES = {
     "alertmanager",
     "kube-system",
@@ -48,6 +50,7 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"alertmanager|"
     r"coredns(?:$|-.*)|"
     r"etcd(?:$|-.*)|"
+    r"envoy(?:$|-.*)|"  # bare OTel graph peer; use frontend-proxy / app names instead
     r"grafana|"
     r"kindnet(?:$|-.*)|"
     r"kube(?:$|-.*)|"
@@ -59,7 +62,7 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
     r"load-generator(?:$|-.*)|"
     r"loadgenerator(?:$|-.*)|"
     r"mimir|"
-    r"minio-(?:loki|mimir|tempo)(?:$|-.*)|"
+    r"minio(?:$|-.*)|"
     r"node-exporter|"
     r"otel-(?:agent|collector|lb)(?:$|-.*)|"
     r"postgres|"
@@ -78,11 +81,21 @@ _DEFAULT_EXCLUDED_SERVICES_RE = (
 _REPLICASET_POD_RE = re.compile(r"^(?P<base>.+)-[a-f0-9]{8,10}-[a-z0-9]{5}$", re.IGNORECASE)
 _STATEFULSET_POD_RE = re.compile(r"^(?P<base>.+)-\d+$")
 _DAEMONSET_POD_RE = re.compile(r"^(?P<base>.+)-[a-z0-9]{5}$", re.IGNORECASE)
+_UNKNOWN_SERVICE_PREFIX_RE = re.compile(r"^unknown_service:(?P<rest>.+)$", re.IGNORECASE)
+_SYSTEM_INFRA_HOST_RE = re.compile(
+    r"(?:^|-)(?:control-plane|master)$",
+    re.IGNORECASE,
+)
+_SYSTEM_INFRA_HOST_NAMES = frozenset({
+    "kind-control-plane",
+    "minikube",
+    "docker-desktop",
+})
 
 
 @lru_cache(maxsize=1)
 def _monitored_services_re() -> re.Pattern[str] | None:
-    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (runtime_profile.load_profile().monitored_services_regex or "").strip()
     if not raw:
         return None
     try:
@@ -93,7 +106,8 @@ def _monitored_services_re() -> re.Pattern[str] | None:
 
 @lru_cache(maxsize=1)
 def _excluded_services_re() -> re.Pattern[str] | None:
-    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
+    prof = runtime_profile.load_profile()
+    extra = (prof.excluded_services_regex or "").strip()
     pattern = (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -105,21 +119,55 @@ def _excluded_services_re() -> re.Pattern[str] | None:
         return re.compile(_DEFAULT_EXCLUDED_SERVICES_RE, re.IGNORECASE)
 
 
+def normalize_service_name(service: str | None) -> str | None:
+    """
+    Clean Alertmanager / Prom service-graph labels into a usable service id.
+
+    - `unknown_service:checkout` → `checkout`
+    - path-like junk (`/nodejs/bin/node`) → `unknown`
+    - bare `unknown_service` → `unknown`
+    """
+    if not service:
+        return None
+    value = service.strip()
+    if not value:
+        return None
+    match = _UNKNOWN_SERVICE_PREFIX_RE.match(value)
+    if match:
+        value = match.group("rest").strip()
+    if not value:
+        return None
+    if value.lower() in {"unknown_service", "unknown", "none", "n/a"}:
+        return "unknown"
+    if value.startswith("/") or "/" in value:
+        return "unknown"
+    return value
+
+
+def is_system_infra_host(name: str | None) -> bool:
+    """True for Kind/k8s control-plane style hosts that must not win app RCA."""
+    if not name:
+        return False
+    value = name.strip()
+    if not value:
+        return False
+    if value.lower() in _SYSTEM_INFRA_HOST_NAMES:
+        return True
+    return bool(_SYSTEM_INFRA_HOST_RE.search(value))
+
+
 def _service_name_label_keys() -> list[str]:
-    keys_env = os.getenv(
-        "CAUSA_SERVICE_NAME_LABEL_KEYS",
-        "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
-    )
-    return [k.strip() for k in keys_env.split(",") if k.strip()]
+    keys = runtime_profile.load_profile().alert_mapping.service_label_keys
+    return [k.strip() for k in keys if k.strip()]
 
 
 def monitored_services_pattern() -> str | None:
-    raw = (os.getenv("CAUSA_MONITORED_SERVICES_REGEX") or "").strip()
+    raw = (runtime_profile.load_profile().monitored_services_regex or "").strip()
     return raw or None
 
 
 def excluded_services_pattern() -> str:
-    extra = (os.getenv("CAUSA_EXCLUDED_SERVICES_REGEX") or "").strip()
+    extra = (runtime_profile.load_profile().excluded_services_regex or "").strip()
     return (
         _DEFAULT_EXCLUDED_SERVICES_RE
         if not extra
@@ -129,20 +177,24 @@ def excluded_services_pattern() -> str:
 
 def extract_service_from_labels(labels: dict[str, str]) -> str | None:
     """Best-effort service extraction from Alertmanager / stream labels."""
+    raw: str | None = None
     for key in _service_name_label_keys():
         if val := labels.get(key):
-            return val
+            raw = val
+            break
 
-    # Fallbacks if none of the above match
-    if server := labels.get("server"):
-        return server
-    if pod := labels.get("pod"):
-        parts = pod.rsplit("-", 2)
-        return parts[0] if len(parts) >= 3 else pod
-    if inst := labels.get("instance"):
-        return inst
-    return labels.get("namespace")
+    if raw is None:
+        if server := labels.get("server"):
+            raw = server
+        elif pod := labels.get("pod"):
+            parts = pod.rsplit("-", 2)
+            raw = parts[0] if len(parts) >= 3 else pod
+        elif inst := labels.get("instance"):
+            raw = inst
+        else:
+            raw = labels.get("namespace")
 
+    return normalize_service_name(raw)
 
 def infer_service_name_from_pod(pod_name: str | None) -> str | None:
     """Infer a stable service/controller name from a Kubernetes pod name."""
@@ -166,7 +218,8 @@ def infer_service_name_from_pod(pod_name: str | None) -> str | None:
 def is_internal_namespace(namespace: str | None) -> bool:
     if not namespace:
         return False
-    return namespace.strip().lower() in _INTERNAL_NAMESPACES
+    names = set(_INTERNAL_NAMESPACES) | {x.lower() for x in runtime_profile.load_profile().internal_namespaces}
+    return namespace.strip().lower() in names
 
 
 def is_monitored_service(service: str | None) -> bool:
@@ -191,9 +244,35 @@ def is_monitored_service(service: str | None) -> bool:
     return not bool(exclude_re and exclude_re.search(value))
 
 
+_PLATFORM_LAYERS = frozenset({"platform", "slo"})
+_PLATFORM_ALERT_RE = re.compile(
+    r"^(?:"
+    r"Minio|"
+    r"Loki|"
+    r"Tempo|"
+    r"Mimir|"
+    r"Otel|"
+    r"Prometheus|"
+    r"Alertmanager|"
+    r"PersistentVolume|"
+    r"HPA|"
+    r"SLO"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def is_monitored_alert(labels: dict[str, str], resolved_service: str | None = None) -> bool:
     """True if an alert belongs to external/app service scope."""
     if is_internal_namespace(labels.get("namespace")):
+        return False
+
+    layer = str(labels.get("layer") or "").strip().lower()
+    if layer in _PLATFORM_LAYERS:
+        return False
+
+    alert_name = str(labels.get("alertname") or "").strip()
+    if alert_name and _PLATFORM_ALERT_RE.match(alert_name):
         return False
 
     service = resolved_service or extract_service_from_labels(labels)

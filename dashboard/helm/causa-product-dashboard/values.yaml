@@ -1,0 +1,36 @@
+replicaCount: 1
+production: false
+image:
+  repository: causa/dashboard
+  tag: local
+  digest: ""
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 8090
+env:
+  PROMETHEUS_URL: http://prometheus.prometheus.svc.cluster.local:9090
+  LOKI_URL: http://loki.loki.svc.cluster.local:3100
+  TEMPO_URL: http://tempo.tempo.svc.cluster.local:3200
+  PGHOST: postgres.postgres.svc.cluster.local
+  PGPORT: "5432"
+  PGDATABASE: causa
+  PGUSER: causa_remediator
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+networkPolicy:
+  enabled: false
+  allowedIngressNamespaces:
+    - ingress-nginx
+database:
+  # This Secret must exist in the dashboard release namespace.
+  secret: causa-dashboard-db
+  passwordKey: remediator-password

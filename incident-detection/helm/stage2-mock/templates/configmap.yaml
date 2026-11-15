@@ -7,7 +7,7 @@ data:
   mock.py: |
     # DEV-ONLY mock Stage-2 receiver. Returns 200 to /trigger and /health and
     # logs the payload so the ingest trigger's forward path is observable. Not a
-    # scorer — Dev B's real engine replaces this.
+    # scorer; install it only through the explicit mock development profile.
     import json
     import logging
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

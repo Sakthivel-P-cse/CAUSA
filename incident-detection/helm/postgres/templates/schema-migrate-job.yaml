@@ -1,0 +1,248 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "postgres.fullname" . }}-schema-migrate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-schema-migrate
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: schema-migrate
+        app.kubernetes.io/part-of: causa
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgres.secretName" . }}
+                  key: {{ .Values.auth.existingSecretKey }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until pg_isready \
+                --host={{ include "postgres.fullname" . | quote }} \
+                --port={{ .Values.service.port }} \
+                --username={{ .Values.auth.username | quote }} \
+                --dbname={{ .Values.auth.database | quote }}; do
+                sleep 2
+              done
+
+              psql \
+                --host={{ include "postgres.fullname" . | quote }} \
+                --port={{ .Values.service.port }} \
+                --username={{ .Values.auth.username | quote }} \
+                --dbname={{ .Values.auth.database | quote }} \
+                --set=ON_ERROR_STOP=1 <<'SQL'
+              CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+              CREATE TABLE IF NOT EXISTS rca_reports (
+                  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                  triggered_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  alert_name          TEXT        NOT NULL,
+                  alerted_service     TEXT,
+                  root_cause_service  TEXT,
+                  failure_type        TEXT,
+                  routing             TEXT,
+                  incident_id         TEXT,
+                  root_cause_summary  TEXT,
+                  origin_candidates   JSONB,
+                  amplifier_nodes     JSONB,
+                  blast_radius        JSONB,
+                  anomaly_scores      JSONB,
+                  first_error_span    JSONB,
+                  retry_amplification JSONB,
+                  incident_scope      JSONB,
+                  inference_evidence  JSONB,
+                  confidence_score    FLOAT,
+                  evidence            JSONB,
+                  timeline            JSONB,
+                  trace_id            TEXT,
+                  resolved_at         TIMESTAMPTZ,
+                  feedback_verdict    TEXT,
+                  feedback_notes      TEXT,
+                  feedback_updated_at TIMESTAMPTZ,
+                  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE INDEX IF NOT EXISTS idx_rca_triggered_at
+                  ON rca_reports (triggered_at DESC);
+              CREATE INDEX IF NOT EXISTS idx_rca_failure_type
+                  ON rca_reports (failure_type);
+              CREATE INDEX IF NOT EXISTS idx_rca_root_cause_service
+                  ON rca_reports (root_cause_service);
+              CREATE INDEX IF NOT EXISTS idx_rca_alert_name
+                  ON rca_reports (alert_name);
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_rca_incident_id
+                  ON rca_reports (incident_id)
+                  WHERE incident_id IS NOT NULL;
+
+              CREATE TABLE IF NOT EXISTS incidents (
+                  incident_id     TEXT        PRIMARY KEY,
+                  alert_name      TEXT        NOT NULL,
+                  alerted_service TEXT,
+                  namespace       TEXT,
+                  node            TEXT,
+                  severity        TEXT,
+                  window_start    TIMESTAMPTZ,
+                  window_end      TIMESTAMPTZ,
+                  trace_id        TEXT,
+                  telemetry_refs  JSONB,
+                  status          TEXT        NOT NULL DEFAULT 'open',
+                  snapshot_status TEXT,
+                  triggered_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  resolved_at     TIMESTAMPTZ
+              );
+              ALTER TABLE incidents ADD COLUMN IF NOT EXISTS snapshot_status TEXT;
+              CREATE INDEX IF NOT EXISTS idx_incidents_triggered_at
+                  ON incidents (triggered_at DESC);
+              CREATE INDEX IF NOT EXISTS idx_incidents_status
+                  ON incidents (status);
+
+              CREATE TABLE IF NOT EXISTS dashboard_incident_state (
+                  incident_key TEXT PRIMARY KEY,
+                  acked_at TIMESTAMPTZ NOT NULL,
+                  acked_by TEXT NOT NULL,
+                  snoozed_until TIMESTAMPTZ
+              );
+
+              CREATE TABLE IF NOT EXISTS anomaly_baseline (
+                  node        TEXT,
+                  metric      TEXT,
+                  median      DOUBLE PRECISION,
+                  mad         DOUBLE PRECISION,
+                  n           INTEGER,
+                  captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  PRIMARY KEY (node, metric)
+              );
+
+              CREATE SCHEMA IF NOT EXISTS groundtruth;
+              CREATE TABLE IF NOT EXISTS groundtruth.ground_truth (
+                  incident_id    TEXT        PRIMARY KEY,
+                  true_root_node TEXT        NOT NULL,
+                  fault_class    TEXT        NOT NULL,
+                  inject_start   TIMESTAMPTZ,
+                  inject_end     TIMESTAMPTZ,
+                  topology_id    TEXT,
+                  labeler        TEXT,
+                  verified_at    TIMESTAMPTZ,
+                  label_notes    TEXT
+              );
+              ALTER TABLE groundtruth.ground_truth
+                  ADD COLUMN IF NOT EXISTS topology_id TEXT,
+                  ADD COLUMN IF NOT EXISTS labeler TEXT,
+                  ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ,
+                  ADD COLUMN IF NOT EXISTS label_notes TEXT;
+
+              CREATE TABLE IF NOT EXISTS stage2_outbox (
+                  id          BIGSERIAL   PRIMARY KEY,
+                  payload     JSONB       NOT NULL,
+                  attempts    INTEGER     NOT NULL DEFAULT 0,
+                  last_error  TEXT,
+                  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  sent_at     TIMESTAMPTZ
+              );
+              CREATE INDEX IF NOT EXISTS idx_stage2_outbox_pending
+                  ON stage2_outbox (id) WHERE sent_at IS NULL;
+
+              CREATE TABLE IF NOT EXISTS remediation_plans (
+                  id              TEXT PRIMARY KEY,
+                  incident_id     TEXT NOT NULL,
+                  report_id       TEXT,
+                  candidate_node  TEXT,
+                  fault_class     TEXT,
+                  action          TEXT,
+                  depth           TEXT,
+                  summary         TEXT,
+                  details         JSONB,
+                  status          TEXT NOT NULL DEFAULT 'proposed',
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  decided_at      TIMESTAMPTZ,
+                  decided_by      TEXT,
+                  apply_result    JSONB
+              );
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS plan_spec JSONB;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS before_fingerprint TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS risk_tier TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS claimed_by TEXT;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+              ALTER TABLE remediation_plans ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
+              CREATE UNIQUE INDEX IF NOT EXISTS idx_remediation_plans_idempotency
+                  ON remediation_plans (idempotency_key) WHERE idempotency_key IS NOT NULL;
+              CREATE INDEX IF NOT EXISTS idx_remediation_plans_status
+                  ON remediation_plans (status);
+              CREATE INDEX IF NOT EXISTS idx_remediation_plans_incident
+                  ON remediation_plans (incident_id);
+              CREATE TABLE IF NOT EXISTS remediation_events (
+                  id          TEXT PRIMARY KEY,
+                  plan_id     TEXT NOT NULL,
+                  event_type  TEXT NOT NULL,
+                  payload     JSONB,
+                  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+              CREATE INDEX IF NOT EXISTS idx_remediation_events_plan
+                  ON remediation_events (plan_id);
+              DO $$$$
+              BEGIN
+                  IF NOT EXISTS (
+                      SELECT 1 FROM pg_constraint
+                      WHERE conname = 'remediation_plans_status_check'
+                  ) THEN
+                      ALTER TABLE remediation_plans
+                      ADD CONSTRAINT remediation_plans_status_check
+                      CHECK (status IN (
+                          'proposed', 'approved', 'claimed', 'executing',
+                          'observing', 'succeeded', 'failed', 'rolled_back',
+                          'rejected', 'expired'
+                      )) NOT VALID;
+                  END IF;
+                  IF NOT EXISTS (
+                      SELECT 1 FROM pg_constraint
+                      WHERE conname = 'remediation_events_plan_fk'
+                  ) THEN
+                      ALTER TABLE remediation_events
+                      ADD CONSTRAINT remediation_events_plan_fk
+                      FOREIGN KEY (plan_id) REFERENCES remediation_plans(id)
+                      ON DELETE CASCADE NOT VALID;
+                  END IF;
+              END
+              $$$$;
+
+              DO $$$$
+              BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
+                      CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
+                  END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'causa_eval') THEN
+                      CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
+                  END IF;
+              END
+              $$$$;
+              SQL

@@ -354,7 +354,10 @@ def _build_incidents(
     inject_start: datetime,
     inject_end: datetime,
     node_name: str | None,
+    incident_id_override: str | None = None,
 ) -> list[Incident]:
+    if incident_id_override and len(scenario.faults) != 1:
+        raise ValueError("--incident-id can only be used with a single-fault scenario")
     resolved_node = _resolve_node(scenario, node_name)
     incidents: list[Incident] = []
     for fault in scenario.faults:
@@ -369,7 +372,8 @@ def _build_incidents(
             root = resolved_node
         incidents.append(
             Incident(
-                incident_id=_incident_id(scenario, root, inject_start),
+                incident_id=incident_id_override
+                or _incident_id(scenario, root, inject_start),
                 true_root_node=root,
                 fault_class=fault.fault_class,
                 inject_start=inject_start,
@@ -447,6 +451,7 @@ def run_scenario(
     probe_seconds: int = 30,
     prometheus_url: str = _DEFAULT_PROM_URL,
     error_floor: float = _DEFAULT_ERROR_FLOOR,
+    incident_id: str | None = None,
 ) -> list[Incident]:
     """Execute one scenario and return the Incident ground-truth row(s)."""
     is_flagd = scenario.special == "flagd"
@@ -454,8 +459,10 @@ def run_scenario(
     # ── dry-run: describe only, never sleep or persist ────────────────
     if not apply:
         now = _now()
-        incidents = _build_incidents(scenario, now, now, node_name)
         how = f"flip flagd flag {scenario.flag!r}" if is_flagd else "apply CRD"
+        incidents = _build_incidents(
+            scenario, now, now, node_name, incident_id_override=incident_id
+        )
         logger.info(
             "[dry-run] would %s for %s (roots=%s) for %ds — not applying, not persisting.",
             how, scenario.id, [i.true_root_node for i in incidents], hold_seconds,
@@ -580,8 +587,24 @@ def run_scenario(
     if inject_start is None or inject_end is None:
         return []
 
-    incidents = _build_incidents(scenario, inject_start, inject_end, node_name)
-    _persist(incidents, scenario, out_dir=out_dir, write_db=write_db)
+    incidents = _build_incidents(
+        scenario,
+        inject_start,
+        inject_end,
+        node_name,
+        incident_id_override=incident_id,
+    )
+    current_context = context or (
+        _kubectl_capture(["config", "current-context"], context) or "unknown-context"
+    ).strip()
+    _persist(
+        incidents,
+        scenario,
+        out_dir=out_dir,
+        write_db=write_db,
+        topology_id=f"{current_context}:{namespace}",
+        injected=injected,
+    )
     return incidents
 
 
@@ -615,6 +638,8 @@ def _persist(
     *,
     out_dir: Path | None,
     write_db: bool,
+    topology_id: str,
+    injected: bool = True,
 ) -> None:
     for inc in incidents:
         record = asdict(inc)
@@ -631,7 +656,22 @@ def _persist(
 
         if write_db:
             from ingest.trigger.state import IncidentStore
-            IncidentStore().write_ground_truth(inc)
+            # Never claim confirmation the run did not obtain. Under
+            # --allow-unverified the fault may never have been admitted, and a
+            # row labelled "confirmed" is worse than an unlabelled one: it makes
+            # a phantom indistinguishable from a real incident at eval time.
+            IncidentStore().write_ground_truth(
+                inc,
+                topology_id=topology_id,
+                labeler=f"chaos-harness:{scenario.id}",
+                verified_at=_now() if injected else None,
+                label_notes=(
+                    "Chaos Mesh AllInjected status confirmed"
+                    if injected
+                    else "UNVERIFIED: recorded via --allow-unverified; "
+                         "AllInjected never observed"
+                ),
+            )
             logger.info("Wrote ground truth → Postgres groundtruth.ground_truth (%s)",
                         inc.incident_id)
 
@@ -673,6 +713,11 @@ def main(argv: list[str] | None = None) -> int:
                    help="Prometheus base URL for --verify-effect")
     p.add_argument("--error-floor", type=float, default=_DEFAULT_ERROR_FLOOR,
                    help="min peak error_rate fraction counted as an effect (--verify-effect)")
+    p.add_argument(
+        "--incident-id",
+        default=None,
+        help="actual Alertmanager/RCA incident id to label (single-fault scenarios only)",
+    )
     p.add_argument("--out", type=Path, default=None, help="dir for ground-truth JSON")
     p.add_argument("--write-db", action="store_true", help="write to Postgres groundtruth schema")
     p.add_argument("--dry-run", action="store_true", help="don't apply/delete CRDs; print only")
@@ -699,6 +744,7 @@ def main(argv: list[str] | None = None) -> int:
         probe_seconds=args.probe_seconds,
         prometheus_url=args.prometheus_url,
         error_floor=args.error_floor,
+        incident_id=args.incident_id,
     )
     return 0
 

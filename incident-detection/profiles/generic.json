@@ -1,0 +1,16 @@
+{
+  "name": "generic",
+  "namespaces": ["default"],
+  "remediation_namespace": "default",
+  "service_allowlist": [],
+  "auto_actions": [],
+  "monitored_services_regex": ".*",
+  "excluded_services_regex": "^(kube-|prometheus|grafana|loki|tempo|mimir|alertmanager).*$",
+  "configmap_name": "",
+  "configmap_key": "",
+  "remediation_base_branch": "main",
+  "min_confidence": 0.15,
+  "capabilities": {
+    "*": ["scale_up", "restart_data_path", "rollback_to_last_good"]
+  }
+}

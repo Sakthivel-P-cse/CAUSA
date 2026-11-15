@@ -11,8 +11,8 @@ set -euo pipefail
 
 FORCE="${1:-}"
 
-RELEASES=("causa-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
-NAMESPACES=("causa-dashboard" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
+RELEASES=("causa-dashboard" "causa-ingest" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
+NAMESPACES=("causa-dashboard" "causa-ingest" "stage2-rca" "postgres" "alertmanager" "otel-agent" "otel-lb" "otel-collector" "prometheus" "mimir" "minio-mimir" "loki" "minio-loki" "tempo" "minio-tempo" "node-exporter" "kube-state-metrics")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"

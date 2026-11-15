@@ -47,7 +47,18 @@ data:
         -- Human-readable RCA summary
         root_cause_summary  TEXT,
 
-        -- Ranked origin candidates + related RCA expansion fields
+        -- Ranked origin candidates + related RCA expansion fields.
+        --
+        -- origin_candidates: ranked [candidate] objects that could be the CAUSE
+        --   — nodes concluded to be effects (role victim / victim-of-infra) are
+        --   excluded. Each carries node_id, score, confidence, role, signals,
+        --   dev_vector, explanation, cluster_id, flags. Exactly one node per
+        --   cluster carries role='origin'; the rest are ranked alternatives.
+        -- amplifier_nodes:   node ids with role='amplifier'.
+        -- blast_radius:      node ids the incident REACHED — anomaly_score at or
+        --   above theta_fire, excluding the origin(s). Not a copy of the
+        --   candidate list; subgraph neighbours below theta_fire are not in it.
+        -- anomaly_scores:    {node: score} for every scored node, unfiltered.
         origin_candidates   JSONB,
         amplifier_nodes     JSONB,
         blast_radius        JSONB,
@@ -104,6 +115,16 @@ data:
     CREATE INDEX IF NOT EXISTS idx_rca_alert_name
         ON rca_reports (alert_name);
 
+    -- One report per incident. Alertmanager re-sends a firing alert every
+    -- repeat_interval, and the trigger's in-process dedup does not survive a
+    -- restart or span replicas — without this, a single incident accumulates
+    -- duplicate reports and the dashboard's "recent incidents" list shows the
+    -- same incident N times. Partial so pre-isolation rows with a NULL
+    -- incident_id (which are not identified incidents) stay permitted.
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_rca_incident_id
+        ON rca_reports (incident_id)
+        WHERE incident_id IS NOT NULL;
+
     -- --------------------------------------------------------
     -- incidents: ingestion-owned incident WINDOW state (PRD2 §9).
     -- Written by the Dev-A trigger service (ingest.trigger) when an
@@ -122,6 +143,7 @@ data:
         trace_id        TEXT,
         telemetry_refs  JSONB,
         status          TEXT        NOT NULL DEFAULT 'open',   -- open | resolved
+        snapshot_status TEXT,                                  -- ok | failed | NULL
         triggered_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         resolved_at     TIMESTAMPTZ
     );
@@ -134,6 +156,13 @@ data:
     -- anomaly_baseline: shared robust warmup baselines (contract C2), so the
     -- trigger service and the eval harness load identical median/MAD numbers.
     -- --------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS dashboard_incident_state (
+        incident_key TEXT PRIMARY KEY,
+        acked_at TIMESTAMPTZ NOT NULL,
+        acked_by TEXT NOT NULL,
+        snoozed_until TIMESTAMPTZ
+    );
+
     CREATE TABLE IF NOT EXISTS anomaly_baseline (
         node        TEXT,
         metric      TEXT,
@@ -184,7 +213,7 @@ data:
     --
     -- NOTE: this init script runs ONCE, on an empty data volume. On an existing
     -- cluster these REVOKE/GRANT/role statements must be applied by hand.
-    DO $$
+    DO $$$$
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rca_engine') THEN
             CREATE ROLE rca_engine LOGIN PASSWORD 'rca_engine';
@@ -195,7 +224,7 @@ data:
             CREATE ROLE causa_eval LOGIN PASSWORD 'causa_eval';
         END IF;
     END
-    $$;
+    $$$$;
 
     -- Lock the groundtruth schema: no access for PUBLIC (rca_engine inherits
     -- from PUBLIC) and an explicit belt-and-suspenders revoke for rca_engine.
@@ -206,7 +235,7 @@ data:
     ALTER DEFAULT PRIVILEGES IN SCHEMA groundtruth REVOKE ALL ON TABLES FROM rca_engine;
 
     -- The engine only ever touches the read-side tables it legitimately uses.
-    GRANT SELECT, INSERT, UPDATE ON rca_reports TO rca_engine;
+    GRANT SELECT, INSERT, UPDATE ON rca_reports, dashboard_incident_state TO rca_engine;
     GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
 
     -- The eval role: read-only across reports/incidents/baselines AND ground

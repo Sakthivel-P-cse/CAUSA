@@ -106,8 +106,8 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  # Kept as the Stage-2 deployment SLOT: Dev-A's dev mock lives here, and Dev B's
-  # real engine replaces it in place (see helm/postgres/DB_ROLE_CONTRACT.md).
+  # Stage-2 deployment slot. The real engine is the default; an explicit dev
+  # mock profile uses the same release and Service.
   # causa-dashboard's namespace is Dev C's to create (they own that chart).
   name: stage2-rca
   labels:

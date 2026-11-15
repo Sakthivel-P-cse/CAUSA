@@ -1,0 +1,316 @@
+# TraceOps Dashboard — Frontend UI Description
+
+This document describes the TraceOps dashboard frontend: how it is built, how it fetches
+and displays data, and what every page and major component shows in the UI.
+
+Source location: `dashboard/frontend`
+
+---
+
+## 1. Technology stack
+
+A **React 18 + Vite** single-page application (JavaScript, no TypeScript).
+
+| Concern | Library |
+|---|---|
+| UI framework | React 18.3 |
+| Build / dev server | Vite 8 (`npm run dev` on port 5173) |
+| Routing | `react-router-dom` v6, routes lazy-loaded via `React.lazy` |
+| Server state & caching | `@tanstack/react-query` (15s stale time, optional polling) |
+| Data tables | `@tanstack/react-table` |
+| Time-series & aggregate charts | `recharts` |
+| Topology / node-link graphs | `reactflow` + `dagre` (automatic layout) |
+| Markdown rendering (AI reports) | `react-markdown` |
+| Date formatting | `date-fns` |
+| Icons | `lucide-react` |
+| Unit tests | `vitest` + Testing Library |
+| E2E / accessibility tests | `playwright` + `@axe-core/playwright` |
+
+Styling is plain CSS split into token/theme/layout/component/explorer/watchdog stylesheets
+under `src/styles/`. Theming (dark/light/system) and density (comfortable/compact) are
+applied via `data-theme` / `data-density` attributes on `<html>`.
+
+---
+
+## 2. Application shell and architecture
+
+### Entry & auth gate (`App.jsx`)
+The app is authentication-gated:
+- `AuthContext` bootstraps a session on load.
+- While loading → a loading screen.
+- If not authenticated → the `Login` page.
+- If authenticated → the `ProductShell`.
+
+### ProductShell layout
+- **Sidebar** — collapsible, with the TraceOps brand and grouped navigation.
+- **Topbar** — mobile menu button, breadcrumbs, global controls, and a user menu.
+- **Main area** — the routed page, rendered inside a `Suspense` boundary.
+- **Mobile drawer** — slide-out navigation for small screens.
+
+### Navigation groups
+| Group | Items (route) |
+|---|---|
+| **Watchdog** | Overview (`/`), Incidents & RCA (`/incidents`), History (`/incidents/history`) |
+| **Investigate** | Graph Maps (`/graphs`) |
+| **Explore** | Metrics (`/metrics`), Logs (`/logs`), Traces (`/traces`), Infrastructure (`/infra`) |
+| **Analytics** | Statistics (`/stats`) |
+
+Additional routes: incident detail (`/incidents/:reportId`), history detail
+(`/incidents/history/:incidentId`), and a legacy `/rca` → `/incidents` redirect.
+
+### Global controls (topbar)
+- **Service scope** — free-text service filter.
+- **Time-range picker** — relative window (15m/30m/1h/2h/6h/24h) or an absolute from/to range.
+- **Auto-refresh** — off / 15s / 30s / 60s.
+- **Refresh button** — dispatches a `watchdog:refresh` event and invalidates all React Query caches.
+
+### User menu
+Theme toggle (dark/light), density toggle (compact/comfortable), and sign out.
+
+---
+
+## 3. State management
+
+### `DashboardContext`
+- Holds **global filters** (service, time window, refresh interval) synchronized to the
+  **URL query string**, so views are shareable and bookmarkable.
+- Holds **preferences** (theme, density, sidebar collapsed, saved views) persisted to
+  `localStorage`.
+- Exposes `filters`, `preferences`, `setFilter`, `setPreference`, `resetFilters`, `timeMode`.
+
+### `AuthContext`
+- Loads the session, exposes `login()` / `logout()` / `bootstrap()`.
+- Listens for the `traceops:unauthorized` event (fired on 401) to drop the session.
+- Stores a CSRF token used by the API client.
+
+### API layer (`src/api/`)
+- **`client.js`** — `apiFetch` wrapper: JSON body handling, cookie credentials, CSRF header
+  injection on mutating requests, and a `traceops:unauthorized` event on 401. Throws a
+  typed `ApiError` with status + code.
+- **`queries.js`** — shared `QueryClient` (retry except on 401/403, 15s stale time) and the
+  `useApiQuery` hook plus `queryKeys` factory.
+- **`incidents.js`** (~600 lines) — the heavy **normalization layer**. It defensively
+  reshapes messy/legacy backend RCA payloads into stable UI shapes:
+  incident history items, RCA report detail, causal hypotheses, five confidence dimensions,
+  telemetry-coverage grouping, supporting/contradicting evidence, and LLM enrichment. It
+  also builds evidence deep-links (`evidenceLink`) that pivot from an evidence item into the
+  correct telemetry explorer (Metrics / Logs / Traces / Topology / change timeline).
+- **`useFetch.js`** — a thin React Query wrapper returning `{ data, loading, error, reload }`
+  with optional `refreshMs` polling.
+
+Each frontend area maps to a FastAPI backend router: `/api/alerts`, `/api/metrics`,
+`/api/logs`, `/api/traces`, `/api/infra`, `/api/graphs`, `/api/incidents`, `/api/rca`,
+`/api/stats`.
+
+---
+
+## 4. Pages
+
+### Watchdog group
+
+#### Overview (`/`)
+The operational landing page. Shows:
+- **Alert banner** — count of active alerts and the top 5 (alert name, service, summary).
+- **Health summary** — KPI cards (active alerts, recent incidents, complete analyses,
+  needs-investigation, degraded services).
+- **Highest-priority insights** — top 6 incidents as `InsightCard`s.
+- **Incident activity card** — an incidents-per-day sparkline plus total incidents and
+  average confidence KPIs.
+- **Service health card** — grid of up to 8 services with health dot, error rate, p99
+  latency, RPS, and an error-rate bar.
+- **Result summary** — scope/window/refresh badges.
+
+#### Incidents & RCA (`/incidents`) — the incident inbox
+- **Search + sort + filter form** — free-text search; sort by highest priority / newest /
+  highest confidence; minimum-confidence filter; automation-eligibility filter.
+- **Faceted filter sidebar** (`FacetPanel`) — severity, analysis quality, failure type,
+  routing, root service, with counts.
+- **Table / Cards view toggle** — table (`IncidentTable`) or card grid (`InsightCard`).
+- **Saved views** — persist the current query under a name (localStorage).
+- **Pagination** — 25 per page, offset-based.
+- Priority sorting is applied client-side when the sort is "highest priority".
+
+#### Incident Investigation (`/incidents/:reportId`) — the centerpiece (~1000 lines)
+A 7-tab RCA report explorer. Header shows severity/analysis-status/incident-status chips, an
+"active alert" chip when correlated, the title, root-cause summary, and a **conservative
+aggregate confidence gauge** (explicitly labelled "not a probability"). A **Re-run analysis**
+button appears when the report is reanalysis-eligible.
+
+Contextual banners:
+- **Calibration-not-fitted warning** when confidence is uncalibrated.
+- **Historical report warning** when analysis is older than 24h.
+- **Analysis-failure panel** when telemetry backends were unavailable (distinguishes an
+  analysis-system failure from an unknown application root cause).
+- **Compact warnings** grouping per-service metric-unavailable warnings.
+
+Tabs:
+1. **Overview** —
+   - **RCA story** (numbered 1–3): Root cause, Critical failure, Impact.
+   - **Causal hypotheses** — a side-by-side comparison table of two selectable hypotheses:
+     root set, failure type, heuristic score, score decomposition, supporting/refuting
+     evidence, causal paths, counterfactual / path coverage, unexplained residuals, and
+     evidence strength/basis, with an auto-generated comparison rationale.
+   - **Confidence panel** — 5 dimensions with `<meter>` bars (root ranking, failure type,
+     causal consistency, evidence coverage, automation safety) plus calibration metadata.
+   - **Quality panel** — telemetry outcomes grouped by backend/signal (success/empty/error
+     counts, record counts) plus calibration and automation-eligibility.
+   - **Impact panel** — observed affected services vs. topology-derived predicted exposure.
+   - **Changes panel** — deployment/Kubernetes changes near the incident (observed vs.
+     context-only), revisions, resource versions, images.
+   - **Investigation scope** and **Anomaly profile** (sparkline of anomaly scores).
+   - **Historical analogs** — grid of similar past incidents with similarity %.
+   - **Feedback form** — accept/reject verdict; on reject, optional corrected root service,
+     corrected failure type, and missing-evidence list; posts to `/api/rca/:id/feedback`.
+2. **Evidence** — supporting and contradicting evidence items, each with observed values vs.
+   baseline, score, timestamp, reproducibility (window/query/reference/source), and a
+   deep-link to its source telemetry explorer.
+3. **Timeline** — causal narrative (or legacy events), sortable oldest/newest, with phase
+   tags, uncertainty labels, and evidence reference links.
+4. **Topology** — three views (incident snapshot / current reconstruction / comparison),
+   with provenance notices and, in comparison mode, a diff summary plus two side-by-side
+   topology graphs.
+5. **Related telemetry** — pivot links into Metrics, Logs, Topology, and each persisted
+   trace, carrying the persisted incident window.
+6. **AI-generated report** — clearly marked non-authoritative; shows synthesis status
+   (complete/fallback/disabled/error/unavailable), provider/model/latency/source-digest
+   metadata, a classification review (agrees/disagrees with canonical RCA), the rendered
+   Markdown report, and collapsible structured JSON.
+7. **Raw** — the raw report JSON.
+
+Keyboard navigation (arrow/Home/End) moves between tabs; the active tab is stored in the URL.
+
+#### History (`/incidents/history`)
+A durable incident lifecycle archive:
+- **List view** — search, service autocomplete, failure-type filter, date-range presets
+  (all/24h/7d/30d), sort, status radio (active/resolved/all), and pagination (25/page).
+  Table columns: incident ID, status chip, root service, analysis status, confidence %,
+  report-version count, first/last seen.
+- **Detail view** (`/incidents/history/:incidentId`) — breadcrumb, header with alert name
+  and status chips; a durable definition list (alerted service, root cause, failure type,
+  first/last/resolved timestamps); a list of immutable RCA report versions (each linking to
+  its investigation); and a chronological lifecycle event timeline.
+
+### Investigate group
+
+#### Graph Maps (`/graphs`)
+A multi-layer topology explorer with 4 tabs, all rendered via `TopologyGraph`:
+- **Services** — live service dependency map.
+- **Infrastructure** — live node/pod/infra map.
+- **Trace execution** — a selected trace's span graph (choose from recent traces).
+- **Incident subgraph** — a selected RCA report's incident topology.
+Each tab has legend chips for node/edge types.
+
+### Explore group (telemetry browsers, built on the shared `Explorer` framework)
+
+#### Metrics (`/metrics`)
+Per-service performance comparison using a **Recharts `ComposedChart`**: stacked baseline
+area + observed line + anomaly scatter, for error rate (%), p99 latency (ms), and request
+rate (req/s). Includes a service sidebar with health dots and stat cards (current, baseline,
+delta %, health) plus per-metric anomaly counts and a rolling baseline reference line.
+
+#### Logs (`/logs`)
+Loki log viewer: full-text search, level dropdown (error/warn/info/debug), source-label
+dropdown, a **24-bucket volume histogram**, a facet sidebar with source counts, and
+expandable rows showing JSON detail and a clickable trace-ID link (200-log limit).
+
+#### Traces (`/traces`)
+Tempo trace explorer: sidebar of up to 50 recent trace IDs (searchable, "errors only"
+toggle); a detail pane with stats (E2E duration, span count, service count, error spans); a
+**span waterfall** with hierarchical indentation, critical-path highlighting (amber) and
+error spans (red); and a per-span inspector.
+
+#### Infrastructure (`/infra`)
+Kubernetes cluster view: side-by-side **Nodes** table (CPU %, memory %, condition badges) and
+**Pods** table (namespace, restart count, status), with search and status filter; 5 stat
+cards (node/pod counts, average CPU/memory, unhealthy count); and a live `TopologyGraph`
+that can focus on a selected node's connected resources.
+
+### Analytics group
+
+#### Statistics (`/stats`)
+RCA aggregates rendered with **Recharts**: stat cards (total reports, classification-coverage
+%, average confidence, failure-type count); a coverage progress bar; a failure-distribution
+**pie chart**; a top-affected-services **bar chart**; and a reports-per-day **bar chart**
+(last 30 days).
+
+### Login (`/login` gate)
+Centered branded card with username/password inputs, a submitting state, and an error box
+(clears the password on failure).
+
+---
+
+## 5. Shared components
+
+### `TopologyGraph.jsx` (ReactFlow + dagre) — the most complex component
+- Automatic top-to-bottom **dagre layout**; custom node component; `fitView`, zoom 0.2–2,
+  pan, and ReactFlow controls.
+- **Node coloring** by status/kind: nodes/infra (grey/yellow/red by condition & CPU), pods
+  (green/yellow/red by restart count), spans (red on error), services (blue/green).
+- **Edge styling** by type and error rate; edges animate when error rate ≥ 5% or on trace
+  calls; labels show request rate or p99 latency.
+- **Causal overlay** driven by the primary hypothesis: root-cause nodes (purple outline),
+  causal-path nodes/edges (cyan; edge width scales with evidence strength), contradictions
+  (dashed orange), unexplained residuals (dotted yellow), with a legend.
+- **Inspector panel** — selected node's metadata (type, namespace, condition, restarts, CPU/
+  memory %, service, host, operation, duration, status code) and incoming/outgoing degree.
+- Selecting a node dims unrelated nodes/edges and thickens connected edges.
+- **Accessible text summary** — a `<details>` list of all nodes and connections.
+
+### Watchdog components (`src/components/watchdog/`)
+- **HealthSummary** — the 5 KPI cards described under Overview.
+- **InsightCard** — compact incident card: severity/analysis-status chips, automation-
+  suppressed chip, clickable title, summary, and a meta row (service, failure type,
+  confidence %, timestamp); prefetches the incident on hover. Exports `incidentPriority`.
+- **IncidentTable** — clickable rows with columns: detected, finding (+ severity chip),
+  root service, quality, confidence %, routing.
+- **FacetPanel** — grouped filter checkboxes with counts and a clear button.
+- **AnomalySparkline** — a small responsive SVG polyline of anomaly scores.
+
+### Explorer framework (`src/components/explorer/Explorer.jsx`)
+Shared building blocks for the Explore pages: `ExplorerHeader`, `ExplorerSummary`,
+`ExplorerState` (loading/error/empty), `ExplorerField`, `FacetButton`, plus helpers
+`formatDuration`, `setUrlParams`, and `initialUrlParam`.
+
+Frontier coding models
+free for the best
+
+We're recruiting the best engineers and giving them the latest premium coding models for free. Your usage will help evaluate and improve the performance of frontier coding models.
+Apply now
+### UI primitives (`src/components/ui/` and `Common.jsx`)
+- `ui/` — Button, Navigation, Page, Overlay (Drawer/Popover), DataTable, FormControls
+  (Input/Select/TimeRangePicker), Feedback (LoadingState/etc.), re-exported from `index.js`.
+- `Common.jsx` — StatusDot, Card, Badge, Spinner, ErrorMsg, Table, Drawer.
+- `ErrorBoundary.jsx` — catches render errors.
+
+---
+
+## 6. Data flow summary
+
+1. Global filters live in `DashboardContext` and are mirrored to the URL query string.
+2. Pages read those filters, build query params (relative or absolute window), and fetch via
+   `useFetch` / `useApiQuery`, which wrap React Query around `apiFetch`.
+3. `apiFetch` talks to the FastAPI backend routers with cookies + CSRF, and raises a typed
+   `ApiError`; 401s drop the session via a global event.
+4. Raw backend payloads (especially RCA reports) pass through the `incidents.js`
+   normalization layer into stable UI shapes.
+5. Components render those shapes as charts (Recharts), topology graphs (ReactFlow + dagre),
+   tables, cards, and timelines.
+6. Evidence items and telemetry tabs deep-link back into the raw telemetry explorers
+   (Metrics/Logs/Traces/Infra/Topology) carrying the persisted incident window, so a
+   responder can pivot from a finding to its underlying signal.
+
+---
+
+## 7. The big picture
+
+The frontend is a three-layer product:
+- **Watchdog** — surfaces and prioritizes incidents with AI-assisted root-cause analysis
+  (Overview, Incident inbox, Investigation, History).
+- **Investigate** — topology and causal exploration (Graph Maps, the Investigation topology
+  tab).
+- **Explore** — raw telemetry browsers backed by Prometheus, Loki, Tempo, and Kubernetes
+  (Metrics, Logs, Traces, Infrastructure), plus RCA analytics (Statistics).
+
+The **Incident Investigation** page is the centerpiece; every other view feeds into it or
+drills out of it, with a strong design theme of clearly separating *observed evidence* from
+*inferred/predicted* results and marking AI synthesis as non-authoritative.

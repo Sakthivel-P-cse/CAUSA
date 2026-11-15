@@ -26,6 +26,8 @@ round-trips via `IncidentTelemetry.from_fixture(...)`.
 | `root_cause_candidate.json` | C3 | Dev C (eval/baselines) — expected ranked output |
 | `ground_truth.json` | C5 | Dev C (accuracy), Dev B (isolation) — never read pre-scoring |
 | `baseline.json` | C2 | robust median/MAD per `(node, metric)`; `anomaly.load_baselines(...)` → all lanes score against identical baselines |
+| `logs.json` | C1 (narrow) | Dev C classify — AppLogic panic/exception on product-catalog |
+| `dual_ground_truth.json` | C5 eval-only | Isolation ARI/cluster-count smoke (engine never reads) |
 | `recorded/tempo_trace.json` | — | golden OTLP payload for parsing tests |
 
 Numbers here are illustrative-but-consistent: the origin scores highest, victims
@@ -36,3 +38,7 @@ lower, and the leaf is a `null` first-deviation. The **T signals in
 frontend `0.0` — so the fixture never contradicts the scoring math. `baseline.json`
 is a plausible healthy stand-in (not raw incident values); regenerate every file
 from a real S0 run (`testbed/harness/run_scenario.py`) once the cluster is up.
+
+CI asserts **fixture smoke** on this single incident (subgraph recall +
+FixtureFull / MostAnomalous / AB Scorer top-1). Portfolio headline metrics across
+N×S0–S5 remain the M3 deliverable once the chaos corpus feeds the same harness.

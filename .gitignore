@@ -1,1 +1,32 @@
 
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.run/
+outputs/
+*.pid
+*.log
+
+# Dev-A operational output (generated, not source)
+baselines/
+ground_truth/
+
+# Fixture-smoke artifacts (regenerated in CI)
+incident-detection/artifacts/
+incident-detection/eval/artifacts/

@@ -1,0 +1,13 @@
+production: true
+replicaCount: 2
+
+image:
+  tag: ""
+  digest: ""
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true

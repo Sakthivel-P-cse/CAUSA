@@ -23,6 +23,9 @@ data:
     # Multi-tenancy: require X-Scope-OrgID on every request.
     multitenancy_enabled: {{ .Values.config.multitenancyEnabled }}
 
+    activity_tracker:
+      filepath: {{ .Values.config.dataDir }}/metrics-activity.log
+
     server:
       http_listen_port: {{ .Values.service.ports.http }}
       grpc_listen_port: {{ .Values.service.ports.grpc }}
@@ -67,6 +70,7 @@ data:
 
     ruler_storage:
       backend: s3
+      storage_prefix: ruler
       s3:
         bucket_name: {{ .Values.config.storage.bucket }}
 

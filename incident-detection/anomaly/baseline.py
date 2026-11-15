@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # genuine ~10% jump on a tight-healthy metric never fires. Robustness comes from
 # the median/MAD, not from inflating the spread.
 _MAD_ABS_FLOOR = 1e-6
+_MIN_BASELINE_N = 5
 
 
 def robust_baseline(values: Iterable[float]) -> Baseline | None:
@@ -42,6 +43,9 @@ def robust_baseline(values: Iterable[float]) -> Baseline | None:
     Non-finite samples (NaN, ±inf) are dropped before any statistic is taken: a
     single NaN would make median/MAD NaN and silently disable the metric, and a
     +inf would make it always-anomalous. Garbage in must not poison the baseline.
+
+    Requires at least ``_MIN_BASELINE_N`` finite samples — MAD with n=1 floors
+    to ε and invents huge anomalies from noise.
     """
     xs: list[float] = []
     for v in values:
@@ -51,7 +55,7 @@ def robust_baseline(values: Iterable[float]) -> Baseline | None:
             continue
         if math.isfinite(f):
             xs.append(f)
-    if not xs:
+    if len(xs) < _MIN_BASELINE_N:
         return None
     median = statistics.median(xs)
     mad_raw = statistics.median([abs(x - median) for x in xs])
@@ -66,9 +70,17 @@ def capture_warmup(
     *,
     metrics: tuple[str, ...] = METRICS,
     namespace: str | None = None,
+    kind: str = "service",
 ) -> dict[tuple[str, str], Baseline]:
     """
     Learn baselines for every (node, metric) over a healthy `window`.
+
+    `kind` selects the resource layer `cpu` / `saturation` resolve to — pass
+    "infra" for k8s node names. It MUST match the kind the reader uses at
+    incident time: dev_vector drops any metric with no (node, metric) baseline,
+    so an infra node warmed as a service silently scores 0.0 forever, and layer
+    arbitration (which needs both an anomaly score and a FirstDeviationTime for
+    the infra node) can never fire.
 
     Metrics with no data for a node are simply omitted (a node/metric with no
     baseline contributes nothing to its anomaly_score — max-composite tolerates
@@ -77,7 +89,9 @@ def capture_warmup(
     baselines: dict[tuple[str, str], Baseline] = {}
     for node in nodes:
         for metric in metrics:
-            series = adapter.metrics(node, metric, window, namespace=namespace)
+            series = adapter.metrics(
+                node, metric, window, namespace=namespace, kind=kind
+            )
             if not series:
                 continue
             b = robust_baseline(v[1] for v in series)

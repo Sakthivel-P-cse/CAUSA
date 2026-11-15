@@ -1,0 +1,59 @@
+replicaCount: 1
+production: false
+environment: development
+
+image:
+  repository: causa/stage2-rca
+  tag: "local"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+env:
+  PROMETHEUS_URL: "http://prometheus.prometheus.svc.cluster.local:9090"
+  TEMPO_URL: "http://tempo.tempo.svc.cluster.local:3200"
+  LOKI_URL: "http://loki.loki.svc.cluster.local:3100"
+  PGHOST: "postgres.postgres.svc.cluster.local"
+  PGPORT: "5432"
+  PGDATABASE: "causa"
+  PGUSER: "rca_engine"
+  TRIGGER_PORT: "8080"
+
+# In production, point this at a pre-created Secret containing PGPASSWORD.
+existingSecret: ""
+
+remediation:
+  namespace: otel-demo
+  autoPropose: "0"
+  autoApply: "0"
+  autoActions: []
+  allowUncalibratedDemo: "0"
+  databasePassword: ""
+
+probes:
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+networkPolicy:
+  enabled: false
+  allowedIngressNamespaces:
+    - causa-ingest

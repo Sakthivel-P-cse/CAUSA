@@ -55,6 +55,10 @@ config:
         regex: "go_gc_.*|go_memstats_.*"
         action: drop
 
+rules:
+  phase2:
+    enabled: true
+
 resources:
   requests:
     cpu: 250m

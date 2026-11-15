@@ -59,6 +59,10 @@ class IncidentStore:
             ) from exc
         return psycopg.connect(self._dsn, autocommit=True)
 
+    def check_available(self) -> None:
+        with self._connect() as conn:
+            conn.execute("SELECT 1")
+
     # ── incidents (window state) ──────────────────────────────────────
 
     def open_incident(
@@ -74,6 +78,7 @@ class IncidentStore:
         window_end: datetime,
         trace_id: str | None,
         telemetry_refs: dict[str, Any] | None = None,
+        snapshot_status: str | None = None,
     ) -> None:
         """Insert (or no-op on re-fire) an open incident row."""
         with self._connect() as conn:
@@ -81,14 +86,16 @@ class IncidentStore:
                 """
                 INSERT INTO incidents (
                     incident_id, alert_name, alerted_service, namespace, node,
-                    severity, window_start, window_end, trace_id, telemetry_refs, status
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'open')
+                    severity, window_start, window_end, trace_id, telemetry_refs,
+                    status, snapshot_status
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'open',%s)
                 ON CONFLICT (incident_id) DO NOTHING
                 """,
                 (
                     incident_id, alert_name, alerted_service, namespace, node,
                     severity, window_start, window_end, trace_id,
                     json.dumps(telemetry_refs or {}),
+                    snapshot_status,
                 ),
             )
         logger.info("Opened incident %s (%s / %s)", incident_id, alert_name, alerted_service)
@@ -118,23 +125,42 @@ class IncidentStore:
 
     # ── ground truth (written by the chaos harness, NOT the engine path) ──
 
-    def write_ground_truth(self, incident: Incident) -> None:
-        """Persist a chaos run's known root into the role-isolated schema."""
+    def write_ground_truth(
+        self,
+        incident: Incident,
+        *,
+        topology_id: str,
+        labeler: str,
+        verified_at: datetime | None,
+        label_notes: str | None = None,
+    ) -> None:
+        """Persist a chaos run's known root into the role-isolated schema.
+
+        ``verified_at`` is None when the run never confirmed the injection
+        (``--allow-unverified``); the column is nullable so eval can filter on
+        it rather than trusting every row equally.
+        """
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO groundtruth.ground_truth (
-                    incident_id, true_root_node, fault_class, inject_start, inject_end
-                ) VALUES (%s,%s,%s,%s,%s)
+                    incident_id, true_root_node, fault_class, inject_start, inject_end,
+                    topology_id, labeler, verified_at, label_notes
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (incident_id) DO UPDATE SET
                     true_root_node = EXCLUDED.true_root_node,
                     fault_class    = EXCLUDED.fault_class,
                     inject_start   = EXCLUDED.inject_start,
-                    inject_end     = EXCLUDED.inject_end
+                    inject_end     = EXCLUDED.inject_end,
+                    topology_id    = EXCLUDED.topology_id,
+                    labeler        = EXCLUDED.labeler,
+                    verified_at    = EXCLUDED.verified_at,
+                    label_notes    = EXCLUDED.label_notes
                 """,
                 (
                     incident.incident_id, incident.true_root_node,
                     incident.fault_class, incident.inject_start, incident.inject_end,
+                    topology_id, labeler, verified_at, label_notes,
                 ),
             )
 

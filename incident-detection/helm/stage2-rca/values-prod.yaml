@@ -1,0 +1,29 @@
+# Pre-create this Secret in namespace stage2-rca with a PGPASSWORD key whose
+# value matches the existing Postgres rca_engine role.
+existingSecret: "stage2-rca-secret"
+production: true
+environment: production
+replicaCount: 2
+
+remediation:
+  autoPropose: "0"
+  autoApply: "0"
+  autoActions: []
+  allowUncalibratedDemo: "0"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  allowedIngressNamespaces:
+    - causa-ingest
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi

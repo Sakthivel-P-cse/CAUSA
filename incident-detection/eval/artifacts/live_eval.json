@@ -1,0 +1,94 @@
+{
+  "n": 0,
+  "scored": 0,
+  "metrics": {
+    "n": 0,
+    "top1": 0.0,
+    "top3": 0.0,
+    "top5": 0.0,
+    "mrr": 0.0,
+    "subgraph_recall": 0.0,
+    "hits_at_1": 0,
+    "hits_at_3": 0,
+    "hits_at_5": 0,
+    "recall_hits": 0,
+    "per_scenario": {}
+  },
+  "failure_type": {
+    "n": 0,
+    "null_count": 0,
+    "null_rate": 0.0,
+    "classified_n": 0,
+    "match_rate": 0.0,
+    "structural_n": 0,
+    "structural_accuracy": 0.0,
+    "confusion": {
+      "n": 0,
+      "accuracy": 0.0,
+      "skipped_timing": 0,
+      "matrix": {
+        "AppLogic": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Config": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Infra": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Dependency": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Resource": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        },
+        "Data": {
+          "AppLogic": 0,
+          "Config": 0,
+          "Infra": 0,
+          "Dependency": 0,
+          "Resource": 0,
+          "Data": 0
+        }
+      },
+      "hard_confusions": []
+    },
+    "targets": [
+      "AppLogic",
+      "Config",
+      "Infra",
+      "Dependency",
+      "Resource",
+      "Data"
+    ]
+  },
+  "classifier": {
+    "attempted": 0,
+    "available": true
+  }
+}

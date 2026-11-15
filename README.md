@@ -24,10 +24,9 @@ Alertmanager
   → proposed plan → approver → leased remediation worker
 ```
 
-The Python packages are organized by domain (`incidents/`, `rca/`,
-`remediation/`, `shared/`, …); the FastAPI/React product dashboard is under
-`dashboard/`; Kubernetes charts live next to their domain under each `helm/`
-subdirectory.
+The main Python package is under `incident-detection/`; the FastAPI/React
+product dashboard is under `dashboard/`; Kubernetes deployments live in the
+corresponding `helm/` directories.
 
 ## Local development
 
@@ -35,13 +34,18 @@ subdirectory.
 2. Start the Causa stack with `./causa-startup.sh`.
 3. Point your application’s OTLP exporter at the Causa collector (or ensure the
    monitored cluster already scrapes into this stack).
+4. Start the OpenTelemetry demo with `./microservice-startup.sh`.
+
+Normal demo startup no longer deletes the application namespace. Set
+`RECREATE_DEMO_NAMESPACE=1` only when a destructive clean reinstall is intended.
 
 ## Verification
 
 ```bash
-PYTHONPATH=.import:. .venv/bin/pytest -q
+cd incident-detection
+PYTHONPATH=. .venv/bin/pytest -q
 
-cd dashboard/frontend
+cd ../dashboard/frontend
 npm ci
 npm run lint
 npm test

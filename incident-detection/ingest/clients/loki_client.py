@@ -25,9 +25,11 @@ def _utcnow() -> datetime:
 
 
 def _service_name_label_keys() -> list[str]:
+    # Prefer `job`: OTel→Loki often promotes service.name into Loki's `job` label
+    # (this demo stack has job=cart|… and no service/service_name stream labels).
     keys_env = os.getenv(
         "CAUSA_SERVICE_NAME_LABEL_KEYS",
-        "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
+        "job,service,service_name,app,app_kubernetes_io_name,k8s_app,workload,deployment,container",
     )
     return [k.strip() for k in keys_env.split(",") if k.strip()]
 
@@ -125,18 +127,22 @@ class LokiClient:
 
     @staticmethod
     def _service_from_labels(stream_labels: dict[str, Any]) -> str:
+        from ingest.service_scope import normalize_service_name
+
         pod = stream_labels.get("pod", "")
         job = stream_labels.get("job", "")
-        for key in ("service", "service_name", "app", "app_kubernetes_io_name"):
+        raw = None
+        for key in ("service", "service_name", "app", "app_kubernetes_io_name", "job"):
             value = stream_labels.get(key)
             if value:
-                return str(value)
-        if job and not str(job).startswith("kubernetes-pods"):
-            return str(job)
-        if pod:
+                raw = str(value)
+                break
+        if raw is None and job and not str(job).startswith("kubernetes-pods"):
+            raw = str(job)
+        if raw is None and pod:
             parts = str(pod).rsplit("-", 2)
-            return parts[0] if len(parts) >= 3 else str(pod)
-        return "unknown"
+            raw = parts[0] if len(parts) >= 3 else str(pod)
+        return normalize_service_name(raw) or "unknown"
 
     @staticmethod
     def _level_from_labels(stream_labels: dict[str, Any], line: str) -> str:
@@ -172,7 +178,9 @@ class LokiClient:
             # result's quotes/backslashes for the `"..."` literal.
             service_regex = self._escape_logql_string(self._escape_logql_regex(service))
             service_matchers = [f'{key}="{service_exact}"' for key in label_keys]
-            # Always append the standard pod-name fallback
+            # OTel→Loki often stores peers as job="unknown_service:<name>".
+            unknown_exact = self._escape_logql_string(f"unknown_service:{service}")
+            service_matchers.append(f'job="{unknown_exact}"')
             service_matchers.append(f'pod=~"{service_regex}-.*"')
         else:
             service_matchers = [f'{key}=~".+"' for key in label_keys]
@@ -180,10 +188,19 @@ class LokiClient:
 
         level_keys = ["level", "severity", "severity_text", "lvl"] if level else [None]
         level_exact = self._escape_logql_string(level) if level else ""
+        level_regex = (
+            self._escape_logql_string(self._escape_logql_regex(level.strip()))
+            if level
+            else ""
+        )
 
         for matcher in service_matchers:
             for level_key in level_keys:
                 if level_key:
+                    # OTel often emits INFO/WARN uppercase; UI sends lowercase.
+                    selectors.append(
+                        f'{{{matcher}, {level_key}=~"(?i){level_regex}"}}'
+                    )
                     selectors.append(f'{{{matcher}, {level_key}="{level_exact}"}}')
                 else:
                     selectors.append(f'{{{matcher}}}')

@@ -38,10 +38,9 @@ persistence:
     - ReadWriteOnce
 
 # ── Alertmanager routing configuration ───────────────────
-# stage2WebhookUrl: the HTTP endpoint alerts are POSTed to.
-# This now points at the Dev-A ingestion trigger (causa-ingest), which opens the
-# incident window + records incident state, then forwards to the Stage-2 engine
-# (chain, don't replace). To bypass ingestion, point this back at stage2-rca.
+# stage2WebhookUrl MUST point at causa-ingest /trigger (opens the incident
+# window, then forwards to Stage-2). Direct Stage-2 bypass is unsupported —
+# set ALLOW_STAGE2_BYPASS=1 only for local debug and accept LookupError noise.
 stage2WebhookUrl: "http://causa-ingest.causa-ingest.svc.cluster.local:8080/trigger"
 
 config:

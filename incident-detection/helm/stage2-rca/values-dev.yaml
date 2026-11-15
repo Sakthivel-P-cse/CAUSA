@@ -1,0 +1,13 @@
+# Development credentials match the rca_engine role created by helm/postgres.
+env:
+  PGPASSWORD: "rca_engine"
+  REMEDIATION_MIN_CONFIDENCE: "0.10"
+environment: local-kind
+remediation:
+  autoPropose: "1"
+  autoApply: "1"
+  autoActions:
+    - config_patch
+    - scale_up
+  allowUncalibratedDemo: "1"
+  databasePassword: "causa_remediator_dev"

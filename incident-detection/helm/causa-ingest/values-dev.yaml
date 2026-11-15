@@ -1,3 +1,4 @@
 # Dev overrides — single replica, plain-text password (fine for kind).
+# This must match helm/postgres auth.password.
 env:
-  PGPASSWORD: "causa"
+  PGPASSWORD: "causa_dev_pass"

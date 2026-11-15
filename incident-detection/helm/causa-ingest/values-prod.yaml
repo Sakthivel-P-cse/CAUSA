@@ -1,6 +1,17 @@
 # Prod overrides — supply the Postgres password via an existing Secret with key
 # PGPASSWORD, and scale/limits as needed.
 existingSecret: "causa-ingest-secret"
+production: true
+replicaCount: 2
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  allowedIngressNamespaces:
+    - alertmanager
 
 resources:
   requests:

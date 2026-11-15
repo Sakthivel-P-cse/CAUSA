@@ -108,6 +108,9 @@ data:
           - action: insert
             key: k8s.node.name
             value: "${env:NODE_NAME}"
+          - action: upsert
+            key: service.name
+            from_attribute: k8s.deployment.name
 
       batch:
         send_batch_size: {{ .Values.config.processors.batch.sendBatchSize }}

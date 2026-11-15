@@ -42,6 +42,10 @@ def _series_points(values: list[list[Any]]) -> list[list[float]]:
     return out
 
 
+class NodeSeriesUnavailable(RuntimeError):
+    """Both node-label and internal_ip PromQL paths returned empty series."""
+
+
 class PrometheusClient:
     """Thin wrapper around the Prometheus HTTP query API."""
 
@@ -51,9 +55,18 @@ class PrometheusClient:
             timeout=15.0,
             transport=httpx.HTTPTransport(retries=3),
         )
+        # k8s node name ↔ internal IP, resolved once from kube_node_info and
+        # shared by the instant (get_infra_nodes) and range (node series) paths
+        # so both key infra on the SAME identifier the runs-on edges use.
+        self._node_ip_cache: tuple[dict[str, str], dict[str, str]] | None = None
 
     def close(self) -> None:
         self._http.close()
+
+    def check_available(self) -> None:
+        """Raise if Prometheus is unreachable (port-forward down, wrong URL, etc.)."""
+        resp = self._http.get(f"{self._base}/-/ready", timeout=5.0)
+        resp.raise_for_status()
 
     # ── Low-level helpers ─────────────────────────────────────────────
 
@@ -248,18 +261,7 @@ class PrometheusClient:
                 service_name=infer_service_name_from_pod(pod),
             )
 
-        # instance → k8s node-name resolver. node-exporter series key on
-        # `instance` (typically IP:port); pod conditions and runs-on edges key
-        # on the k8s `node` name (kube_pod_info.node). Without this, the same
-        # physical node produces two un-mergeable keys and the saturated node is
-        # orphaned from its condition row → S5 infra attribution breaks (#7).
-        # kube_node_info carries both `node` and `internal_ip`.
-        ip_to_node: dict[str, str] = {}
-        for r in self._instant_safe("kube_node_info"):
-            node = r["metric"].get("node", "")
-            ip = r["metric"].get("internal_ip", "")
-            if node and ip:
-                ip_to_node[ip] = node
+        ip_to_node, _ = self._node_ip_maps()
 
         def node_key(metric: dict[str, Any]) -> str:
             # Prefer an explicit `node` label (relabeled node-exporter); else
@@ -403,6 +405,105 @@ class PrometheusClient:
             )
             results = self._range_safe(query_prefix, start, end, step=step)
         return _series_points(results[0]["values"]) if results else []
+
+    # ── Node-level (infra) series ─────────────────────────────────────
+    #
+    # Without these, infra nodes reach the kernel as topology-only vertices:
+    # get_infra_nodes() returns INSTANT cpu/mem values, so an infra node had no
+    # metric series, hence no anomaly_score and no FirstDeviationTime. Layer
+    # arbitration requires BOTH (`t_i is not None` and `a_i >= a_n`), so on live
+    # telemetry it could never fire and infra was structurally unable to be named
+    # a root cause — the S1/S5 fixtures only passed because they inject infra
+    # anomaly by hand. These range queries close that gap.
+    #
+    # They deliberately reuse the `cpu` / `saturation` metric names from the
+    # anomaly contract's METRICS rather than introducing node-specific ones, so
+    # baselines, dev_vector, and the max-composite all work unchanged.
+
+    def _node_ip_maps(self) -> tuple[dict[str, str], dict[str, str]]:
+        """(internal_ip → node name, node name → internal_ip) from kube_node_info.
+
+        node-exporter series key on `instance` (typically IP:port) while pod
+        conditions and runs-on edges key on the k8s `node` name. Resolving both
+        directions from one source keeps the instant and range paths on the same
+        identifier; without it the same physical node yields two un-mergeable
+        keys and the saturated node is orphaned from its condition row (#7).
+        """
+        if self._node_ip_cache is not None:
+            return self._node_ip_cache
+        ip_to_node: dict[str, str] = {}
+        node_to_ip: dict[str, str] = {}
+        for r in self._instant_safe("kube_node_info"):
+            node = r["metric"].get("node", "")
+            ip = r["metric"].get("internal_ip", "")
+            if node and ip:
+                ip_to_node[ip] = node
+                node_to_ip.setdefault(node, ip)
+        self._node_ip_cache = (ip_to_node, node_to_ip)
+        return self._node_ip_cache
+
+    def _node_series(
+        self, expr: str, node: str, start: datetime, end: datetime, step: str
+    ) -> list[list[float]]:
+        """Run `expr` for one k8s node, preferring a relabeled `node` label.
+
+        `expr` must contain a single ``{sel}`` placeholder for the selector and
+        aggregate ``by (node)`` / ``by (instance)`` to match. Falls back to an
+        instance-IP regex when node-exporter carries no `node` label.
+        """
+        results = self._range_safe(
+            expr.format(sel=f'node="{self._esc(node)}"', by="node"), start, end, step=step
+        )
+        label_empty = not results
+        if not results:
+            _, node_to_ip = self._node_ip_maps()
+            ip = node_to_ip.get(node)
+            if ip is None:
+                logger.error(
+                    "No internal_ip for node %r; infra series unavailable "
+                    "(kube_node_info missing or node-exporter unrelabeled)",
+                    node,
+                )
+                raise NodeSeriesUnavailable(
+                    f"node series empty for {node!r}: no node label match and "
+                    f"no kube_node_info.internal_ip"
+                )
+            sel = f'instance=~"{self._esc_re(ip)}(:[0-9]+)?"'
+            results = self._range_safe(
+                expr.format(sel=sel, by="instance"), start, end, step=step
+            )
+        if not results:
+            logger.error(
+                "Node PromQL empty for %r after label and IP paths "
+                "(label_empty=%s)",
+                node,
+                label_empty,
+            )
+            raise NodeSeriesUnavailable(
+                f"node series empty for {node!r}: label and internal_ip paths "
+                f"both returned no samples"
+            )
+        return _series_points(results[0]["values"])
+
+    def get_node_cpu_pct_series(
+        self, node: str, start: datetime, end: datetime, step: str = "1m"
+    ) -> list[list[float]]:
+        """Node CPU usage % over [start, end] as [[ts, val]]."""
+        return self._node_series(
+            '100 - (avg by ({by}) (rate(node_cpu_seconds_total'
+            '{{mode="idle",{sel}}}[2m])) * 100)',
+            node, start, end, step,
+        )
+
+    def get_node_memory_pct_series(
+        self, node: str, start: datetime, end: datetime, step: str = "1m"
+    ) -> list[list[float]]:
+        """Node memory usage % over [start, end] as [[ts, val]]."""
+        return self._node_series(
+            '(1 - (avg by ({by}) (node_memory_MemAvailable_bytes{{{sel}}}) '
+            '/ avg by ({by}) (node_memory_MemTotal_bytes{{{sel}}}))) * 100',
+            node, start, end, step,
+        )
 
     @staticmethod
     def _pod_label_selector(service: str, namespace: str) -> str:

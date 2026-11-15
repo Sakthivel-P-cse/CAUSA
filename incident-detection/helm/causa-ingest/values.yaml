@@ -1,8 +1,10 @@
 replicaCount: 1
+production: false
 
 image:
   repository: causa/ingest
-  tag: "latest"
+  tag: "local"
+  digest: ""
   pullPolicy: IfNotPresent
 
 service:
@@ -16,6 +18,16 @@ resources:
   limits:
     cpu: 500m
     memory: 256Mi
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+networkPolicy:
+  enabled: false
+  # Namespace labels use kubernetes.io/metadata.name, available by default.
+  allowedIngressNamespaces:
+    - alertmanager
 
 env:
   # Backends the incident-window reader queries.
@@ -38,3 +50,10 @@ env:
   CAUSA_SERVICE_NAME_LABEL_KEYS: "service,app,app_kubernetes_io_name,k8s_app,workload,deployment,container"
 
 existingSecret: ""   # set in prod to avoid a plain-text password in values
+
+baselineCron:
+  enabled: true
+  schedule: "0 */6 * * *"
+  windowMinutes: "30"
+  appNamespace: "otel-demo"
+  prometheusUrl: "http://prometheus.prometheus.svc.cluster.local:9090"

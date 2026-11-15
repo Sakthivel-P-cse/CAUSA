@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Iterable, Mapping
 
 
 # The metrics every node is scored on. One-sided: only INCREASES are anomalous.
@@ -85,3 +86,59 @@ class AnomalyOutput:
     dev_vector: dict[str, float] = field(default_factory=dict)
     first_deviation: datetime | None = None
     window_ts: datetime | None = None
+
+    @property
+    def node_id(self) -> str:
+        return self.node
+
+
+@dataclass
+class AnomalyBag:
+    """Incident-scoped score lookup for eval baselines (Outputs lane)."""
+
+    incident_id: str
+    nodes: dict[str, AnomalyOutput]
+    thresholds: Thresholds = field(default_factory=Thresholds)
+
+    def score(self, node_id: str) -> float:
+        n = self.nodes.get(node_id)
+        return n.anomaly_score if n else 0.0
+
+    def dev_vector(self, node_id: str) -> dict[str, float]:
+        n = self.nodes.get(node_id)
+        return dict(n.dev_vector) if n else {}
+
+    @classmethod
+    def from_outputs(
+        cls,
+        incident_id: str,
+        outputs: Iterable[AnomalyOutput],
+        thresholds: Thresholds | None = None,
+    ) -> AnomalyBag:
+        nodes = {o.node: o for o in outputs}
+        return cls(
+            incident_id=incident_id,
+            nodes=nodes,
+            thresholds=thresholds or Thresholds(),
+        )
+
+    @classmethod
+    def from_score_map(
+        cls,
+        incident_id: str,
+        scores: Mapping[str, float],
+        thresholds: Thresholds | None = None,
+    ) -> AnomalyBag:
+        nodes = {
+            nid: AnomalyOutput(node=nid, anomaly_score=float(s))
+            for nid, s in scores.items()
+        }
+        return cls(
+            incident_id=incident_id,
+            nodes=nodes,
+            thresholds=thresholds or Thresholds(),
+        )
+
+
+NodeAnomaly = AnomalyOutput
+AnomalyThresholds = Thresholds

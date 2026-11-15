@@ -1,0 +1,44 @@
+image:
+  repository: causa/dashboard
+  tag: local
+  digest: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+production: false
+
+service:
+  type: ClusterIP
+  port: 8090
+
+existingSecret: ""
+
+env:
+  PGHOST: postgres.postgres.svc.cluster.local
+  PGPORT: "5432"
+  PGDATABASE: causa
+  PGUSER: rca_engine
+  REMEDIATION_PGHOST: postgres.postgres.svc.cluster.local
+  REMEDIATION_PGPORT: "5432"
+  REMEDIATION_PGDATABASE: causa
+  REMEDIATION_PGUSER: causa_remediator
+  PROMETHEUS_URL: http://prometheus.prometheus.svc.cluster.local:9090
+  TEMPO_URL: http://tempo.tempo.svc.cluster.local:3200
+  LOKI_URL: http://loki.loki.svc.cluster.local:3100
+  CAUSA_CORS_ORIGINS: ""
+  CAUSA_PROFILE: otel-demo
+  CAUSA_ENVIRONMENT: local-kind
+  CAUSA_REMEDIATION_AUTO_PROPOSE: "1"
+  CAUSA_REMEDIATION_AUTO_APPLY: "1"
+  CAUSA_REMEDIATION_AUTO_ACTIONS: config_patch,scale_up
+  CAUSA_DEMO_ALLOW_UNCALIBRATED_AUTO_APPLY: "1"
+  REMEDIATION_MIN_CONFIDENCE: "0.10"
+  CAUSA_REMEDIATION_KILL_SWITCH: "0"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

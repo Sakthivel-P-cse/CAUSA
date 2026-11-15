@@ -26,6 +26,7 @@ from .adapters import TelemetryAdapter
 from .clients.loki_client import LokiClient
 from .clients.prometheus_client import PrometheusClient
 from .clients.tempo_client import TempoClient
+from .service_scope import is_system_infra_host
 from .topology import build_topology, stamp_service_edges
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,10 @@ logger = logging.getLogger(__name__)
 # scored metric); `retry_rate` has no first-class OTel-Demo counter and is a
 # documented gap (adapter returns [], never synthesized).
 _SERVICE_METRICS = ("error_rate", "p95_latency", "request_rate")
+# Node-level resource metrics, scored under the same contract names as the
+# container ones so infra flows through dev_vector unchanged. Not namespaced —
+# a k8s node is cluster-scoped.
+_INFRA_METRICS = ("cpu", "saturation")
 _CONTAINER_METRICS = ("cpu", "saturation")
 
 
@@ -78,17 +83,22 @@ class TelemetryReader:
         service: str | None,
         preferred: str | None = None,
         lookback_minutes: int = 10,
+        window: Window | None = None,
     ) -> str | None:
         if preferred:
             return preferred
+        bounds = {"start": window.start, "end": window.end} if window else {}
         ids = self._tempo.search_error_traces(
-            service=service, lookback_minutes=lookback_minutes, limit=1
+            service=service, lookback_minutes=lookback_minutes, limit=1, **bounds
         )
         if ids:
             return ids[0]
-        ids = self._tempo.search_traces(
-            service=service, lookback_minutes=lookback_minutes, limit=1
-        )
+        if window:
+            ids = self._tempo.search_traces_in_window(service=service, limit=1, **bounds)
+        else:
+            ids = self._tempo.search_traces(
+                service=service, lookback_minutes=lookback_minutes, limit=1
+            )
         return ids[0] if ids else None
 
     def read_incident_window(
@@ -96,12 +106,14 @@ class TelemetryReader:
         *,
         incident_id: str,
         alerted_service: str,
-        around: datetime,
+        around: datetime | None = None,
         lookback_minutes: int = 10,
         namespace: str | None = None,
         preferred_trace_id: str | None = None,
         include_logs: bool = True,
         include_metrics: bool = True,
+        window_start: datetime | None = None,
+        window_end: datetime | None = None,
     ) -> IncidentTelemetry:
         """
         Load typed envelopes for one incident window from Tempo/Prom/Loki.
@@ -109,10 +121,16 @@ class TelemetryReader:
         This is the normalization boundary: every consumer downstream reads the
         returned IncidentTelemetry, not raw backend responses.
         """
-        window = Window(
-            start=around - timedelta(minutes=lookback_minutes),
-            end=around + timedelta(minutes=1),
-        )
+        if (window_start is None) != (window_end is None):
+            raise ValueError("window bounds must be supplied together")
+        if window_start is None:
+            if around is None:
+                raise ValueError("around or window bounds are required")
+            window_start = around - timedelta(minutes=lookback_minutes)
+            window_end = around + timedelta(minutes=1)
+        if window_end <= window_start:
+            raise ValueError("invalid incident window")
+        window = Window(start=window_start, end=window_end)
         adapter = TelemetryAdapter(self._prom, self._tempo, self._loki, namespace=namespace)
 
         telemetry = IncidentTelemetry(
@@ -127,6 +145,7 @@ class TelemetryReader:
             service=alerted_service,
             preferred=preferred_trace_id,
             lookback_minutes=lookback_minutes,
+            window=window,
         )
         telemetry.spans = adapter.traces(window, service=alerted_service)
         # traces() samples up to `limit` recent traces and may NOT include the
@@ -187,6 +206,27 @@ class TelemetryReader:
             for svc in sorted(s for s in services if s and s != "unknown"):
                 for metric in metrics:
                     point = adapter.metric_point(svc, metric, window, namespace=namespace)
+                    if point is not None:
+                        telemetry.metric_points.append(point)
+                        if point.reference:
+                            telemetry.references.append(point.reference)
+
+            # ── Per-infra-node metric series ──────────────────────────
+            # Infra nodes were previously fetched for topology only (instant
+            # cpu/mem via get_infra_nodes), so they entered the kernel with no
+            # series → anomaly_score 0.0 and first_deviation None. Layer
+            # arbitration needs both, so infra could never win on live data.
+            # Query the same host names the runs-on edges use, so the anomaly
+            # node IDs and the graph node IDs match.
+            for host in sorted(
+                {n.name for n in telemetry.infra_nodes if n.kind == "node" and n.name}
+            ):
+                # Kind/k8s control-plane hosts co-locate every pod and inject
+                # noisy CPU/mem — skip scoring them so they cannot win app RCA.
+                if is_system_infra_host(host):
+                    continue
+                for metric in _INFRA_METRICS:
+                    point = adapter.metric_point(host, metric, window, kind="infra")
                     if point is not None:
                         telemetry.metric_points.append(point)
                         if point.reference:

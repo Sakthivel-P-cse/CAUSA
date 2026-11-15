@@ -145,16 +145,31 @@ class TelemetryAdapter:
     # ── C1: metrics(node, metric, window) ──────────────────────────────
 
     def metrics(
-        self, node: str, metric: str, window: Window, namespace: str | None = None
+        self,
+        node: str,
+        metric: str,
+        window: Window,
+        namespace: str | None = None,
+        *,
+        kind: str = "service",
     ) -> list[list[float]]:
         """
         Return the [[unix_ts, value], ...] series for one (node, metric).
 
         Metric names follow the anomaly contract's METRICS plus the RED extras:
           p95_latency | latency_p99_ms | error_rate | request_rate
-          cpu | saturation            (container CPU% / memory-vs-limit%; namespaced)
+          cpu | saturation            (CPU% / memory%; see `kind` below)
           retry_rate                  (not first-class on the OTel Demo → []; a
                                        documented gap, never synthesized)
+
+        `kind` selects the resource layer that `cpu` / `saturation` resolve to:
+          "service" — container CPU% and memory-vs-limit% (namespaced)
+          "infra"   — k8s node CPU% and memory%, keyed by node name
+
+        The metric NAMES are shared across both layers on purpose: baselines are
+        keyed (node, metric), so reusing them lets infra nodes flow through
+        dev_vector and the max-composite with no contract change. The RED metrics
+        are service-only and return [] for infra rather than being faked.
 
         Queries honor the ABSOLUTE [window.start, window.end] and share one
         window-derived step, so a warmup baseline reads its historical healthy
@@ -163,6 +178,15 @@ class TelemetryAdapter:
         start, end = window.start, window.end
         step = _step_str(window)
         ns = namespace or self._namespace
+
+        if kind == "infra":
+            if metric == "cpu":
+                return self._prom.get_node_cpu_pct_series(node, start, end, step)
+            if metric == "saturation":
+                return self._prom.get_node_memory_pct_series(node, start, end, step)
+            # RED metrics are service-level; an infra node has none. Return []
+            # rather than synthesizing — the max-composite tolerates absence.
+            return []
 
         if metric == "error_rate":
             return self._prom.get_error_rate_series(node, start, end, step)
@@ -206,10 +230,16 @@ class TelemetryAdapter:
         )
 
     def metric_point(
-        self, node: str, metric: str, window: Window, namespace: str | None = None
+        self,
+        node: str,
+        metric: str,
+        window: Window,
+        namespace: str | None = None,
+        *,
+        kind: str = "service",
     ) -> MetricPointEnvelope | None:
         """metrics() wrapped as a MetricPointEnvelope (latest value + full series)."""
-        series = self.metrics(node, metric, window, namespace=namespace)
+        series = self.metrics(node, metric, window, namespace=namespace, kind=kind)
         if not series:
             return None
         return MetricPointEnvelope(
