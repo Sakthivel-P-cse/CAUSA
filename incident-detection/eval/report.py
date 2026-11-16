@@ -157,7 +157,7 @@ def generate_all() -> dict[str, Any]:
                 "- AppLogic → proposed PR payload (never auto-merged)",
                 "- Config → before/after patch proposal",
                 "- Dependency → rollback-to-last-good proposal",
-                f"- Canary rollback on breach: {canary_rb['rolled_back']}",
+                f"- Canary rollback: {canary_rb['note']}",
                 "",
             ]
         )

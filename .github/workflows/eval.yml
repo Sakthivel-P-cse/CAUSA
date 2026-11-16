@@ -51,6 +51,7 @@ jobs:
         env:
           PGPASSWORD: causa_ci
         run: |
+          set -o pipefail
           ./scripts/render-schema.sh \
             | psql -h 127.0.0.1 -p 5432 -U causa_ci -d causa_test -v ON_ERROR_STOP=1 -f -
       - name: Python dependency audit
