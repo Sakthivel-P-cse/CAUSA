@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tsdb-mysql-conf
+  namespace: train-ticket
+  labels:
+    app: tsdb-mysql
+data:
+  memory.cnf: |
+    [mysqld]
+    innodb_buffer_pool_size=128M
+    max_connections=100
+    performance_schema=OFF
+    skip_log_bin
+    table_open_cache=64
+    thread_cache_size=8
+    key_buffer_size=8M
+    tmp_table_size=16M
+    max_heap_table_size=16M
+    innodb_log_buffer_size=8M
+    innodb_log_file_size=48M
+    character_set_server=utf8mb4
+    collation_server=utf8mb4_unicode_ci
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tsdb-mysql
+  namespace: train-ticket
+  labels:
+    app: tsdb-mysql
+type: Opaque
+stringData:
+  mysql-password: "Ts_123456"
+  mysql-replication-password: "Repl_123"
+  MYSQL_ROOT_PASSWORD: "Root_ts_123"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsdb-mysql
+  namespace: train-ticket
+  labels:
+    app: tsdb-mysql
+spec:
+  clusterIP: None
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+  selector:
+    app: tsdb-mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tsdb-mysql-leader
+  namespace: train-ticket
+  labels:
+    app: tsdb-mysql
+spec:
+  type: ClusterIP
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+  selector:
+    app: tsdb-mysql
+    role: leader
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tsdb-mysql
+  namespace: train-ticket
+  labels:
+    app: tsdb-mysql
+spec:
+  serviceName: tsdb-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tsdb-mysql
+  template:
+    metadata:
+      labels:
+        app: tsdb-mysql
+        role: leader
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:5.7
+          imagePullPolicy: IfNotPresent
+          args:
+            - mysqld
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tsdb-mysql
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: ts
+            - name: MYSQL_USER
+              value: ts
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tsdb-mysql
+                  key: mysql-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD"
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: conf
+              mountPath: /etc/mysql/conf.d
+              readOnly: true
+      volumes:
+        - name: conf
+          configMap:
+            name: tsdb-mysql-conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

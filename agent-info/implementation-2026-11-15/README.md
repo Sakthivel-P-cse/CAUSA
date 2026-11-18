@@ -1,0 +1,1 @@
+Implement agent-info/improvement-plan-2026-11-15/improvement-plan.md. Preserve pre-existing untracked work. Root owns shared JSON. Each agent writes its own report here and in .swarm/2026-11-15-implementation. No commits, pushes, live remediation or deployments. Tests before fixes; report red/green results and limits.

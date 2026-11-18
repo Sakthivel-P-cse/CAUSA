@@ -1,0 +1,147 @@
+[
+  {
+    "agent": "/root/pipeline",
+    "task": "pipeline read-only audit",
+    "status": "stopped_at_budget",
+    "findings": [],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Prior hunt ended; findings retained in conversation",
+    "updated_at": "2026-11-15T04:04:06.188365+00:00"
+  },
+  {
+    "agent": "/root/dashboard",
+    "task": "dashboard read-only audit",
+    "status": "stopped_at_budget",
+    "findings": [],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Prior hunt ended; findings retained in conversation",
+    "updated_at": "2026-11-15T04:04:06.188365+00:00"
+  },
+  {
+    "agent": "/root/dashboard_plan",
+    "task": "dashboard_plan",
+    "status": "complete",
+    "findings": [
+      "Five dashboard issues source-confirmed; plan saved"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Planning complete; implementation awaits a separate request",
+    "updated_at": "2026-11-15T04:07:21.992126+00:00"
+  },
+  {
+    "agent": "/root/pipeline_plan",
+    "task": "pipeline_plan",
+    "status": "complete",
+    "findings": [
+      "Exact-window reconstruction and historical trace selection mechanisms source-confirmed; plan saved"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Planning complete; implementation awaits a separate request",
+    "updated_at": "2026-11-15T04:07:21.992126+00:00"
+  },
+  {
+    "agent": "/root",
+    "task": "approved implementation: remediation safety and integration",
+    "status": "complete",
+    "findings": [
+      "All seven plan items implemented",
+      "384 Python tests passed; 2 existing integration skips",
+      "10 frontend tests, lint, build, Helm render and diff checks passed",
+      "Real disposable PostgreSQL and Prometheus integrations passed",
+      "Report: agent-info/implementation-2026-11-15/completion-report.md"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Implementation complete; deployment is separate and requires documented schema/state migration",
+    "updated_at": "2026-11-15T04:43:43.551019+00:00"
+  },
+  {
+    "agent": "/root/dashboard_impl",
+    "task": "dashboard_impl",
+    "status": "complete",
+    "findings": [
+      "Durable operator state/status/stats/feedback implemented; root added checked import and integration evidence"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Implementation complete; deployment is separate and requires documented schema/state migration",
+    "updated_at": "2026-11-15T04:43:43.551019+00:00"
+  },
+  {
+    "agent": "/root/pipeline_impl",
+    "task": "pipeline_impl",
+    "status": "complete",
+    "findings": [
+      "Exact window pipeline implemented; reviewed safety blockers resolved"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Implementation complete; deployment is separate and requires documented schema/state migration",
+    "updated_at": "2026-11-15T04:43:43.551019+00:00"
+  },
+  {
+    "agent": "/root/inbox_impl",
+    "task": "inbox_impl",
+    "status": "complete",
+    "findings": [
+      "Moving inbox windows and accurate metric labels implemented; frontend checks passed"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Implementation complete; deployment is separate and requires documented schema/state migration",
+    "updated_at": "2026-11-15T04:43:43.551019+00:00"
+  },
+  {
+    "agent": "/root",
+    "task": "GitHub CI repair integration",
+    "status": "in_progress",
+    "findings": [
+      "GitHub run 43737906279 fails in frontend npm audit and unit-and-golden Postgres test; main CD run 43737906306 also fails"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Delegate isolated root-cause repairs, integrate, verify hosted CI",
+    "updated_at": "2026-11-15T17:10:00+05:30"
+  },
+  {
+    "agent": "/root/frontend_audit",
+    "task": "frontend npm audit",
+    "status": "in_progress",
+    "findings": [],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Inspect assigned CI failure; implement isolated repair and focused check",
+    "updated_at": "2026-11-15T17:10:00+05:30"
+  },
+  {
+    "agent": "/root/postgres_ci",
+    "task": "Postgres integration-test schema mismatch",
+    "status": "complete",
+    "findings": [
+      "Hosted schema-load step fails because render-schema.sh imports PyYAML, omitted from requirements-devc.txt; strict pipeline prevents psql receiving DDL",
+      "Added PyYAML>=6.0 to requirements-devc.txt; test failure on first DELETE was downstream"
+    ],
+    "blockers": [
+      "No local PostgreSQL server available for focused integration reproduction"
+    ],
+    "dependencies": [],
+    "next_action": "Parent integrates dependency change and verifies CI rerun",
+    "updated_at": "2026-11-15T17:10:14.215991+00:00"
+  },
+  {
+    "agent": "/root/remediation_cd",
+    "task": "Diagnose/fix main Remediation CD failure",
+    "status": "complete",
+    "findings": [
+      "Pushes with no service Dockerfile now skip image build and promotion; workflow_dispatch behavior remains unchanged"
+    ],
+    "blockers": [],
+    "dependencies": [],
+    "next_action": "Integrated workflow change is ready for parent review",
+    "updated_at": "2026-11-15T17:30:00+05:30"
+  }
+]

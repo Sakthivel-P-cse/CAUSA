@@ -1,0 +1,9 @@
+{
+  "run": "2026-11-16-ci-analysis",
+  "started": "2026-11-16",
+  "budget": 18.64,
+  "basis": "twice prior CI repair budget of 9.32",
+  "estimated_total": 2.33,
+  "finished": "2026-11-16T03:16:33.263144+00:00",
+  "est_total": 2.33
+}

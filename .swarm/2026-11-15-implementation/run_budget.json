@@ -1,0 +1,40 @@
+{
+  "run": "2026-11-15-implementation",
+  "started": "2026-11-15T04:10:56.572477+00:00",
+  "budget": 2003.94,
+  "approved_by": "user approve after credit stop",
+  "agents": [
+    {
+      "id": "/root",
+      "model": "current host",
+      "allowance": 1000
+    },
+    {
+      "id": "/root/dashboard_impl",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.86
+    },
+    {
+      "id": "/root/pipeline_impl",
+      "model": "gpt-6.1-terra",
+      "allowance": 1000
+    },
+    {
+      "id": "/root/inbox_impl",
+      "model": "gpt-6-luna",
+      "allowance": 1.08
+    }
+  ],
+  "est_total": 5.9,
+  "scope": "Implement approved improvement plan; no commit push or deployment",
+  "continuation_approved": "2026-11-15T04:22:55.137501+00:00",
+  "reallocation": "Move .72 master allowance to finish mechanical inbox and metric callers",
+  "budget_policy": "User explicitly removed budget stopping condition; continue until task completes",
+  "budget_note": "High guard allowance represents user instruction to continue; not a spend target or billing estimate.",
+  "finished": "2026-11-15T04:43:43.551019+00:00",
+  "outcome": "implementation_complete",
+  "billed_total": null,
+  "estimate_note": "Initial estimate only; actual billing unavailable, user removed budget stop during continuation",
+  "measured_usage": 50.783869,
+  "usage_source": "Local credits.py transcript estimator; not provider invoice"
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">Causa — See the signal. Follow the cause.</title>
+  <desc id="desc">A dark gradient banner with connected nodes representing an incident influence graph.</desc>
+  <defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#0b1026"/><stop offset="1" stop-color="#123b53"/></linearGradient><linearGradient id="accent"><stop stop-color="#5eead4"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs>
+  <rect width="1200" height="300" rx="24" fill="url(#bg)"/>
+  <g fill="none" stroke="url(#accent)" stroke-width="2" opacity=".6"><path d="M840 65 950 120 1060 55M950 120 1020 210 1120 170M840 65 805 185 1020 210M805 185 890 250 1020 210"/></g>
+  <g fill="#5eead4"><circle cx="840" cy="65" r="6"/><circle cx="950" cy="120" r="10"/><circle cx="1060" cy="55" r="6"/><circle cx="805" cy="185" r="6"/><circle cx="1020" cy="210" r="8"/><circle cx="1120" cy="170" r="6"/><circle cx="890" cy="250" r="5"/></g>
+  <text x="80" y="135" fill="#f8fafc" font-family="Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="8">CAUSA</text>
+  <text x="84" y="190" fill="#a5f3e7" font-family="Arial, sans-serif" font-size="25">See the signal. Follow the cause.</text>
+  <rect x="84" y="218" width="190" height="4" rx="2" fill="url(#accent)"/>
+</svg>

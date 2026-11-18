@@ -1,0 +1,41 @@
+{
+  "run": "2026-11-15-bug-hunt",
+  "started": "2026-11-15T02:46:17.156355+00:00",
+  "budget": 8.58,
+  "normal_budget": 11.44,
+  "fraction": 0.75,
+  "metering": "estimates only; live credit metering unavailable",
+  "agents": [
+    {
+      "id": "/root",
+      "model": "current host",
+      "allowance": 4.29
+    },
+    {
+      "id": "/root/pipeline",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    },
+    {
+      "id": "/root/dashboard",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    }
+  ],
+  "planned_agents": [
+    {
+      "unit": "pipeline",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    },
+    {
+      "unit": "dashboard",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    }
+  ],
+  "finished": "2026-11-15T04:04:06.188365+00:00",
+  "accounting_note": "Closed prior accounting interval before separate Git delivery; work status preserved.",
+  "measured_usage": 11.313915,
+  "usage_source": "Local credits.py transcript estimator; not provider invoice"
+}

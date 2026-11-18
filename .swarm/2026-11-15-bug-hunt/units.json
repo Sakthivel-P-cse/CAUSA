@@ -1,0 +1,41 @@
+[
+  {
+    "id": "safety",
+    "files": [
+      "incident-detection/remediation",
+      "deployment/startup",
+      "tests"
+    ],
+    "depends_on": [],
+    "goal": "Verify execution safety, auth boundaries and integrated findings",
+    "check": "Trace callers and run focused safe tests",
+    "tier": "master"
+  },
+  {
+    "id": "pipeline",
+    "files": [
+      "incident-detection/ingest",
+      "incident-detection/rca",
+      "incident-detection/anomaly",
+      "incident-detection/scoring",
+      "incident-detection/graphs",
+      "incident-detection/isolation",
+      "shared",
+      "rca"
+    ],
+    "depends_on": [],
+    "goal": "Find reachable ingestion/RCA and persistence defects",
+    "check": "Focused existing tests or isolated reproductions plus source anchors",
+    "tier": "lead"
+  },
+  {
+    "id": "dashboard",
+    "files": [
+      "dashboard"
+    ],
+    "depends_on": [],
+    "goal": "Find API/UI contract, scope and state defects",
+    "check": "Focused existing tests or isolated reproductions plus source anchors",
+    "tier": "lead"
+  }
+]
