@@ -1,1 +1,0 @@
-Master integrated improvement plan: agent-info/improvement-plan-2026-11-15/improvement-plan.md. Three isolated assert probes reproduced the scale-down, missing-metrics pass and missing atomic precondition mechanisms. Application code unchanged. Runtime integration untested.
