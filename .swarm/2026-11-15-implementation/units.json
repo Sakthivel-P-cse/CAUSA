@@ -1,0 +1,64 @@
+[
+  {
+    "id": "safety",
+    "files": [
+      "incident-detection/remediation",
+      "incident-detection/tests/test_remediation_apply_safety.py",
+      "incident-detection/tests/test_worker_rollback_safety.py",
+      "incident-detection/tests/test_remediation_real.py",
+      "scripts/import_incident_acks.py",
+      "tests/test_ack_import.py",
+      "tests/test_dashboard_postgres.py",
+      "tests/test_remediation_prometheus.py",
+      "docs/operator-state-upgrade.md",
+      "SECURITY.md"
+    ],
+    "depends_on": [],
+    "goal": "Atomic mutation guards, bounded scaling, truthful SLO verification",
+    "check": "Regression tests and integration review",
+    "tier": "master",
+    "status": "complete"
+  },
+  {
+    "id": "dashboard_impl",
+    "files": [
+      "dashboard/backend",
+      "incident-detection/helm/postgres",
+      "tests/test_dashboard_improvements.py"
+    ],
+    "depends_on": [],
+    "goal": "Correct read contracts and durable operator state with honest feedback errors",
+    "check": "Focused backend regression tests and schema checks",
+    "tier": "lead",
+    "status": "complete"
+  },
+  {
+    "id": "pipeline_impl",
+    "files": [
+      "incident-detection/ingest/reader.py",
+      "incident-detection/ingest/clients/tempo_client.py",
+      "incident-detection/rca/orchestrator.py",
+      "incident-detection/tests/rca/test_orchestrator.py",
+      "incident-detection/tests/test_historical_window.py"
+    ],
+    "depends_on": [],
+    "goal": "Preserve exact incident bounds through trace selection",
+    "check": "Historical bounds regressions and existing caller tests",
+    "tier": "lead",
+    "status": "complete"
+  },
+  {
+    "id": "inbox_impl",
+    "files": [
+      "dashboard/frontend/src/pages/IncidentInbox.jsx",
+      "dashboard/frontend/src/pages/IncidentInbox.test.jsx",
+      "dashboard/frontend/src/pages/Statistics.jsx",
+      "dashboard/frontend/src/pages/Overview.jsx"
+    ],
+    "depends_on": [],
+    "goal": "Advance relative inbox bounds with cleanup and fixed-range preservation",
+    "check": "Fake timer regression and frontend checks",
+    "tier": "worker",
+    "status": "complete"
+  }
+]

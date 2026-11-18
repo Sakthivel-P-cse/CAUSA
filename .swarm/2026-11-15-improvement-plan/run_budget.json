@@ -1,0 +1,32 @@
+{
+  "run": "2026-11-15-improvement-plan",
+  "started": "2026-11-15T04:04:06.188365+00:00",
+  "budget": 8.58,
+  "normal_budget": 11.44,
+  "fraction": 0.75,
+  "scope": "planning only",
+  "agents": [
+    {
+      "id": "/root",
+      "model": "current host",
+      "allowance": 4.29
+    },
+    {
+      "id": "/root/dashboard_plan",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    },
+    {
+      "id": "/root/pipeline_plan",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.145
+    }
+  ],
+  "metering": "Credit guard authoritative; estimates are not billed usage",
+  "finished": "2026-11-15T04:07:21.992126+00:00",
+  "est_total": 5.72,
+  "billed_total": null,
+  "outcome": "planning_complete",
+  "measured_usage": 6.15212,
+  "usage_source": "Local credits.py transcript estimator; not provider invoice"
+}

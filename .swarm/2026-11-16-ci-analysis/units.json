@@ -1,0 +1,55 @@
+[
+  {
+    "id": "log-review",
+    "files": [],
+    "depends_on": [],
+    "goal": "Identify failed steps in latest CI run",
+    "check": "Hosted failed job log",
+    "tier": "worker"
+  },
+  {
+    "id": "contract-review",
+    "files": [],
+    "depends_on": [],
+    "goal": "Trace canary evaluation report failure and appropriate behavior",
+    "check": "Source and caller inspection",
+    "tier": "worker"
+  },
+  {
+    "id": "integration",
+    "files": [
+      "incident-detection/eval/report.py"
+    ],
+    "depends_on": [
+      "log-review",
+      "contract-review"
+    ],
+    "goal": "Fix confirmed cause and verify",
+    "check": "Focused evaluation report execution",
+    "tier": "lead"
+  },
+  {
+    "id": "python-lane",
+    "files": [],
+    "depends_on": [],
+    "goal": "Run Python CI commands",
+    "check": "Python lane commands",
+    "tier": "worker"
+  },
+  {
+    "id": "rules-helm",
+    "files": [],
+    "depends_on": [],
+    "goal": "Run rule and Helm CI checks",
+    "check": "CI scripts and helm lint",
+    "tier": "worker"
+  },
+  {
+    "id": "frontend",
+    "files": [],
+    "depends_on": [],
+    "goal": "Run frontend CI checks",
+    "check": "npm audit, lint, test, build",
+    "tier": "worker"
+  }
+]

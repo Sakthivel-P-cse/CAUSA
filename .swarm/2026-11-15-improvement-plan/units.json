@@ -1,0 +1,35 @@
+[
+  {
+    "id": "safety",
+    "files": [
+      "agent-info/improvement-plan-2026-11-15/improvement-plan.md"
+    ],
+    "depends_on": [],
+    "goal": "Plan remediation preconditions, monotonic scale-up and truthful verification",
+    "check": "Trace affected callers; specify regression outcomes and integration gates",
+    "tier": "master",
+    "status": "complete"
+  },
+  {
+    "id": "dashboard_plan",
+    "files": [
+      "agent-info/improvement-plan-2026-11-15/dashboard-plan.md"
+    ],
+    "depends_on": [],
+    "goal": "Verify dashboard findings and produce bounded implementation tasks",
+    "check": "Current source anchors, callers and acceptance criteria",
+    "tier": "lead",
+    "status": "complete"
+  },
+  {
+    "id": "pipeline_plan",
+    "files": [
+      "agent-info/improvement-plan-2026-11-15/pipeline-plan.md"
+    ],
+    "depends_on": [],
+    "goal": "Validate prior historical trace/window candidates for plan inclusion",
+    "check": "Current guards/callers and decisive repro or explicit uncertainty",
+    "tier": "lead",
+    "status": "complete"
+  }
+]

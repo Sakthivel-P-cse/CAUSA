@@ -1,0 +1,20 @@
+{
+  "run": "git-20261115T051054Z",
+  "started": "2026-11-15T05:10:54Z",
+  "budget": 2.86,
+  "est_total": 1.43,
+  "agents": [
+    {
+      "id": "/root",
+      "model": "current host",
+      "allowance": 0
+    }
+  ],
+  "scope": "Review, commit and push the requested implementation only",
+  "accounting": "Separate Git interval; no project-budget borrowing",
+  "finished": "2026-11-15T05:11:22Z",
+  "outcome": "blocked_before_delivery_agent_spawn_by_credit_guard",
+  "est_total": 0,
+  "measured_usage": 0,
+  "note": "PreToolUse rejected Terra delivery agent spawn: credit allowance reached; no Git commands ran"
+}

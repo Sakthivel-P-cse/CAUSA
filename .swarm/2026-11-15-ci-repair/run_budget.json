@@ -1,0 +1,29 @@
+{
+  "run": "2026-11-15-ci-repair",
+  "started": "2026-11-15T17:10:00+05:30",
+  "rung": "R3 continuation approved by user",
+  "previous_budget": 6.8,
+  "budget": 9.32,
+  "agents": [
+    {
+      "id": "/root",
+      "model": "Sol 6.1 high",
+      "allowance": 7.52
+    },
+    {
+      "id": "/root/frontend_audit",
+      "model": "Luna xhigh",
+      "allowance": 0.36
+    },
+    {
+      "id": "/root/postgres_ci",
+      "model": "Luna xhigh",
+      "allowance": 0.72
+    },
+    {
+      "id": "/root/remediation_cd",
+      "model": "Luna xhigh",
+      "allowance": 0.72
+    }
+  ]
+}

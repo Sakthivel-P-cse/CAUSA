@@ -1,0 +1,23 @@
+{
+  "run": "git-20261115T045605Z",
+  "started": "2026-11-15T04:56:10.134038+00:00",
+  "budget": 2.86,
+  "est_total": 1.43,
+  "agents": [
+    {
+      "id": "/root/git_delivery_2",
+      "model": "gpt-6.1-terra",
+      "allowance": 2.86
+    }
+  ],
+  "scope": "Review, commit and push approved implementation only",
+  "accounting": "Separate Git interval; no project-budget borrowing",
+  "finished": "2026-11-15T04:57:43.747037+00:00",
+  "measured_usage": 4.529785,
+  "measured_by_agent": {
+    "/root": 3.47691,
+    "/root/git_delivery_2": 1.052875
+  },
+  "outcome": "blocked_by_delivery_budget_before_git",
+  "usage_source": "Local transcript credit estimator, not provider invoice"
+}
