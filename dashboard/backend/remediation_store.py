@@ -488,9 +488,19 @@ class RemediationStore:
                     with conn.cursor() as cur:
                         cur.execute(
                             """
+                            UPDATE remediation_plans SET
+                                status='failed', decided_at=NOW(), lease_until=NULL,
+                                apply_result=COALESCE(apply_result, '{}'::jsonb) ||
+                                    '{"status":"failed","error":"worker lease expired after execution began; operator review required"}'::jsonb
+                            WHERE status IN ('executing', 'observing')
+                              AND (lease_until IS NULL OR lease_until < NOW())
+                            """
+                        )
+                        cur.execute(
+                            """
                             SELECT id FROM remediation_plans
                             WHERE status = 'approved'
-                               OR (status IN ('claimed', 'executing', 'observing')
+                               OR (status = 'claimed'
                                    AND (lease_until IS NULL OR lease_until < NOW()))
                             ORDER BY created_at ASC
                             FOR UPDATE SKIP LOCKED
@@ -499,7 +509,7 @@ class RemediationStore:
                         )
                         found = cur.fetchone()
                         if not found:
-                            conn.rollback()
+                            conn.commit()
                             return None
                         plan_id = found[0]
                         cur.execute(
@@ -519,6 +529,7 @@ class RemediationStore:
                     raise RuntimeError("remediation plan claim failed") from exc
 
         rows = self._load_file()
+        changed = False
         for row in rows:
             status = row.get("status")
             lease = row.get("lease_until")
@@ -528,7 +539,19 @@ class RemediationStore:
                     lease_dt = datetime.fromisoformat(str(lease).replace("Z", "+00:00"))
                 except ValueError:
                     lease_dt = None
-            reclaim = status in ("claimed", "executing", "observing") and (lease_dt is None or lease_dt < now)
+            expired = lease_dt is None or lease_dt < now
+            if status in ("executing", "observing") and expired:
+                row["status"] = "failed"
+                row["decided_at"] = _iso(now)
+                row["lease_until"] = None
+                row["apply_result"] = {
+                    **(row.get("apply_result") or {}),
+                    "status": "failed",
+                    "error": "worker lease expired after execution began; operator review required",
+                }
+                changed = True
+                continue
+            reclaim = status == "claimed" and expired
             if status == "approved" or reclaim:
                 row["status"] = "claimed"
                 row["claimed_by"] = worker_id
@@ -537,6 +560,8 @@ class RemediationStore:
                 self._save_file(rows)
                 self.add_event(row["id"], "claimed", {"worker_id": worker_id})
                 return row
+        if changed:
+            self._save_file(rows)
         return None
 
     def heartbeat(self, plan_id: str, worker_id: str, *, lease_seconds: int = 300) -> None:
@@ -549,6 +574,7 @@ class RemediationStore:
                     SET lease_until=%s
                     WHERE id=%s AND claimed_by=%s
                       AND status IN ('claimed', 'executing', 'observing')
+                      AND lease_until > NOW()
                     RETURNING id
                     """,
                     (lease_until.isoformat(), plan_id, worker_id),
@@ -557,7 +583,7 @@ class RemediationStore:
                 raise RuntimeError(f"worker {worker_id} no longer owns plan {plan_id}")
             return
         row = self.get(plan_id)
-        if not row or row.get("claimed_by") != worker_id:
+        if not row or not self.owns_lease(plan_id, worker_id):
             raise RuntimeError(f"worker {worker_id} no longer owns plan {plan_id}")
         row["lease_until"] = _iso(lease_until)
         self._update(row)

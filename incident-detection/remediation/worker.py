@@ -189,6 +189,8 @@ def execute_plan(
         set_status("failed", apply_result)
         return apply_result
 
+    if worker_id and not store.owns_lease(plan_id, worker_id):
+        raise RuntimeError(f"worker {worker_id} lost lease before rollback of {plan_id}")
     rb = _dispatch_rollback(plan_row, spec)
     store.add_event(plan_id, "rollback", rb)
     post = snapshot_service(service)

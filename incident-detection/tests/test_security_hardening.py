@@ -72,8 +72,37 @@ def test_development_file_store_enforces_worker_ownership(monkeypatch, tmp_path)
     store._update(expired)
     with pytest.raises(RuntimeError, match="no longer owns"):
         store.set_status_if_owned(plan["id"], "succeeded", "worker-a")
-    reclaimed = store.claim_next("worker-b", lease_seconds=60)
-    assert reclaimed and reclaimed["claimed_by"] == "worker-b"
+    assert store.claim_next("worker-b", lease_seconds=60) is None
+    failed = store.get(plan["id"])
+    assert failed["status"] == "failed"
+    assert "operator review required" in failed["apply_result"]["error"]
+    with pytest.raises(RuntimeError, match="no longer owns"):
+        store.heartbeat(plan["id"], "worker-a")
+
+
+@pytest.mark.parametrize("status", ["claimed", "observing"])
+def test_lease_recovery_only_reclaims_before_execution(monkeypatch, tmp_path, status):
+    _clear_pg(monkeypatch)
+    monkeypatch.setenv("CAUSA_REMEDIATION_ALLOW_FILE_STORE", "1")
+    monkeypatch.setenv("CAUSA_REMEDIATION_STORE", str(tmp_path / "plans.json"))
+    store = RemediationStore()
+    plan = store.create_proposed({"incident_id": "inc-recovery"})
+    store.set_status(plan["id"], "approved")
+    store.claim_next("worker-a")
+    row = store.get(plan["id"])
+    row.update(status=status, lease_until=(datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat())
+    if status == "observing":
+        row["apply_result"] = {"attempted": True, "mode": "restart"}
+    store._update(row)
+
+    reclaimed = store.claim_next("worker-b")
+    if status == "claimed":
+        assert reclaimed["claimed_by"] == "worker-b"
+    else:
+        assert reclaimed is None
+        result = store.get(plan["id"])
+        assert result["status"] == "failed"
+        assert result["apply_result"]["mode"] == "restart"
 
 
 def test_calibration_gate_requires_real_sample_count(tmp_path):
