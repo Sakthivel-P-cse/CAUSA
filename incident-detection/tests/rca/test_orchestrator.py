@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from contracts import (
     Baseline,
@@ -6,7 +7,12 @@ from contracts import (
     Edge,
     IncidentTelemetry,
     MetricPointEnvelope,
+    NodeKind,
+    Role,
+    RootCauseCandidate,
+    SignalScores,
 )
+import rca.orchestrator as orchestrator_module
 from rca.orchestrator import RCAOrchestrator
 from rca.store import IncidentState
 
@@ -104,6 +110,83 @@ def test_orchestrator_loads_exact_window_scores_and_persists():
     assert reader.calls[0]["preferred_trace_id"] == "trace-1"
     assert reader.closed
     assert result.fault_class is not None or result.candidates
+
+
+def test_orchestrator_preserves_one_origin_per_cluster(monkeypatch):
+    state = IncidentState(
+        incident_id="inc-multi-origin",
+        alert_name="MultipleServicesDegraded",
+        alerted_service="service-a",
+        namespace="otel-demo",
+        node=None,
+        severity="critical",
+        window_start=NOW,
+        window_end=NOW + timedelta(minutes=1),
+        trace_id=None,
+        telemetry_refs={},
+        status="open",
+        triggered_at=NOW,
+        resolved_at=None,
+    )
+    store = _Store(state, {("service-a", "error_rate"): Baseline(0.0, 1.0, 30)})
+    reader = _Reader(
+        IncidentTelemetry(
+            incident_id=state.incident_id,
+            alerted_service=state.alerted_service,
+            window_start=state.window_start,
+            window_end=state.window_end,
+        )
+    )
+
+    def candidate(node_id, score):
+        return RootCauseCandidate(
+            node_id=node_id,
+            node_kind=NodeKind.SERVICE,
+            score=score,
+            confidence=0.0,
+            role=Role.ORIGIN,
+            signals=SignalScores(T=0.0, D=0.0, P=0.0),
+            dev_vector={},
+            explanation=f"{node_id}. Role: origin.",
+        )
+
+    cluster_a = candidate("service-a", 1.0)
+    cluster_b = candidate("service-b", 0.8)
+    monkeypatch.setattr(orchestrator_module, "anomalies_from_telemetry", lambda *args: [])
+    monkeypatch.setattr(
+        orchestrator_module,
+        "adapt_incident",
+        lambda *args, **kwargs: SimpleNamespace(
+            topology=object(), traces=object(), anomaly=object()
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_module,
+        "build_incident_subgraph",
+        lambda *args, **kwargs: SimpleNamespace(nodes=["service-a", "service-b"]),
+    )
+    monkeypatch.setattr(orchestrator_module, "build_influence_graph", lambda subgraph: object())
+    monkeypatch.setattr(
+        orchestrator_module,
+        "isolate",
+        lambda *args, **kwargs: SimpleNamespace(
+            abstain_reason=None,
+            ranked_by_cluster={
+                "cluster-a": SimpleNamespace(candidates=[cluster_a], fault_class=None),
+                "cluster-b": SimpleNamespace(candidates=[cluster_b], fault_class=None),
+            },
+        ),
+    )
+    monkeypatch.setattr(orchestrator_module, "derive_fault_class", lambda *args: None)
+    monkeypatch.setattr(orchestrator_module, "stamp_confidence", lambda candidates: None)
+
+    result = RCAOrchestrator(store, reader_factory=lambda: reader).process(state.incident_id)
+
+    assert {candidate.node_id for candidate in result.candidates if candidate.role is Role.ORIGIN} == {
+        "service-a",
+        "service-b",
+    }
+    assert store.saved[0][3] is result
 
 
 def test_orchestrator_empty_baselines_loud_abstain():

@@ -13,10 +13,7 @@ from graphs import build_incident_subgraph, build_influence_graph
 from ingest.reader import TelemetryReader
 from isolation import isolate
 from scoring.fault_class import derive_fault_class
-from scoring.output import (
-    resolve_origins,
-    stamp_confidence,
-)
+from scoring.output import stamp_confidence
 
 from .adapter import adapt_incident
 from .store import IncidentState, RCAStore
@@ -192,7 +189,6 @@ class RCAOrchestrator:
                     for candidate in ranked.candidates
                 ]
                 candidates.sort(key=lambda candidate: (-candidate.score, candidate.node_id))
-                resolve_origins(candidates)
                 stamp_confidence(candidates)
                 fault_class = None
                 if candidates:
