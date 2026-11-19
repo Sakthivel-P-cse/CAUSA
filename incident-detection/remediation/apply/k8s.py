@@ -305,12 +305,8 @@ def apply_dependency_rollback(plan_row: dict[str, Any]) -> dict[str, Any]:
             code, out, err = _kubectl(
                 ["arollouts", "undo", node, "-n", ns, "--to-revision", str(target_revision)],
             )
-            if code != 0:
-                code, out, err = _kubectl(["rollout", "undo", f"rollout/{node}", "-n", ns])
         else:
             code, out, err = _kubectl(["arollouts", "abort", node, "-n", ns])
-            if code != 0:
-                code, out, err = _kubectl(["rollout", "undo", f"rollout/{node}", "-n", ns])
         return {
             "attempted": True,
             "mode": "argo_rollout_undo",

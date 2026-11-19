@@ -125,6 +125,27 @@ def test_rollback_context_mismatch_cannot_fall_back_to_row(monkeypatch):
     assert not out['attempted'];call.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    'revision, command',
+    [
+        ('7', ['arollouts', 'undo', 'payment', '-n', 'otel-demo', '--to-revision', '7']),
+        (None, ['arollouts', 'abort', 'payment', '-n', 'otel-demo']),
+    ],
+)
+def test_argo_rollback_failure_does_not_run_a_different_action(monkeypatch, revision, command):
+    s = spec('rollback_to_last_good')
+    s.target = ExactTarget('test-cluster', 'otel-demo', 'Rollout', 'payment', revision=revision)
+    s.change = PlanChange('test', {'revision': revision}, {'revision': 'current'})
+    call = Mock(return_value=(1, '', 'argo command failed'))
+    monkeypatch.setattr(k8s, '_kubectl', call)
+
+    out = k8s.apply_dependency_rollback({'plan_spec': s.to_dict()})
+
+    assert out['status'] == 'failed'
+    assert out['revision'] == revision
+    call.assert_called_once_with(command)
+
+
 def test_unknown_preflight_stops_fresh_required_plan(monkeypatch):
     monkeypatch.setattr('remediation.policy.check_plan_executable',lambda s: SimpleNamespace(allowed=True,to_dict=lambda:{}))
     monkeypatch.setattr('remediation.slo.snapshot_service',lambda *a,**kw:SLOSnapshot('payment',float('nan'),20,1,True,'now'))
