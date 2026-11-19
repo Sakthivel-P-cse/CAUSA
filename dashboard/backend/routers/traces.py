@@ -27,7 +27,7 @@ def search_traces(
         if start is not None and end is not None:
             if error_only:
                 ids = tempo.search_error_traces(
-                    service=service, lookback_minutes=minutes, limit=limit
+                    service=service, lookback_minutes=minutes, limit=limit, start=start, end=end
                 )
             else:
                 ids = tempo.search_traces_in_window(
