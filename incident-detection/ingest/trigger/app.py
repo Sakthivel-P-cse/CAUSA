@@ -1,11 +1,8 @@
 """
 app.py — the RCA-trigger HTTP service (/trigger + /health).
 
-Request path (fast): parse + scope-filter the Alertmanager webhook, then ACK
-immediately (202). The heavy work — window snapshot, incident persistence, and
-the Stage-2 forward — runs on a background worker so the HTTP response never
-blocks on a slow backend. Alertmanager's webhook has a short timeout; a slow
-synchronous handler would time out and re-deliver, double-scoring the incident.
+Request path: parse and scope-filter the webhook, persist it in Postgres, then
+acknowledge it (202). Background workers snapshot and forward accepted work.
 
 Worker path (durable): per firing alert, snapshot the C1 window + persist the
 open incident; on a resolved alert, mark it resolved. Then forward the original
@@ -34,7 +31,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import queue
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -42,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..reader import TelemetryReader
 from .state import IncidentStore
-from .webhook import Alert, monitored_alerts, scoped_forward_payload
+from .webhook import Alert, monitored_alerts, parse_alerts, scoped_forward_payload
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +71,8 @@ def _default_reader_factory() -> TelemetryReader:
 
 class Dispatcher:
     """
-    Background processing for accepted webhooks. The request thread only enqueues
-    (alerts, payload); worker threads do the slow snapshot/persist/forward, and a
-    drain thread retries the durable Stage-2 outbox.
+    Background processing for accepted webhooks. Workers claim persisted payloads
+    and a drain thread retries the durable Stage-2 outbox.
     """
 
     def __init__(
@@ -92,7 +87,7 @@ class Dispatcher:
         self.store = store
         self.reader_factory = reader_factory
         self.forward_url = forward_url
-        self._q: queue.Queue = queue.Queue(maxsize=1000)
+        self._wake = threading.Event()
         for i in range(max(1, workers)):
             threading.Thread(
                 target=self._run, name=f"trigger-worker-{i}", daemon=True
@@ -103,27 +98,26 @@ class Dispatcher:
             ).start()
 
     def submit(self, alerts: list[Alert], payload: dict) -> bool:
-        global ingest_queue_full_total
         try:
-            self._q.put_nowait((alerts, payload))
+            self.store.enqueue_webhook(payload)
+            if hasattr(self, "_wake"):
+                self._wake.set()
             return True
-        except queue.Full:
-            ingest_queue_full_total += 1
-            logger.warning(
-                "Trigger queue saturated (maxsize=%d) — 503 for Alertmanager retry.",
-                self._q.maxsize,
-            )
+        except Exception:
+            logger.exception("Failed to persist webhook — 503 for Alertmanager retry")
             return False
 
     def _run(self) -> None:
         while True:
-            alerts, payload = self._q.get()
             try:
-                self._process(alerts, payload)
+                with self.store.claim_webhook() as payload:
+                    if payload is not None:
+                        self._process(monitored_alerts(payload), payload)
+                        continue
             except Exception:
                 logger.exception("Worker failed processing webhook")
-            finally:
-                self._q.task_done()
+            self._wake.wait(1)
+            self._wake.clear()
 
     def _process(self, alerts: list[Alert], payload: dict) -> None:
         if not alerts:
@@ -132,17 +126,23 @@ class Dispatcher:
 
         opened_ids: set[str] = set()
         firing = 0
+        failed = False
         for alert in alerts:
             try:
                 if alert.is_resolved:
                     self.store.resolve_incident(
-                        alert.incident_id, alert.ends_at or datetime.now(timezone.utc)
+                        alert.incident_id, alert.ends_at or datetime.now(timezone.utc),
+                        legacy_id=f"inc-{alert.fingerprint}" if alert.fingerprint and alert.starts_at else None,
+                        starts_at=alert.starts_at,
                     )
                 else:
                     firing += 1
                     if self._open(alert):
                         opened_ids.add(alert.incident_id)
+                    else:
+                        failed = True
             except Exception:
+                failed = True
                 logger.exception("Failed handling alert %s", alert.alert_name)
 
         if not opened_ids:
@@ -151,6 +151,8 @@ class Dispatcher:
                     "Skipping Stage-2 forward — %d firing alert(s) failed to open",
                     firing,
                 )
+            if failed:
+                raise RuntimeError("one or more alerts failed to process")
             return
 
         scoped = dict(payload)
@@ -159,9 +161,11 @@ class Dispatcher:
             a
             for a in raw_alerts
             if isinstance(a, dict)
-            and f"inc-{a.get('fingerprint') or ''}" in opened_ids
+            and any(alert.incident_id in opened_ids for alert in parse_alerts({**payload, "alerts": [a]}))
         ]
         self._forward_with_retry(scoped)
+        if failed:
+            raise RuntimeError("one or more alerts failed to process")
 
     def _open(self, alert: Alert) -> bool:
         global ingest_snapshot_failed_total
@@ -261,7 +265,8 @@ class Dispatcher:
             ingest_outbox_enqueued_total += 1
         except Exception:
             ingest_outbox_lost_total += 1
-            logger.exception("Failed to buffer Stage-2 forward to outbox — LOST")
+            logger.exception("Failed to buffer Stage-2 forward to outbox; webhook will retry")
+            raise
 
     def _drain_outbox_loop(self) -> None:
         global ingest_outbox_sent_total
@@ -390,10 +395,7 @@ class TriggerHandler(BaseHTTPRequestHandler):
             self._send(400, {"error": "malformed payload"})
             return
 
-        # ACK fast; the dispatcher does snapshot/persist/forward off-thread.
-        # Forward only the monitored alerts (scope-filtered) to Stage-2. On a
-        # saturated queue, answer 503 so Alertmanager re-delivers (not a 500,
-        # not a silent drop).
+        # Persist before ACK; a database failure returns 503 for redelivery.
         if self.dispatcher.submit(alerts, scoped_forward_payload(payload)):
             self._send(202, {"accepted": [a.incident_id for a in alerts]})
         else:

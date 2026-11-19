@@ -9,6 +9,7 @@ because the first path it happened to try failed the time check.
 from __future__ import annotations
 
 import threading
+import time
 
 from contracts import CallType, NodeKind
 from graphs.influence_graph import InfluenceGraph
@@ -23,10 +24,44 @@ THETA_LOW = 0.25
 # ── dispatcher dedup ──────────────────────────────────────────────────
 
 
+class _QueueStore:
+    def __init__(self):
+        self.pending = set()
+        self.running = set()
+        self.lock = threading.Lock()
+
+    def enqueue_trigger(self, ids):
+        with self.lock:
+            self.pending.update(set(ids) - self.running)
+
+    def process_trigger(self, process):
+        with self.lock:
+            if not self.pending:
+                return False
+            item = self.pending.pop()
+            self.running.add(item)
+        try:
+            process(item)
+        finally:
+            with self.lock:
+                self.running.remove(item)
+        return True
+
+    def wait(self):
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with self.lock:
+                if not self.pending and not self.running:
+                    return
+            time.sleep(.01)
+        raise AssertionError("queue did not drain")
+
+
 class _BlockingOrchestrator:
     """Holds each incident inside process() until released."""
 
     def __init__(self):
+        self.store = _QueueStore()
         self.processed: list[str] = []
         self.entered = threading.Event()
         self.release = threading.Event()
@@ -47,7 +82,7 @@ def test_resent_alert_is_not_processed_twice():
     # Resend while the first run is still in flight.
     assert dispatcher.submit(["inc-1"]) is True, "a resend must still be accepted"
     orch.release.set()
-    dispatcher._q.join()
+    orch.store.wait()
 
     assert orch.processed == ["inc-1"], f"processed twice: {orch.processed}"
 
@@ -59,9 +94,9 @@ def test_incident_can_be_reprocessed_after_completion():
     dispatcher = Dispatcher(orch, workers=1)
 
     dispatcher.submit(["inc-2"])
-    dispatcher._q.join()
+    orch.store.wait()
     dispatcher.submit(["inc-2"])
-    dispatcher._q.join()
+    orch.store.wait()
 
     assert orch.processed == ["inc-2", "inc-2"]
 
@@ -72,7 +107,7 @@ def test_distinct_incidents_are_not_deduped_against_each_other():
     dispatcher = Dispatcher(orch, workers=1)
 
     dispatcher.submit(["inc-a", "inc-b", "inc-a"])
-    dispatcher._q.join()
+    orch.store.wait()
 
     assert sorted(orch.processed) == ["inc-a", "inc-b"]
 

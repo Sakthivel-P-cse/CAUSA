@@ -170,6 +170,19 @@ spec:
               CREATE INDEX IF NOT EXISTS idx_stage2_outbox_pending
                   ON stage2_outbox (id) WHERE sent_at IS NULL;
 
+              CREATE TABLE IF NOT EXISTS trigger_webhooks (
+                  id BIGSERIAL PRIMARY KEY,
+                  payload JSONB NOT NULL,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE TABLE IF NOT EXISTS rca_trigger_queue (
+                  incident_id TEXT PRIMARY KEY,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  lease_token TEXT,
+                  lease_until TIMESTAMPTZ
+              );
+
               CREATE TABLE IF NOT EXISTS remediation_plans (
                   id              TEXT PRIMARY KEY,
                   incident_id     TEXT NOT NULL,
@@ -245,4 +258,5 @@ spec:
                   END IF;
               END
               $$$$;
+              GRANT SELECT, INSERT, UPDATE, DELETE ON rca_trigger_queue TO rca_engine;
               SQL

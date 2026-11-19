@@ -205,6 +205,19 @@ data:
     CREATE INDEX IF NOT EXISTS idx_stage2_outbox_pending
         ON stage2_outbox (id) WHERE sent_at IS NULL;
 
+    CREATE TABLE IF NOT EXISTS trigger_webhooks (
+        id BIGSERIAL PRIMARY KEY,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS rca_trigger_queue (
+        incident_id TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        lease_token TEXT,
+        lease_until TIMESTAMPTZ
+    );
+
     -- Role isolation for the ground-truth invariant. Created if absent; the
     -- engine/dashboard deployments must connect as `rca_engine` (NOT the owner
     -- `causa`, a superuser that bypasses every grant) so they physically cannot
@@ -236,6 +249,7 @@ data:
 
     -- The engine only ever touches the read-side tables it legitimately uses.
     GRANT SELECT, INSERT, UPDATE ON rca_reports, dashboard_incident_state TO rca_engine;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON rca_trigger_queue TO rca_engine;
     GRANT SELECT ON incidents, anomaly_baseline TO rca_engine;
 
     -- The eval role: read-only across reports/incidents/baselines AND ground

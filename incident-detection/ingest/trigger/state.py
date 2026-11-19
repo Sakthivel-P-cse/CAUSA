@@ -14,7 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Any
 
 from contracts import Baseline, Incident
@@ -63,6 +64,34 @@ class IncidentStore:
         with self._connect() as conn:
             conn.execute("SELECT 1")
 
+    def enqueue_webhook(self, payload: dict[str, Any]) -> None:
+        with self._connect() as conn:
+            conn.execute("INSERT INTO trigger_webhooks (payload) VALUES (%s::jsonb)", (json.dumps(payload),))
+
+    @contextmanager
+    def claim_webhook(self):
+        # Keep the row lock until processing finishes; a crashed worker releases it.
+        with self._connect() as conn:
+            with conn.transaction():
+                # Preserve firing/resolved order across concurrent worker processes.
+                if not conn.execute(
+                    "SELECT pg_try_advisory_xact_lock(hashtext('causa.trigger_webhooks'))"
+                ).fetchone()[0]:
+                    yield None
+                    return
+                row = conn.execute(
+                    "SELECT id, payload FROM trigger_webhooks ORDER BY id "
+                    "FOR UPDATE SKIP LOCKED LIMIT 1"
+                ).fetchone()
+                if not row:
+                    yield None
+                    return
+                payload = row[1]
+                if isinstance(payload, (str, bytes, bytearray)):
+                    payload = json.loads(payload)
+                yield payload
+                conn.execute("DELETE FROM trigger_webhooks WHERE id=%s", (row[0],))
+
     # ── incidents (window state) ──────────────────────────────────────
 
     def open_incident(
@@ -100,7 +129,10 @@ class IncidentStore:
             )
         logger.info("Opened incident %s (%s / %s)", incident_id, alert_name, alerted_service)
 
-    def resolve_incident(self, incident_id: str, resolved_at: datetime) -> bool:
+    def resolve_incident(
+        self, incident_id: str, resolved_at: datetime, *,
+        legacy_id: str | None = None, starts_at: datetime | None = None,
+    ) -> bool:
         """
         Mark an incident resolved (from an Alertmanager send_resolved POST).
 
@@ -111,8 +143,10 @@ class IncidentStore:
         with self._connect() as conn:
             cur = conn.execute(
                 "UPDATE incidents SET status='resolved', resolved_at=%s "
-                "WHERE incident_id=%s AND status<>'resolved'",
-                (resolved_at, incident_id),
+                "WHERE status<>'resolved' AND (incident_id=%s OR "
+                "(incident_id=%s AND window_end=%s))",
+                (resolved_at, incident_id, legacy_id,
+                 starts_at + timedelta(minutes=1) if starts_at else None),
             )
             matched = cur.rowcount
         if matched:

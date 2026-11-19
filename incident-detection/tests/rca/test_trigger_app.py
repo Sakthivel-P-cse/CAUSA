@@ -1,12 +1,37 @@
 import http.client
 import json
 import threading
+import queue
 
 from rca.trigger.app import make_server
 
 
+class _QueueStore:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def enqueue_trigger(self, ids):
+        for item in ids:
+            self.queue.put(item)
+
+    def process_trigger(self, process):
+        try:
+            item = self.queue.get_nowait()
+        except queue.Empty:
+            return False
+        try:
+            process(item)
+        finally:
+            self.queue.task_done()
+        return True
+
+    def wait(self):
+        self.queue.join()
+
+
 class _Orchestrator:
     def __init__(self):
+        self.store = _QueueStore()
         self.processed = []
 
     def process(self, incident_id):
@@ -54,7 +79,7 @@ def test_health_and_trigger_acceptance():
         status, body = _request(server, "POST", "/trigger", payload)
         assert status == 202
         assert body == {"accepted": ["inc-abc"]}
-        server.RequestHandlerClass.dispatcher._q.join()
+        orchestrator.store.wait()
         assert orchestrator.processed == ["inc-abc"]
     finally:
         server.shutdown()

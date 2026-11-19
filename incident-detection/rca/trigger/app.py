@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import queue
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ingest.trigger.webhook import monitored_alerts
@@ -21,78 +21,35 @@ rca_process_failures_total = 0
 
 
 class Dispatcher:
-    """Bounded background execution; a successful submit means accepted."""
+    """Persist accepted incidents and process them in background workers."""
 
-    def __init__(
-        self,
-        orchestrator: RCAOrchestrator,
-        *,
-        workers: int = 2,
-        queue_size: int = 1000,
-    ):
+    def __init__(self, orchestrator: RCAOrchestrator, *, workers: int = 2):
         self.orchestrator = orchestrator
-        self._q: queue.Queue[str] = queue.Queue(maxsize=queue_size)
-        self._submit_lock = threading.Lock()
-        # Incidents queued or currently being processed. Alertmanager re-sends a
-        # firing alert every repeat_interval, so without this the same incident
-        # is re-analyzed on every resend — wasted work, and duplicate reports
-        # before the DB's uq_rca_incident_id index rejects them. That index is
-        # the durable guarantee; this is the cheap in-process one.
-        self._inflight: set[str] = set()
         for index in range(max(1, workers)):
-            threading.Thread(
-                target=self._run,
-                name=f"rca-worker-{index}",
-                daemon=True,
-            ).start()
+            threading.Thread(target=self._run, name=f"rca-worker-{index}", daemon=True).start()
 
     def submit(self, incident_ids: list[str]) -> bool:
-        with self._submit_lock:
-            # Dedupe against in-flight work AND within this batch — callers are
-            # not required to pre-uniquify, and a repeated id in one payload
-            # would otherwise be enqueued twice.
-            fresh: list[str] = []
-            for incident_id in incident_ids:
-                if incident_id in self._inflight:
-                    continue
-                self._inflight.add(incident_id)
-                fresh.append(incident_id)
-            if self._q.maxsize and self._q.qsize() + len(fresh) > self._q.maxsize:
-                # Roll back the reservations; nothing was enqueued.
-                self._inflight.difference_update(fresh)
-                return False
-            for incident_id in fresh:
-                self._q.put_nowait(incident_id)
-        if len(fresh) != len(incident_ids):
-            logger.info(
-                "Skipped %d already-inflight incident(s)",
-                len(incident_ids) - len(fresh),
-            )
-        # Accepted either way: an already-inflight incident IS being handled, so
-        # reporting failure would make Alertmanager retry something in progress.
-        return True
+        try:
+            self.orchestrator.store.enqueue_trigger(list(dict.fromkeys(incident_ids)))
+            return True
+        except Exception:
+            logger.exception("Failed to persist RCA trigger")
+            return False
 
     def _run(self) -> None:
         global incident_not_opened_via_ingest_total, rca_process_failures_total
         while True:
-            incident_id = self._q.get()
             try:
-                self.orchestrator.process(incident_id)
+                if not self.orchestrator.store.process_trigger(self.orchestrator.process):
+                    time.sleep(1)
             except LookupError:
                 incident_not_opened_via_ingest_total += 1
-                logger.error(
-                    "incident_not_opened_via_ingest incident_id=%s "
-                    "(count=%d) — Alertmanager must POST causa-ingest, not stage2",
-                    incident_id,
-                    incident_not_opened_via_ingest_total,
-                )
+                logger.exception("RCA incident not opened via ingest; retrying")
+                time.sleep(5)
             except Exception:
                 rca_process_failures_total += 1
-                logger.exception("RCA failed for incident %s", incident_id)
-            finally:
-                with self._submit_lock:
-                    self._inflight.discard(incident_id)
-                self._q.task_done()
+                logger.exception("RCA trigger processing failed; retrying")
+                time.sleep(5)
 
 
 class TriggerHandler(BaseHTTPRequestHandler):

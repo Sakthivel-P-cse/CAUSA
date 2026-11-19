@@ -63,11 +63,13 @@ class Alert:
     @property
     def incident_id(self) -> str:
         """
-        Stable id for the incident this alert opened. Prefer Alertmanager's
-        fingerprint (identical across the firing→resolved pair); fall back to a
-        composite so resolve can find the row it opened.
+        Stable across notifications of one firing episode, including resolve.
         """
         if self.fingerprint:
+            if self.starts_at:
+                started = self.starts_at.astimezone(timezone.utc).isoformat()
+                return f"inc-{self.fingerprint}-{started}"
+            # shortcut: alerts without startsAt cannot distinguish episodes, fix the sender to include startsAt
             return f"inc-{self.fingerprint}"
         svc = self.service or "unknown"
         ts = self.starts_at.isoformat() if self.starts_at else "?"

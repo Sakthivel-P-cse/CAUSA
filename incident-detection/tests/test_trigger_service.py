@@ -6,6 +6,7 @@ retry→outbox forward path.
 from __future__ import annotations
 
 import httpx
+import pytest
 import respx
 
 from ingest.trigger import app as app_mod
@@ -101,7 +102,7 @@ class _OpenStore(_FakeStore):
     def open_incident(self, **kwargs):
         self.opened.append(kwargs["incident_id"])
 
-    def resolve_incident(self, incident_id, resolved_at):
+    def resolve_incident(self, incident_id, resolved_at, **kwargs):
         self.resolved.append(incident_id)
         return True
 
@@ -117,7 +118,7 @@ def _alert(fp: str, service: str = "cart", resolved: bool = False):
         node=None,
         severity="critical",
         status="resolved" if resolved else "firing",
-        starts_at=datetime.now(timezone.utc),
+        starts_at=None,
         ends_at=datetime.now(timezone.utc) if resolved else None,
         fingerprint=fp,
         labels={"service": service, "alertname": "ServiceHighErrorRate"},
@@ -208,8 +209,22 @@ def test_process_mixed_batch_forwards_only_opened(monkeypatch):
             {"fingerprint": "bad", "labels": {"service": "payment"}},
         ]
     }
-    disp._process([_alert("good"), _alert("bad", service="payment")], payload)
+    with pytest.raises(RuntimeError, match="alerts failed"):
+        disp._process(parse_alerts(payload), payload)
     assert route.called
     forwarded = route.calls.last.request.content.decode()
     assert "good" in forwarded
     assert "bad" not in forwarded
+
+
+@respx.mock
+def test_process_forwards_fingerprintless_opened_alert(monkeypatch):
+    route = respx.post("http://s2.local/trigger").mock(return_value=httpx.Response(200))
+    disp = Dispatcher(_OpenStore(), reader_factory=lambda: None,
+                      forward_url="http://s2.local/trigger", workers=1, run_outbox=False)
+    monkeypatch.setattr(disp, "_open", lambda alert: True)
+    payload = {"alerts": [{"labels": {"service": "cart", "alertname": "AppDown"},
+                           "startsAt": "2026-07-16T12:04:00Z"}]}
+    disp._process(parse_alerts(payload), payload)
+    assert route.calls.last.request.read()
+    assert b'"AppDown"' in route.calls.last.request.content

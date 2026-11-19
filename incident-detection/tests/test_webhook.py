@@ -48,7 +48,12 @@ def test_parse_extracts_fields():
 
 def test_incident_id_stable_from_fingerprint():
     alerts = parse_alerts(_payload())
-    assert alerts[0].incident_id == "inc-abc123"
+    assert alerts[0].incident_id == "inc-abc123-2026-07-16T12:04:00+00:00"
+    payload = _payload()
+    payload["alerts"][0]["status"] = "resolved"
+    assert parse_alerts(payload)[0].incident_id == alerts[0].incident_id
+    payload["alerts"][0]["startsAt"] = "2026-07-16T12:14:00Z"
+    assert parse_alerts(payload)[0].incident_id != alerts[0].incident_id
 
 
 def test_monitored_filters_internal_namespace():

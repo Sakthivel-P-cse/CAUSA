@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
@@ -104,6 +106,56 @@ class RCAStore:
     def check_available(self) -> None:
         with self._connect() as conn:
             conn.execute("SELECT 1")
+
+    def enqueue_trigger(self, incident_ids: list[str]) -> None:
+        with self._connect() as conn, conn.transaction():
+            for incident_id in incident_ids:
+                conn.execute(
+                    "INSERT INTO rca_trigger_queue (incident_id) VALUES (%s) ON CONFLICT DO NOTHING",
+                    (incident_id,),
+                )
+
+    def process_trigger(self, process: Callable[[str], Any]) -> bool:
+        token = str(uuid.uuid4())
+        with self._connect() as conn:
+            row = conn.execute(
+                "UPDATE rca_trigger_queue SET lease_token=%s, lease_until=NOW() + interval '15 minutes' "
+                "WHERE incident_id=(SELECT incident_id FROM rca_trigger_queue "
+                "WHERE lease_until IS NULL OR lease_until < NOW() ORDER BY created_at "
+                "FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING incident_id",
+                (token,),
+            ).fetchone()
+        if row is None:
+            return False
+        stop = threading.Event()
+
+        def renew() -> None:
+            while not stop.wait(60):
+                try:
+                    with self._connect() as conn:
+                        conn.execute(
+                            "UPDATE rca_trigger_queue SET lease_until=NOW() + interval '15 minutes' "
+                            "WHERE incident_id=%s AND lease_token=%s", (row[0], token),
+                        )
+                except Exception:
+                    logger.exception("Failed to renew RCA trigger lease")
+
+        heartbeat = threading.Thread(target=renew, daemon=True)
+        heartbeat.start()
+        try:
+            process(row[0])
+        except Exception:
+            with self._connect() as conn:
+                conn.execute("UPDATE rca_trigger_queue SET lease_until=NULL, lease_token=NULL "
+                             "WHERE incident_id=%s AND lease_token=%s", (row[0], token))
+            raise
+        finally:
+            stop.set()
+            heartbeat.join()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM rca_trigger_queue WHERE incident_id=%s AND lease_token=%s",
+                         (row[0], token))
+        return True
 
     def load_incident(self, incident_id: str) -> IncidentState:
         with self._connect() as conn:
