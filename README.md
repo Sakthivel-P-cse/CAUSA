@@ -121,7 +121,7 @@ From the repository root:
 cp .env.example .env
 ```
 
-**TODO:** Remove the stray `>>>>>>> 98bf5d4 ...` merge marker from your local `.env` before starting. The checked-in example currently has invalid shell syntax, and `causa-startup.sh` sources the file. Replace example tokens and never commit real credentials. The complete reference is [.env.example](.env.example).
+Replace example tokens before starting, and never commit real credentials. The complete reference is [.env.example](.env.example).
 
 | Variables | Purpose |
 | --- | --- |
